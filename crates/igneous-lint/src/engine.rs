@@ -64,38 +64,47 @@ impl LintResult {
 
 /// The configured rules, ready to run.
 pub struct Linter {
+    settings: LintSettings,
     plan: Vec<(&'static dyn Rule, Options)>,
     ignore_folders: Vec<String>,
-    ignore_files: Vec<String>,
 }
 
 impl Linter {
     pub fn new(settings: &LintSettings) -> Self {
-        let shared = settings
-            .extra
-            .get("commonStyles")
-            .and_then(|v| v.as_object());
-        let mut plan: Vec<(&'static dyn Rule, Options)> = rules::all()
-            .iter()
-            .filter_map(|rule| {
-                let config = settings.rules.get(rule.id())?;
-                config.enabled.then(|| {
-                    let options = Options::resolve(rule.options(), shared, &config.options);
-                    (*rule, options)
-                })
-            })
-            .collect();
-        plan.sort_by_key(|(rule, _)| run_order(*rule));
-        Self {
-            plan,
+        let mut linter = Self {
+            settings: settings.clone(),
+            plan: Vec::new(),
             ignore_folders: settings
                 .ignore_folders
                 .iter()
                 .map(|f| f.trim_matches('/').to_owned())
                 .filter(|f| !f.is_empty())
                 .collect(),
-            ignore_files: settings.ignore_files.clone(),
-        }
+        };
+        linter.plan = rules::all()
+            .iter()
+            .filter(|rule| settings.rules.get(rule.id()).is_some_and(|c| c.enabled))
+            .map(|rule| (*rule, linter.options_for(*rule)))
+            .collect();
+        linter.plan.sort_by_key(|(rule, _)| run_order(*rule));
+        linter
+    }
+
+    /// A rule's options: its defaults, the shared styles, then its own
+    /// configuration.
+    pub fn options_for(&self, rule: &dyn Rule) -> Options {
+        let shared = self
+            .settings
+            .extra
+            .get("commonStyles")
+            .and_then(|v| v.as_object());
+        let configured = self
+            .settings
+            .rules
+            .get(rule.id())
+            .map(|c| c.options.clone())
+            .unwrap_or_default();
+        Options::resolve(rule.options(), shared, &configured)
     }
 
     /// The enabled rules, in the order they run.
@@ -106,7 +115,7 @@ impl Linter {
     /// Whether `path` is in an ignored folder or is an ignored file.
     pub fn is_ignored(&self, path: &VaultPath) -> bool {
         let path = path.as_str();
-        self.ignore_files.iter().any(|f| f == path)
+        self.settings.ignore_files.iter().any(|f| f == path)
             || self.ignore_folders.iter().any(|folder| {
                 path.strip_prefix(folder.as_str())
                     .is_some_and(|rest| rest.starts_with('/'))
@@ -181,26 +190,11 @@ impl Linter {
     /// The changes one rule alone would make, for a diagnostic's Fix action.
     /// The rule needn't be enabled; it runs with its configured options, or
     /// its defaults.
-    pub fn fix_rule(
-        &self,
-        settings: &LintSettings,
-        rule_id: &str,
-        text: &str,
-        path: &VaultPath,
-    ) -> Vec<TextEdit> {
+    pub fn fix_rule(&self, rule_id: &str, text: &str, path: &VaultPath) -> Vec<TextEdit> {
         let Some(rule) = rules::get(rule_id) else {
             return Vec::new();
         };
-        let shared = settings
-            .extra
-            .get("commonStyles")
-            .and_then(|v| v.as_object());
-        let configured = settings
-            .rules
-            .get(rule_id)
-            .map(|c| c.options.clone())
-            .unwrap_or_default();
-        let options = Options::resolve(rule.options(), shared, &configured);
+        let options = self.options_for(rule);
         let now = Zoned::now();
         let file = FileInfo {
             created: None,

@@ -262,6 +262,18 @@ fn diagnostics_point_at_the_original_text() {
 }
 
 #[test]
+fn fix_runs_one_rule() {
+    let linter = Linter::new(&igneous_lint::recommended());
+    let text = "a  \n\n\n\nb";
+    let edits = linter.fix_rule("trailing-spaces", text, &path());
+    assert_eq!(apply(text, &edits), "a\n\n\n\nb");
+    // A rule that isn't enabled still fixes, with its defaults.
+    let edits = linter.fix_rule("heading-blank-lines", "# A\ntext", &path());
+    assert_eq!(apply("# A\ntext", &edits), "# A\n\ntext");
+    assert!(linter.fix_rule("no-such-rule", text, &path()).is_empty());
+}
+
+#[test]
 fn invalid_yaml_is_reported_with_every_rule_off() {
     let mut settings = LintSettings::default();
     settings.rules.clear();

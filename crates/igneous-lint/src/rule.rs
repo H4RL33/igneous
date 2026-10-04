@@ -88,8 +88,6 @@ pub enum OptionKind {
     },
     /// A list of strings, empty by default.
     List,
-    /// A text option with no value by default.
-    OptionalText,
 }
 
 impl OptionSpec {
@@ -122,7 +120,6 @@ impl OptionSpec {
             }
             OptionKind::Choice { default, .. } => Value::String((*default).to_owned()),
             OptionKind::List => Value::Array(Vec::new()),
-            OptionKind::OptionalText => Value::Null,
         }
     }
 }
