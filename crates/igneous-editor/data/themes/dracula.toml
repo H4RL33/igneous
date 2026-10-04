@@ -1,0 +1,26 @@
+# Dracula. https://draculatheme.com/contribute
+name = "Dracula"
+url = "https://draculatheme.com"
+
+[dark]
+background = "#282a36"
+foreground = "#f8f8f2"
+surface = "#44475a"
+muted = "#6272a4"
+cursor = "#f8f8f2"
+selection = "#44475a"
+red = "#ff5555"
+orange = "#ffb86c"
+yellow = "#f1fa8c"
+green = "#50fa7b"
+cyan = "#8be9fd"
+blue = "#bd93f9"
+purple = "#bd93f9"
+pink = "#ff79c6"
+
+[dark.roles]
+heading = "purple"
+link = "cyan"
+list-marker = "cyan"
+quote = "yellow"
+tag = "pink"

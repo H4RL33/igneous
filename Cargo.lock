@@ -738,6 +738,10 @@ dependencies = [
  "gtk4",
  "libadwaita",
  "sourceview5",
+ "tempfile",
+ "thiserror",
+ "toml",
+ "tracing",
 ]
 
 [[package]]

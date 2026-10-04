@@ -1,0 +1,30 @@
+# Catppuccin Frappé. https://catppuccin.com/palette
+name = "Catppuccin Frappé"
+url = "https://catppuccin.com"
+
+[dark]
+background = "#303446"
+foreground = "#c6d0f5"
+surface = "#414559"
+muted = "#838ba7"
+cursor = "#f2d5cf"
+selection = "#949cbb4d"
+red = "#e78284"
+orange = "#ef9f76"
+yellow = "#e5c890"
+green = "#a6d189"
+cyan = "#81c8be"
+blue = "#8caaee"
+purple = "#ca9ee6"
+pink = "#f4b8e4"
+
+[dark.roles]
+comment = "#949cbb"
+heading = "red"
+heading-1 = "red"
+heading-2 = "orange"
+heading-3 = "yellow"
+heading-4 = "green"
+heading-5 = "#85c1dc"
+heading-6 = "#babbf1"
+url = "#f2d5cf"

@@ -5,9 +5,12 @@
 //! line length. Live Preview (see docs/decisions/0001-editor.md) is added in M4.
 
 mod buffer;
+mod scheme;
+pub mod theme;
 mod view;
 
 pub use buffer::{LANGUAGE_ID, new_buffer};
+pub use scheme::{style_scheme, system_accent};
 pub use view::NoteView;
 
 use std::sync::Once;

@@ -1,0 +1,23 @@
+# Nord. https://www.nordtheme.com/docs/colors-and-palettes
+name = "Nord"
+url = "https://www.nordtheme.com"
+
+[dark]
+background = "#2e3440"
+foreground = "#d8dee9"
+surface = "#3b4252"
+muted = "#616e88"
+cursor = "#d8dee9"
+selection = "#434c5e"
+red = "#bf616a"
+orange = "#d08770"
+yellow = "#ebcb8b"
+green = "#a3be8c"
+cyan = "#8fbcbb"
+blue = "#81a1c1"
+purple = "#b48ead"
+pink = "#b48ead"
+
+[dark.roles]
+heading = "#88c0d0"
+link = "#88c0d0"

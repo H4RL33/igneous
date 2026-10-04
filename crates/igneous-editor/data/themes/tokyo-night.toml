@@ -1,0 +1,33 @@
+# Tokyo Night Day (light) and Night (dark). https://github.com/folke/tokyonight.nvim
+name = "Tokyo Night"
+url = "https://github.com/folke/tokyonight.nvim"
+
+[light]
+name = "Day"
+background = "#e1e2e7"
+foreground = "#3760bf"
+surface = "#c4c8da"
+muted = "#848cb5"
+red = "#f52a65"
+orange = "#b15c00"
+yellow = "#8c6c3e"
+green = "#587539"
+cyan = "#007197"
+blue = "#2e7de9"
+purple = "#9854f1"
+pink = "#9854f1"
+
+[dark]
+name = "Night"
+background = "#1a1b26"
+foreground = "#c0caf5"
+surface = "#292e42"
+muted = "#565f89"
+red = "#f7768e"
+orange = "#ff9e64"
+yellow = "#e0af68"
+green = "#9ece6a"
+cyan = "#7dcfff"
+blue = "#7aa2f7"
+purple = "#bb9af7"
+pink = "#bb9af7"

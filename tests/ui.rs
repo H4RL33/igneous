@@ -8,6 +8,7 @@ use adw::prelude::*;
 use gtk::glib;
 use igneous::{NoteState, Window};
 use igneous_core::VaultPath;
+use sourceview::prelude::*;
 
 const FIXTURE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/vaults/basic");
 
@@ -28,10 +29,6 @@ fn copy_dir(from: &Path, to: &Path) {
 fn vault(autosave_ms: Option<u32>) -> tempfile::TempDir {
     if let Some(settings) = gtk::Settings::default() {
         settings.set_gtk_error_bell(false);
-        // A legacy GTK 3 setting some desktops carry; libadwaita doesn't
-        // support it and it mixes light and dark styles.
-        #[allow(deprecated)]
-        settings.set_gtk_application_prefer_dark_theme(false);
     }
     let dir = tempfile::tempdir().unwrap();
     copy_dir(Path::new(FIXTURE), dir.path());
@@ -200,6 +197,59 @@ async fn file_tree_lists_and_follows_the_disk() {
     window.close();
 }
 
+fn scheme_id(window: &Window) -> String {
+    let note = window.selected_note().unwrap();
+    note.buffer().style_scheme().unwrap().id().to_string()
+}
+
+#[gtk::test]
+async fn editor_themes_apply_and_persist() {
+    let dir = vault(None);
+    {
+        let window = open(&dir);
+        window.open_path(&p("Home.md"), false);
+        assert!(
+            scheme_id(&window).starts_with("igneous-adwaita-"),
+            "{}",
+            scheme_id(&window)
+        );
+        window.set_editor_theme("catppuccin");
+        assert!(scheme_id(&window).starts_with("igneous-catppuccin-"));
+        // Notes opened later get it too.
+        window.open_path(&p("Projects/Ideas.md"), true);
+        assert!(scheme_id(&window).starts_with("igneous-catppuccin-"));
+        window.close();
+    }
+    let appearance = std::fs::read_to_string(dir.path().join(".igneous/appearance.json")).unwrap();
+    assert!(
+        appearance.contains("\"editorTheme\": \"catppuccin\""),
+        "{appearance}"
+    );
+    let window = open(&dir);
+    assert_eq!(window.editor_theme_id(), "catppuccin");
+    window.close();
+}
+
+#[gtk::test]
+async fn vault_themes_are_found() {
+    let dir = vault(None);
+    std::fs::create_dir_all(dir.path().join(".igneous/themes")).unwrap();
+    std::fs::write(
+        dir.path().join(".igneous/themes/paper.toml"),
+        "name = \"Paper\"\n[light]\nbackground = \"#fafaf7\"\nforeground = \"#222222\"\n",
+    )
+    .unwrap();
+    std::fs::write(dir.path().join(".igneous/themes/broken.toml"), "name = ").unwrap();
+    let window = open(&dir);
+    let themes = window.themes();
+    assert_eq!(themes.get("paper").map(|t| t.name.as_str()), Some("Paper"));
+    assert_eq!(themes.errors.len(), 1);
+    window.open_path(&p("Home.md"), false);
+    window.set_editor_theme("paper");
+    assert!(scheme_id(&window).starts_with("igneous-paper-"));
+    window.close();
+}
+
 #[gtk::test]
 fn application_registers_actions() {
     let app = igneous::Application::new();
@@ -255,6 +305,9 @@ async fn screenshot() {
         ),
     )
     .unwrap();
+    if std::env::var("IGNEOUS_SCREENSHOT_DARK").is_ok() {
+        adw::StyleManager::default().set_color_scheme(adw::ColorScheme::ForceDark);
+    }
     if let Ok(theme) = std::env::var("IGNEOUS_SCREENSHOT_THEME") {
         std::fs::write(
             dir.path().join(".igneous/appearance.json"),
@@ -265,10 +318,12 @@ async fn screenshot() {
     let window = open(&dir);
     window.set_default_size(width, 720);
     wait(1500).await;
+    save_png(window.upcast_ref(), &out);
+    WidgetExt::activate_action(&window, "win.preferences", None).unwrap();
+    wait(800).await;
     save_png(
         window.upcast_ref(),
-        AdwApplicationWindowExt::content(&window).unwrap(),
-        &out,
+        &out.replace(".png", "-preferences.png"),
     );
     window.close();
 
@@ -277,16 +332,11 @@ async fn screenshot() {
     let picker = igneous::VaultPicker::new(&app);
     picker.present();
     wait(800).await;
-    let content = AdwApplicationWindowExt::content(&picker).unwrap();
-    save_png(
-        picker.upcast_ref(),
-        content,
-        &out.replace(".png", "-picker.png"),
-    );
+    save_png(picker.upcast_ref(), &out.replace(".png", "-picker.png"));
     picker.close();
 }
 
-fn save_png(window: &gtk::Window, _content: gtk::Widget, out: &str) {
+fn save_png(window: &gtk::Window, out: &str) {
     // Paint the whole window: header bars are translucent over its background.
     let paintable = gtk::WidgetPaintable::new(Some(window));
     let snapshot = gtk::Snapshot::new();

@@ -1,0 +1,37 @@
+# Solarized, light and dark. https://ethanschoonover.com/solarized/
+name = "Solarized"
+url = "https://ethanschoonover.com/solarized/"
+
+[light]
+background = "#fdf6e3"
+foreground = "#657b83"
+surface = "#eee8d5"
+muted = "#93a1a1"
+red = "#dc322f"
+orange = "#cb4b16"
+yellow = "#b58900"
+green = "#859900"
+cyan = "#2aa198"
+blue = "#268bd2"
+purple = "#6c71c4"
+pink = "#d33682"
+
+[light.roles]
+current-line = "surface"
+
+[dark]
+background = "#002b36"
+foreground = "#839496"
+surface = "#073642"
+muted = "#586e75"
+red = "#dc322f"
+orange = "#cb4b16"
+yellow = "#b58900"
+green = "#859900"
+cyan = "#2aa198"
+blue = "#268bd2"
+purple = "#6c71c4"
+pink = "#d33682"
+
+[dark.roles]
+current-line = "surface"

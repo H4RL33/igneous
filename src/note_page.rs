@@ -14,6 +14,7 @@ use gtk::glib;
 use igneous_core::fs::{self, Expect, FileStamp, ReadError, WriteError};
 use igneous_core::{TextFile, VaultPath};
 use igneous_editor::NoteView;
+use sourceview::prelude::*;
 
 use crate::vault::VaultContext;
 
@@ -434,6 +435,10 @@ impl NotePage {
             view,
             move || view.scroll_to_mark(&mark, 0.0, true, 0.0, 0.3)
         ));
+    }
+
+    pub fn set_style_scheme(&self, scheme: Option<&sourceview::StyleScheme>) {
+        self.buffer().set_style_scheme(scheme);
     }
 
     pub fn focus_editor(&self) {

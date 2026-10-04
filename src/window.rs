@@ -10,10 +10,12 @@ use adw::{prelude::*, subclass::prelude::*};
 use gtk::{gio, glib};
 use igneous_core::fs::{self as corefs, Expect};
 use igneous_core::settings::{
-    Location, SidebarPane, TabKind, TabState, TrashMode, Workspace, WorkspaceStore,
+    self as vault_settings, Appearance, Location, SidebarPane, TabKind, TabState, TrashMode,
+    Workspace, WorkspaceStore,
 };
 use igneous_core::watch::VaultEvent;
 use igneous_core::{TextFile, VaultPath};
+use igneous_editor::theme::{Catalog, Theme};
 
 use crate::application::Application;
 use crate::files::FileTree;
@@ -56,6 +58,9 @@ mod imp {
         pub menu_page: RefCell<Option<adw::TabPage>>,
         /// The workspace as loaded, so fields Igneous doesn't manage survive.
         pub base_workspace: RefCell<Workspace>,
+        pub themes: RefCell<Catalog>,
+        pub theme_id: RefCell<String>,
+        pub style_handlers: RefCell<Vec<glib::SignalHandlerId>>,
     }
 
     #[glib::object_subclass]
@@ -94,6 +99,13 @@ mod imp {
             match pspec.name() {
                 "menu-page-pinned" => self.obj().menu_page_pinned().to_value(),
                 _ => unimplemented!(),
+            }
+        }
+
+        fn dispose(&self) {
+            let style = adw::StyleManager::default();
+            for handler in self.style_handlers.take() {
+                style.disconnect(handler);
             }
         }
 
@@ -146,6 +158,9 @@ fn install_actions(klass: &mut <imp::Window as ObjectSubclass>::Class) {
     klass.install_action("win.new-folder", None, |w, _, _| w.new_folder_dialog(None));
     klass.install_action("win.quick-switcher", None, |w, _, _| {
         w.show_quick_switcher()
+    });
+    klass.install_action("win.preferences", None, |w, _, _| {
+        crate::preferences::Preferences::new(w).present(Some(w));
     });
     klass.install_action("win.close-tab", None, |w, _, _| {
         let view = w.imp().tab_view.get();
@@ -359,6 +374,23 @@ impl Window {
             }
         });
 
+        // Editor theme: follow the desktop's light/dark style and accent colour.
+        self.load_themes();
+        let style = adw::StyleManager::default();
+        let weak = self.downgrade();
+        let on_dark = style.connect_dark_notify(move |_| {
+            if let Some(window) = weak.upgrade() {
+                window.apply_editor_theme();
+            }
+        });
+        let weak = self.downgrade();
+        let on_accent = style.connect_accent_color_notify(move |_| {
+            if let Some(window) = weak.upgrade() {
+                window.apply_editor_theme();
+            }
+        });
+        self.imp().style_handlers.replace(vec![on_dark, on_accent]);
+
         self.restore_workspace();
     }
 
@@ -456,6 +488,7 @@ impl Window {
         }
         let child: gtk::Widget = if is_note {
             let note = NotePage::new(&ctx);
+            note.set_style_scheme(self.editor_scheme().as_ref());
             if let Err(e) = note.load(path) {
                 self.toast(&format!("Couldn't open “{path}”: {e}"));
                 return;
@@ -928,6 +961,85 @@ impl Window {
             self.on_vault_events(vec![VaultEvent::Created(path.clone())]);
         }
         self.open_path(&path, false);
+    }
+
+    // --- editor theme ----------------------------------------------------------
+
+    /// Where the user's own themes go.
+    pub fn user_themes_dir() -> PathBuf {
+        glib::user_data_dir().join("igneous").join("themes")
+    }
+
+    /// Loads every theme and the vault's choice (or the app-wide default).
+    fn load_themes(&self) {
+        let ctx = self.ctx();
+        let catalog = Catalog::load(
+            Some(&Self::user_themes_dir()),
+            Some(&ctx.vault.igneous_dir().join("themes")),
+        );
+        for (path, error) in &catalog.errors {
+            tracing::warn!(path = %path.display(), %error, "skipping a theme");
+        }
+        let id = vault_settings::load::<Appearance>(&ctx.vault.igneous_dir())
+            .ok()
+            .and_then(|a| a.editor_theme)
+            .unwrap_or_else(|| gsettings::settings().string("editor-theme").to_string());
+        let imp = self.imp();
+        imp.themes.replace(catalog);
+        imp.theme_id.replace(id);
+    }
+
+    /// Re-reads theme files, e.g. after the user added one.
+    pub fn reload_themes(&self) {
+        self.load_themes();
+        self.apply_editor_theme();
+    }
+
+    pub fn themes(&self) -> Catalog {
+        self.imp().themes.borrow().clone()
+    }
+
+    pub fn editor_theme_id(&self) -> String {
+        self.editor_theme().id
+    }
+
+    fn editor_theme(&self) -> Theme {
+        let imp = self.imp();
+        imp.themes
+            .borrow()
+            .get_or_default(&imp.theme_id.borrow())
+            .clone()
+    }
+
+    fn editor_scheme(&self) -> Option<sourceview::StyleScheme> {
+        igneous_editor::style_scheme(&self.editor_theme(), adw::StyleManager::default().is_dark())
+    }
+
+    fn apply_editor_theme(&self) {
+        let scheme = self.editor_scheme();
+        for note in self.notes() {
+            note.set_style_scheme(scheme.as_ref());
+        }
+    }
+
+    /// Uses `id` in this vault, and makes it the default for vaults that
+    /// haven't chosen a theme.
+    pub fn set_editor_theme(&self, id: &str) {
+        self.imp().theme_id.replace(id.to_owned());
+        let dir = self.ctx().vault.igneous_dir();
+        match vault_settings::load::<Appearance>(&dir) {
+            Ok(mut appearance) => {
+                appearance.editor_theme = Some(id.to_owned());
+                if let Err(e) = vault_settings::save(&dir, &appearance) {
+                    self.toast(&format!("Couldn't save the theme for this vault: {e}"));
+                }
+            }
+            Err(e) => self.toast(&format!(
+                "Couldn't save the theme for this vault, because appearance.json can't be read: {e}"
+            )),
+        }
+        let _ = gsettings::settings().set_string("editor-theme", id);
+        self.apply_editor_theme();
     }
 
     // --- workspace -------------------------------------------------------------

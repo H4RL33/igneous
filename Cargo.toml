@@ -58,6 +58,7 @@ serde_json = "1"
 smallvec = { version = "1", features = ["union", "const_generics"] }
 tempfile = "3"
 thiserror = "2"
+toml = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 unicode-normalization = "0.1"

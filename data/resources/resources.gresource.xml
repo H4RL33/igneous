@@ -5,6 +5,7 @@
     <file preprocess="xml-stripblanks">note-page.ui</file>
     <file preprocess="xml-stripblanks">vault-picker.ui</file>
     <file preprocess="xml-stripblanks">quick-switcher.ui</file>
+    <file preprocess="xml-stripblanks">preferences.ui</file>
     <file preprocess="xml-stripblanks">shortcuts-dialog.ui</file>
     <file>igneous.css</file>
     <file alias="icons/scalable/apps/dev.h4rl3y.igneous.svg">icons/hicolor/scalable/apps/dev.h4rl3y.igneous.svg</file>

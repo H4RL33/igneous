@@ -1,0 +1,52 @@
+# GNOME's own colours, matching GtkSourceView's Adwaita schemes. Links use
+# the desktop's accent colour.
+name = "Adwaita"
+url = "https://gnome.pages.gitlab.gnome.org/libadwaita/"
+
+[light]
+background = "#ffffff"
+foreground = "#504e55"
+surface = "#f6f5f4"
+muted = "#77767b"
+cursor = "#77767b"
+red = "#e01b24"
+orange = "#c64600"
+yellow = "#e5a50a"
+green = "#26a269"
+cyan = "#218787"
+blue = "#1c71d8"
+purple = "#4e57ba"
+pink = "#c061cb"
+
+[light.roles]
+current-line = "surface"
+heading = "cyan"
+link = "accent"
+code = "purple"
+code-background = "surface"
+highlight = "#fcf7b5"
+frontmatter = "orange"
+
+[dark]
+background = "#1d1d20"
+foreground = "#c0bfbc"
+surface = "#242428"
+muted = "#777777"
+cursor = "#c0bfbc"
+red = "#ed333b"
+orange = "#e66100"
+yellow = "#f5c211"
+green = "#57e389"
+cyan = "#33b2a4"
+blue = "#62a0ea"
+purple = "#7d8ac7"
+pink = "#dc8add"
+
+[dark.roles]
+current-line = "surface"
+heading = "cyan"
+link = "accent"
+code = "purple"
+code-background = "surface"
+highlight = "#f6d32d66"
+frontmatter = "orange"

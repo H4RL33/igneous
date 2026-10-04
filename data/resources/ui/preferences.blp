@@ -1,0 +1,48 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $IgneousPreferences: Adw.PreferencesDialog {
+  Adw.PreferencesPage {
+    title: _("Appearance");
+    icon-name: "preferences-desktop-appearance-symbolic";
+
+    Adw.PreferencesGroup {
+      title: _("Editor Theme");
+      description: _("Saved with this vault. Vaults that haven't chosen a theme use the one picked most recently.");
+
+      [header-suffix]
+      Button {
+        icon-name: "folder-open-symbolic";
+        tooltip-text: _("Open Themes Folder");
+        valign: center;
+        action-name: "prefs.open-themes-folder";
+
+        styles [
+          "flat",
+        ]
+      }
+
+      FlowBox themes_box {
+        selection-mode: none;
+        homogeneous: true;
+        min-children-per-line: 2;
+        max-children-per-line: 4;
+        row-spacing: 12;
+        column-spacing: 12;
+      }
+    }
+
+    Adw.PreferencesGroup problems_group {
+      title: _("Themes That Couldn’t Be Loaded");
+      visible: false;
+
+      ListBox problems_list {
+        selection-mode: none;
+
+        styles [
+          "boxed-list",
+        ]
+      }
+    }
+  }
+}

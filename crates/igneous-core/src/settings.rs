@@ -375,6 +375,9 @@ pub struct Appearance {
     pub monospace_font: Option<String>,
     pub font_scale: f64,
     pub readable_line_length: bool,
+    /// The editor theme's id. When unset, the app-wide default is used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub editor_theme: Option<String>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
@@ -389,6 +392,7 @@ impl Default for Appearance {
             monospace_font: None,
             font_scale: 1.0,
             readable_line_length: true,
+            editor_theme: None,
             extra: Map::new(),
         }
     }

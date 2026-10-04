@@ -106,6 +106,7 @@ impl Application {
             ("win.toggle-sidebar", &["F9"]),
             ("win.save", &["<Control>s"]),
             ("win.rename-note", &["F2"]),
+            ("win.preferences", &["<Control>comma"]),
         ] {
             self.set_accels_for_action(action, accels);
         }

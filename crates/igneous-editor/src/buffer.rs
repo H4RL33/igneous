@@ -1,12 +1,11 @@
 //! Buffers for notes.
 
-use adw::prelude::*;
 use sourceview::prelude::*;
 
 pub const LANGUAGE_ID: &str = "igneous-markdown";
 
-/// A buffer with Markdown highlighting whose colours follow the system's
-/// light or dark style.
+/// A buffer with Markdown highlighting. Its colours come from whichever
+/// editor theme its owner applies (see [`crate::style_scheme`]).
 pub fn new_buffer() -> sourceview::Buffer {
     crate::init();
     let buffer = sourceview::Buffer::new(None);
@@ -16,33 +15,7 @@ pub fn new_buffer() -> sourceview::Buffer {
             .as_ref(),
     );
     buffer.set_highlight_matching_brackets(false);
-
-    let style = adw::StyleManager::default();
-    apply_scheme(&buffer, style.is_dark());
-    let weak = buffer.downgrade();
-    let handler = style.connect_dark_notify(move |style| {
-        if let Some(buffer) = weak.upgrade() {
-            apply_scheme(&buffer, style.is_dark());
-        }
-    });
-    // Disconnect when the buffer goes away.
-    let style_weak = style.downgrade();
-    let handler = std::cell::Cell::new(Some(handler));
-    buffer.add_weak_ref_notify_local(move || {
-        if let (Some(style), Some(handler)) = (style_weak.upgrade(), handler.take()) {
-            style.disconnect(handler);
-        }
-    });
     buffer
-}
-
-fn apply_scheme(buffer: &sourceview::Buffer, dark: bool) {
-    let id = if dark { "Adwaita-dark" } else { "Adwaita" };
-    buffer.set_style_scheme(
-        sourceview::StyleSchemeManager::default()
-            .scheme(id)
-            .as_ref(),
-    );
 }
 
 #[cfg(test)]

@@ -1,0 +1,30 @@
+# Catppuccin Macchiato. https://catppuccin.com/palette
+name = "Catppuccin Macchiato"
+url = "https://catppuccin.com"
+
+[dark]
+background = "#24273a"
+foreground = "#cad3f5"
+surface = "#363a4f"
+muted = "#8087a2"
+cursor = "#f4dbd6"
+selection = "#939ab74d"
+red = "#ed8796"
+orange = "#f5a97f"
+yellow = "#eed49f"
+green = "#a6da95"
+cyan = "#8bd5ca"
+blue = "#8aadf4"
+purple = "#c6a0f6"
+pink = "#f5bde6"
+
+[dark.roles]
+comment = "#939ab7"
+heading = "red"
+heading-1 = "red"
+heading-2 = "orange"
+heading-3 = "yellow"
+heading-4 = "green"
+heading-5 = "#7dc4e4"
+heading-6 = "#b7bdf8"
+url = "#f4dbd6"

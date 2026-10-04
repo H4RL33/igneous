@@ -13,6 +13,11 @@
       <default>false</default>
       <summary>Whether the window is maximized</summary>
     </key>
+    <key name="editor-theme" type="s">
+      <default>'adwaita'</default>
+      <summary>Editor theme for vaults that haven't chosen one</summary>
+      <description>Set to the theme most recently picked in any vault.</description>
+    </key>
     <key name="recent-vaults" type="as">
       <default>[]</default>
       <summary>Recently opened vaults, most recent first</summary>

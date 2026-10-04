@@ -6,6 +6,7 @@ mod files;
 mod gsettings;
 mod image_page;
 mod note_page;
+mod preferences;
 mod quick_switcher;
 mod vault;
 mod vault_picker;
