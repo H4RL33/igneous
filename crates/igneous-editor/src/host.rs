@@ -1,6 +1,6 @@
 //! What the editor asks of the app it's in.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use igneous_markdown::LinkRef;
 
@@ -78,6 +78,19 @@ pub trait Host {
     /// Property keys used in the vault, most common first.
     fn property_keys(&self) -> Vec<String> {
         Vec::new()
+    }
+
+    /// Saves pasted data (an image) as an attachment named like `name`,
+    /// returning the embed to insert, e.g. `![[Pasted image 1.png]]`.
+    fn save_attachment(&self, _name: &str, _bytes: &[u8]) -> Option<String> {
+        None
+    }
+
+    /// Copies a dropped or pasted file into the vault as an attachment
+    /// (or links it, if it's already in the vault), returning the embed or
+    /// link to insert.
+    fn attach_file(&self, _path: &Path) -> Option<String> {
+        None
     }
 }
 

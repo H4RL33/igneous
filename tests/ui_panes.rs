@@ -45,3 +45,21 @@ async fn tags_rename_across_the_vault() {
     let _ = WidgetExt::activate_action(&window, "win.search", None);
     window.close();
 }
+
+#[gtk::test]
+async fn dropped_files_become_attachments() {
+    let dir = vault(None);
+    let window = open(&dir);
+    window.open_path(&p("Home.md"), false);
+    let outside = tempfile::tempdir().unwrap();
+    let file = outside.path().join("Scan.pdf");
+    std::fs::write(&file, b"%PDF-1.4").unwrap();
+    let note = window.selected_note().unwrap();
+    let link = note.attach_for_test(&file);
+    assert_eq!(link.as_deref(), Some("![[Scan.pdf]]"));
+    assert!(dir.path().join("Scan.pdf").is_file());
+    // A second copy gets a free name.
+    let link = note.attach_for_test(&file);
+    assert_eq!(link.as_deref(), Some("![[Scan 1.pdf]]"));
+    window.close();
+}

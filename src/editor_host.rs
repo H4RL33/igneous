@@ -1,7 +1,7 @@
 //! What a note's editor asks of the window: which links exist, where images
 //! are, what embeds contain, and following links.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use gtk::{glib, prelude::*};
@@ -154,6 +154,31 @@ impl Host for NoteHost {
         window.index().set_overrides(settings.properties.types);
     }
 
+    fn save_attachment(&self, name: &str, bytes: &[u8]) -> Option<String> {
+        // Obsidian names pasted images "Pasted image 20261004093000.png".
+        let (stem, ext) = name.rsplit_once('.').unwrap_or((name, ""));
+        let stamp = glib::DateTime::now_local()
+            .ok()?
+            .format("%Y%m%d%H%M%S")
+            .ok()?;
+        let path = self.attachment_path(&format!("{stem} {stamp}"), ext)?;
+        self.write_attachment(&path, bytes)
+    }
+
+    fn attach_file(&self, source: &Path) -> Option<String> {
+        // Already in the vault: just link to it.
+        if let Some(path) = self.ctx.vault.relative(source)
+            && !self.ctx.vault.is_ignored(&path)
+        {
+            return Some(format!("![[{}]]", self.ctx.link_text(&path)));
+        }
+        let name = source.file_name()?.to_string_lossy().into_owned();
+        let (stem, ext) = name.rsplit_once('.').unwrap_or((name.as_str(), ""));
+        let path = self.attachment_path(stem, ext)?;
+        let bytes = std::fs::read(source).ok()?;
+        self.write_attachment(&path, &bytes)
+    }
+
     fn property_keys(&self) -> Vec<String> {
         self.window()
             .map(|w| {
@@ -194,6 +219,39 @@ fn type_of(kind: PropertyKind) -> PropertyType {
 }
 
 impl NoteHost {
+    /// A free path for a new attachment, in the vault's attachment folder.
+    fn attachment_path(&self, stem: &str, ext: &str) -> Option<VaultPath> {
+        use igneous_core::settings::Location;
+        let note_folder = self.from().and_then(|p| p.parent());
+        let folder = match &self.ctx.settings.files.attachment_location {
+            Location::VaultRoot => None,
+            Location::SameFolder => note_folder,
+            Location::Folder(f) => VaultPath::new(f).ok(),
+            Location::Subfolder(sub) => match note_folder {
+                Some(base) => base.join(sub).ok(),
+                None => VaultPath::new(sub).ok(),
+            },
+        };
+        if let Some(folder) = &folder {
+            std::fs::create_dir_all(self.ctx.abs(folder)).ok()?;
+        }
+        Some(self.ctx.vault.unused_name(folder.as_ref(), stem, ext))
+    }
+
+    fn write_attachment(&self, path: &VaultPath, bytes: &[u8]) -> Option<String> {
+        let window = self.window()?;
+        if let Err(e) = igneous_core::fs::write_bytes_atomic(
+            &self.ctx.abs(path),
+            bytes,
+            igneous_core::fs::Expect::Absent,
+        ) {
+            window.toast(&format!("Couldn’t save the attachment: {e}"));
+            return None;
+        }
+        window.on_vault_events(vec![igneous_core::watch::VaultEvent::Created(path.clone())]);
+        Some(format!("![[{}]]", self.ctx.link_text(path)))
+    }
+
     /// The text and parse of the note `target` names.
     fn parsed(&self, target: &str) -> Option<(String, igneous_markdown::Document)> {
         let link = LinkRef {

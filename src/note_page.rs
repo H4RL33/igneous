@@ -154,6 +154,16 @@ impl NotePage {
     pub fn new(ctx: &Rc<VaultContext>) -> Self {
         let page: Self = glib::Object::new();
         page.imp().ctx.set(ctx.clone()).ok().unwrap();
+        let editor = &ctx.settings.editor;
+        page.imp()
+            .view
+            .set_input_options(igneous_editor::InputOptions {
+                smart_lists: editor.smart_lists,
+                indent_with_tabs: editor.indent_with_tabs,
+                tab_size: editor.tab_size,
+                auto_pair_brackets: editor.auto_pair_brackets,
+                auto_pair_markdown: editor.auto_pair_markdown,
+            });
         page.imp()
             .view
             .set_host(Rc::new(crate::editor_host::NoteHost {
@@ -223,6 +233,17 @@ impl NotePage {
         if let Some(range) = igneous_markdown::subpath_range(&doc, &text, subpath) {
             self.set_cursor_byte(range.start);
         }
+    }
+
+    /// Attaches a file as if dropped on the note. For tests.
+    #[doc(hidden)]
+    pub fn attach_for_test(&self, path: &std::path::Path) -> Option<String> {
+        use igneous_editor::Host;
+        crate::editor_host::NoteHost {
+            ctx: self.ctx().clone(),
+            page: self.downgrade(),
+        }
+        .attach_file(path)
     }
 
     /// Checks link targets again (files were added, removed or renamed).

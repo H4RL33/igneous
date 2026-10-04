@@ -10,6 +10,7 @@ authors.workspace = true
 [dependencies]
 adw.workspace = true
 gtk.workspace = true
+htmd.workspace = true
 igneous-markdown.workspace = true
 nucleo-matcher.workspace = true
 sourceview.workspace = true

@@ -78,6 +78,7 @@ mod imp {
         pub(crate) depth: Cell<u8>,
         /// Overlay slots not showing anything (see `live.rs`).
         pub(crate) free_slots: RefCell<Vec<adw::Bin>>,
+        pub(crate) input: RefCell<crate::input::InputOptions>,
     }
 
     #[glib::object_subclass]
@@ -113,6 +114,7 @@ mod imp {
             view.set_pixels_below_lines(2);
             view.add_css_class("igneous-note");
             view.connect_live_preview(&buffer);
+            view.connect_input();
             let completion = view.completion();
             completion.add_provider(&crate::completion::LinkCompletion::new(&view));
             completion.set_select_on_show(true);
