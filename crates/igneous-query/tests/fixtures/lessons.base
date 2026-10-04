@@ -1,0 +1,18 @@
+properties:
+  note.score:
+    displayName: score (/10)
+views:
+  - type: table
+    name: Table
+    filters:
+      and:
+        - file.hasTag("course")
+        - file.hasTag("lesson")
+    order:
+      - file.name
+      - score
+    sort:
+      - property: score
+        direction: DESC
+    columnSize:
+      file.name: 250

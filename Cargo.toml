@@ -36,6 +36,7 @@ members = [
     "crates/igneous-git",
     "crates/igneous-graph",
     "crates/igneous-markdown",
+    "crates/igneous-query",
     "spikes/live-preview",
 ]
 
@@ -52,6 +53,7 @@ igneous-editor = { path = "crates/igneous-editor" }
 igneous-git = { path = "crates/igneous-git" }
 igneous-graph = { path = "crates/igneous-graph" }
 igneous-markdown = { path = "crates/igneous-markdown" }
+igneous-query = { path = "crates/igneous-query" }
 
 anyhow = "1"
 async-channel = "2"
