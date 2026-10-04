@@ -1237,6 +1237,27 @@ impl NoteView {
         self.add_controller(motion);
     }
 
+    /// A preview of the note linked at `iter`, for hovering.
+    pub(crate) fn preview_at(&self, iter: &gtk::TextIter) -> Option<gtk::Widget> {
+        let link = {
+            let st = self.imp().state.try_borrow().ok()?;
+            let pos = byte_of(&st.lines, iter);
+            st.doc
+                .links
+                .iter()
+                .find(|l| {
+                    l.range.start <= pos
+                        && pos < l.range.end
+                        && matches!(l.kind, LinkKind::Wiki | LinkKind::Markdown)
+                })
+                .map(|l| l.reference.clone())?
+        };
+        self.host().embed(&link)?;
+        let card = self.embed_widget(&link);
+        card.set_size_request(420, -1);
+        Some(card)
+    }
+
     /// The link under widget coordinates `(x, y)`.
     fn link_at(&self, x: f64, y: f64) -> Option<LinkRef> {
         let (bx, by) =

@@ -33,6 +33,19 @@ impl<T: 'static> Worker<T> {
         Self { sender }
     }
 
+    /// Queues `f` on the thread now (so it runs before anything queued
+    /// later) and returns where its result will arrive.
+    pub fn submit<R: Send + 'static>(
+        &self,
+        f: impl FnOnce(&mut T) -> R + Send + 'static,
+    ) -> async_channel::Receiver<R> {
+        let (sender, receiver) = async_channel::bounded(1);
+        let _ = self.sender.send(Box::new(move |resource| {
+            let _ = sender.send_blocking(f(resource));
+        }));
+        receiver
+    }
+
     /// Runs `f` on the thread. `None` if the thread has gone.
     pub async fn call<R: Send + 'static>(
         &self,

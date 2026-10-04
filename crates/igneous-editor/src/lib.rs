@@ -3,7 +3,9 @@
 //! themes.
 
 mod buffer;
+pub mod completion;
 mod host;
+mod hover;
 mod live;
 pub mod markup;
 mod rangeset;
@@ -13,7 +15,7 @@ pub mod theme;
 mod view;
 
 pub use buffer::LANGUAGE_ID;
-pub use host::{Embed, Host, NoHost};
+pub use host::{Embed, Host, NoHost, NoteName};
 pub use scheme::{style_scheme, system_accent};
 pub use view::{Mode, NoteView};
 

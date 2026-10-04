@@ -7,7 +7,7 @@ use std::rc::Rc;
 use gtk::{glib, prelude::*};
 use igneous_core::VaultPath;
 use igneous_core::fs::read_text;
-use igneous_editor::{Embed, Host};
+use igneous_editor::{Embed, Host, NoteName};
 use igneous_markdown::{LinkRef, Subpath, parse, subpath_range};
 
 use crate::note_page::NotePage;
@@ -67,6 +67,76 @@ impl Host for NoteHost {
         if let Some(window) = self.window() {
             window.follow_link(link, self.from().as_ref(), new_tab);
         }
+    }
+
+    fn note_names(&self) -> Vec<NoteName> {
+        let Some(window) = self.window() else {
+            return Vec::new();
+        };
+        let mut names = Vec::new();
+        for note in window.index().notes().iter() {
+            let link = self.ctx.link_text(&note.path);
+            let detail = note
+                .path
+                .parent()
+                .map(|p| p.to_string())
+                .unwrap_or_default();
+            for alias in &note.aliases {
+                names.push(NoteName {
+                    link: link.clone(),
+                    title: note.title.clone(),
+                    detail: format!("Alias of {}", note.title),
+                    alias: Some(alias.clone()),
+                });
+            }
+            names.push(NoteName {
+                link,
+                title: note.title.clone(),
+                detail,
+                alias: None,
+            });
+        }
+        names
+    }
+
+    fn headings(&self, target: &str) -> Vec<String> {
+        self.parsed(target)
+            .map(|(_, doc)| doc.headings.into_iter().map(|h| h.text).collect())
+            .unwrap_or_default()
+    }
+
+    fn blocks(&self, target: &str) -> Vec<(String, String)> {
+        let Some((text, doc)) = self.parsed(target) else {
+            return Vec::new();
+        };
+        doc.block_ids
+            .iter()
+            .map(|b| {
+                let start = igneous_markdown::text::line_start(&text, b.range.start);
+                (b.id.clone(), text[start..b.range.start].trim().to_owned())
+            })
+            .collect()
+    }
+
+    fn tags(&self) -> Vec<(String, usize)> {
+        self.window()
+            .map(|w| w.index().tags().as_ref().clone())
+            .unwrap_or_default()
+    }
+}
+
+impl NoteHost {
+    /// The text and parse of the note `target` names.
+    fn parsed(&self, target: &str) -> Option<(String, igneous_markdown::Document)> {
+        let link = LinkRef {
+            target: target.to_owned(),
+            ..LinkRef::default()
+        };
+        let path = self.ctx.resolve(&link, self.from().as_ref())?;
+        let (file, _) = read_text(&self.ctx.abs(&path)).ok()?;
+        let text = file.text().to_owned();
+        let doc = parse(&text);
+        Some((text, doc))
     }
 }
 

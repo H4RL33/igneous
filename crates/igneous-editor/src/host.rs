@@ -12,6 +12,17 @@ pub struct Embed {
     pub text: String,
 }
 
+/// A note offered when completing `[[`.
+pub struct NoteName {
+    /// What goes in the link: the name, or the path if the name is shared.
+    pub link: String,
+    pub title: String,
+    /// The folder, shown beside the name.
+    pub detail: String,
+    /// Set when this entry is one of the note's aliases.
+    pub alias: Option<String>,
+}
+
 pub trait Host {
     /// Whether a link points at something that exists. Unresolved links are
     /// styled differently. Called for every link after every change, so it
@@ -32,6 +43,26 @@ pub trait Host {
 
     /// Follows a link (Ctrl+click, middle-click, or a click in Reading mode).
     fn open_link(&self, _link: &LinkRef, _new_tab: bool) {}
+
+    /// Notes (and aliases) to offer after `[[`.
+    fn note_names(&self) -> Vec<NoteName> {
+        Vec::new()
+    }
+
+    /// The headings of the note `target` refers to.
+    fn headings(&self, _target: &str) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// The block IDs of the note `target` refers to, with their text.
+    fn blocks(&self, _target: &str) -> Vec<(String, String)> {
+        Vec::new()
+    }
+
+    /// The vault's tags, with how many notes use each.
+    fn tags(&self) -> Vec<(String, usize)> {
+        Vec::new()
+    }
 }
 
 /// A host that knows nothing: every link exists, nothing opens.

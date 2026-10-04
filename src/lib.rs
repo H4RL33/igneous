@@ -9,6 +9,8 @@ mod files;
 mod gsettings;
 mod history;
 mod image_page;
+mod index;
+mod inspector;
 mod note_page;
 mod preferences;
 mod quick_switcher;
@@ -21,6 +23,7 @@ mod window;
 mod worker;
 
 pub use application::Application;
+pub use index::IndexService;
 pub use note_page::{NotePage, State as NoteState};
 pub use sync::{State as SyncState, SyncService};
 pub use vault_picker::VaultPicker;

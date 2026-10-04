@@ -278,6 +278,49 @@ async fn back_and_forward_follow_the_tab() {
     window.close();
 }
 
+#[gtk::test]
+async fn renames_update_links() {
+    let dir = vault(None);
+    let window = open(&dir);
+    assert!(until(5000, || window.index().is_ready()).await);
+    let backlinks = window
+        .index()
+        .query(|index| index.backlinks(&p("Projects/Igneous/Roadmap.md")))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(backlinks.len(), 1);
+    assert_eq!(backlinks[0].source, p("Home.md"));
+
+    window.rename(
+        &p("Projects/Igneous/Roadmap.md"),
+        &p("Projects/Igneous/Plan.md"),
+    );
+    let home = || std::fs::read_to_string(dir.path().join("Home.md")).unwrap();
+    assert!(
+        until(3000, || home().contains("See [[Plan]] and")).await,
+        "{}",
+        home()
+    );
+    // Only the link changed.
+    assert_eq!(
+        home().replace("[[Plan]]", "[[Roadmap]]"),
+        std::fs::read_to_string(Path::new(FIXTURE).join("Home.md")).unwrap()
+    );
+    window.close();
+}
+
+#[gtk::test]
+async fn following_a_missing_link_creates_the_note() {
+    let dir = vault(None);
+    let window = open(&dir);
+    let link = igneous_markdown::LinkRef::parse_wiki("Brand new idea", false);
+    window.follow_link(&link, Some(&p("Home.md")), false);
+    assert!(dir.path().join("Brand new idea.md").is_file());
+    assert_eq!(window.selected_path(), Some(p("Brand new idea.md")));
+    window.close();
+}
+
 // --- Git sync ------------------------------------------------------------------
 //
 // These rely on the sealed session's own Git configuration (identity, no

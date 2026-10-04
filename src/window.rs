@@ -10,8 +10,8 @@ use adw::{prelude::*, subclass::prelude::*};
 use gtk::{gio, glib};
 use igneous_core::fs::{self as corefs, Expect};
 use igneous_core::settings::{
-    self as vault_settings, Appearance, Location, SidebarPane, TabKind, TabState, TrashMode,
-    Workspace, WorkspaceStore,
+    self as vault_settings, Appearance, InspectorView, Location, SidebarPane, TabKind, TabState,
+    TrashMode, Workspace, WorkspaceStore,
 };
 use igneous_core::watch::VaultEvent;
 use igneous_core::{TextFile, VaultPath};
@@ -24,6 +24,8 @@ use crate::application::Application;
 use crate::changes::ChangesPane;
 use crate::files::FileTree;
 use crate::image_page::{self, ImagePage};
+use crate::index::IndexService;
+use crate::inspector::{Inspector, Links};
 use crate::note_page::NotePage;
 use crate::quick_switcher::{Choice, QuickSwitcher};
 use crate::sync::{State as SyncState, SyncService};
@@ -31,6 +33,7 @@ use crate::sync_button::SyncButton;
 use crate::text_page::{Contents, TextPage};
 use crate::vault::VaultContext;
 use crate::{config, gsettings};
+use igneous_index::refactor::RefactorPlan;
 
 const MAX_RECENT_FILES: usize = 50;
 const MAX_CLOSED_TABS: usize = 20;
@@ -64,6 +67,10 @@ mod imp {
         #[template_child]
         pub mode_toggle: TemplateChild<adw::ToggleGroup>,
         #[template_child]
+        pub inspector_split: TemplateChild<adw::OverlaySplitView>,
+        #[template_child]
+        pub inspector_bin: TemplateChild<adw::Bin>,
+        #[template_child]
         pub note_title: TemplateChild<adw::WindowTitle>,
         #[template_child]
         pub tab_view: TemplateChild<adw::TabView>,
@@ -90,6 +97,9 @@ mod imp {
         pub wanted_pane: Cell<Option<SidebarPane>>,
         /// Set while the mode toggle is being updated to match a tab.
         pub updating_mode: Cell<bool>,
+        pub index: OnceCell<Rc<IndexService>>,
+        pub inspector: OnceCell<Rc<Inspector>>,
+        pub inspector_timer: RefCell<Option<glib::SourceId>>,
     }
 
     #[glib::object_subclass]
@@ -443,6 +453,28 @@ impl Window {
             move |_| window.schedule_workspace_save()
         ));
 
+        // The index, and the inspector that shows what it knows.
+        let index = IndexService::new(&ctx.vault);
+        let weak = self.downgrade();
+        index.connect_changed(move || {
+            if let Some(window) = weak.upgrade() {
+                window.update_inspector();
+            }
+        });
+        imp.index.set(index).ok().unwrap();
+        let inspector = Inspector::new(self);
+        imp.inspector_bin.set_child(Some(&inspector.widget));
+        imp.inspector.set(inspector).ok().unwrap();
+        imp.inspector_split
+            .connect_show_sidebar_notify(glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                move |_| {
+                    window.update_inspector();
+                    window.schedule_workspace_save();
+                }
+            ));
+
         imp.mode_toggle.connect_active_name_notify(glib::clone!(
             #[weak(rename_to = window)]
             self,
@@ -594,6 +626,11 @@ impl Window {
         }
         let child: gtk::Widget = if is_note {
             let note = NotePage::new(&ctx);
+            note.buffer().connect_changed(glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                move |_| window.schedule_inspector_update()
+            ));
             note.set_theme(&self.editor_theme(), adw::StyleManager::default().is_dark());
             note.set_mode(mode_from(self.ctx().settings.editor.default_mode));
             if let Err(e) = note.load(path) {
@@ -644,6 +681,7 @@ impl Window {
         }
         self.tree().select(path.as_ref());
         self.sync_mode_toggle();
+        self.update_inspector();
         self.schedule_workspace_save();
     }
 
@@ -785,6 +823,7 @@ impl Window {
 
     pub fn on_vault_events(&self, events: Vec<VaultEvent>) {
         self.sync().refresh();
+        self.index().apply(events.clone());
         let ctx = self.ctx();
         ctx.apply_events(&events);
         // Files appearing or disappearing change which links resolve.
@@ -1008,6 +1047,12 @@ impl Window {
         {
             note.flush();
         }
+        // Plan link updates against the index as it is before the move.
+        let plan = (ctx.settings.links.update_on_rename && self.index().is_ready()).then(|| {
+            let (from, to) = (from.clone(), to.clone());
+            self.index()
+                .submit(move |index| igneous_index::refactor::plan_rename(index, &from, &to))
+        });
         // Renaming that only changes case needs a hop on case-insensitive disks.
         let result = if from.eq_loose(to) && from != to {
             let hop = ctx
@@ -1019,11 +1064,99 @@ impl Window {
             corefs::rename(&ctx.abs(from), &ctx.abs(to))
         };
         match result {
-            Ok(()) => self.on_vault_events(vec![VaultEvent::Renamed {
-                from: from.clone(),
-                to: to.clone(),
-            }]),
+            Ok(()) => {
+                self.on_vault_events(vec![VaultEvent::Renamed {
+                    from: from.clone(),
+                    to: to.clone(),
+                }]);
+                if let Some(plan) = plan {
+                    self.update_links_after_rename(plan, from.clone(), to.clone());
+                }
+            }
             Err(e) => self.toast(&format!("Couldn't rename “{from}”: {e}")),
+        }
+    }
+
+    /// Rewrites links to a renamed file or folder once it has moved, then
+    /// offers to undo the whole rename.
+    fn update_links_after_rename(
+        &self,
+        plan: async_channel::Receiver<Option<Result<RefactorPlan, igneous_index::IndexError>>>,
+        from: VaultPath,
+        to: VaultPath,
+    ) {
+        let window = self.downgrade();
+        glib::spawn_future_local(async move {
+            let Ok(Some(Ok(plan))) = plan.recv().await else {
+                return;
+            };
+            let Some(window) = window.upgrade() else {
+                return;
+            };
+            let mut undo: Vec<(VaultPath, String)> = Vec::new();
+            let mut skipped = 0;
+            for file in &plan.files {
+                if file.edits.is_empty() {
+                    continue;
+                }
+                let new_text = file.apply();
+                let result = window.edit_note(&file.path_after, |current| {
+                    (current == file.text).then(|| new_text.clone())
+                });
+                match result {
+                    Ok(()) => undo.push((file.path_after.clone(), file.text.clone())),
+                    Err(e) => {
+                        tracing::warn!(path = %file.path_after, %e, "skipped a link update");
+                        skipped += 1;
+                    }
+                }
+            }
+            if undo.is_empty() && skipped == 0 {
+                return;
+            }
+            let notes = |n: usize| {
+                if n == 1 {
+                    "1 note".to_owned()
+                } else {
+                    format!("{n} notes")
+                }
+            };
+            let mut title = format!("Updated links in {}", notes(undo.len()));
+            if skipped > 0 {
+                title.push_str(&format!("; {} changed and were skipped", notes(skipped)));
+            }
+            let toast = adw::Toast::builder()
+                .title(title)
+                .button_label("_Undo")
+                .timeout(8)
+                .build();
+            let weak = window.downgrade();
+            toast.connect_button_clicked(move |_| {
+                let Some(window) = weak.upgrade() else { return };
+                window.undo_rename(&from, &to, &undo);
+            });
+            window.imp().toast_overlay.add_toast(toast);
+        });
+    }
+
+    /// Moves a renamed file back and restores the notes whose links were
+    /// rewritten, unless they've changed since.
+    fn undo_rename(&self, from: &VaultPath, to: &VaultPath, texts: &[(VaultPath, String)]) {
+        let ctx = self.ctx();
+        if ctx.abs(from).exists() {
+            self.toast(&format!("Can’t undo: “{from}” exists again"));
+            return;
+        }
+        // Back to the old text first, at the paths the notes have now.
+        for (path, old) in texts {
+            let _ = self.edit_note(path, |_| Some(old.clone()));
+        }
+        match corefs::rename(&ctx.abs(to), &ctx.abs(from)) {
+            Ok(()) => self.on_vault_events(vec![VaultEvent::Renamed {
+                from: to.clone(),
+                to: from.clone(),
+            }]),
+            Err(e) => self.toast(&format!("Couldn't move “{to}” back: {e}")),
         }
     }
 
@@ -1126,11 +1259,34 @@ impl Window {
     fn show_quick_switcher(&self) {
         let files = self.ctx().files();
         let recent = self.imp().recent_files.borrow().clone();
+        let aliases = self
+            .index()
+            .notes()
+            .iter()
+            .filter(|n| !n.aliases.is_empty())
+            .map(|n| (n.path.clone(), n.aliases.clone()))
+            .collect();
+        let ctx = self.ctx().clone();
+        let headings = move |path: &VaultPath| -> Vec<(String, u8, usize)> {
+            let Ok((file, _)) = corefs::read_text(&ctx.abs(path)) else {
+                return Vec::new();
+            };
+            igneous_markdown::parse(file.text())
+                .headings
+                .into_iter()
+                .map(|h| (h.text, h.level, h.range.start))
+                .collect()
+        };
         let weak = self.downgrade();
-        let switcher = QuickSwitcher::new(files, recent, move |choice| {
+        let switcher = QuickSwitcher::new(files, recent, aliases, headings, move |choice| {
             let Some(window) = weak.upgrade() else { return };
             match choice {
-                Choice::Open { path, new_tab } => window.open_path(&path, new_tab),
+                Choice::Open { path, new_tab, at } => {
+                    window.open_path(&path, new_tab);
+                    if let (Some(at), Some(note)) = (at, window.selected_note()) {
+                        note.set_cursor_byte(at);
+                    }
+                }
                 Choice::Create { name } => window.create_named_note(&name),
             }
         });
@@ -1293,6 +1449,13 @@ impl Window {
             _ => SidebarPane::Files,
         };
         workspace.sidebar.expanded = self.tree().expanded_folders();
+        workspace.inspector.visible = imp.inspector_split.shows_sidebar();
+        if let Some(inspector) = imp.inspector.get() {
+            workspace.inspector.view = match inspector.stack.visible_child_name().as_deref() {
+                Some("outline") => InspectorView::Outline,
+                _ => InspectorView::Backlinks,
+            };
+        }
         workspace.recently_closed = imp.recently_closed.borrow().clone();
         workspace.recent_files = imp.recent_files.borrow().clone();
         workspace
@@ -1320,6 +1483,13 @@ impl Window {
         imp.restoring.set(true);
         self.tree().expand(&workspace.sidebar.expanded);
         imp.split_view.set_show_sidebar(workspace.sidebar.visible);
+        imp.inspector_split
+            .set_show_sidebar(workspace.inspector.visible);
+        if let Some(inspector) = imp.inspector.get()
+            && workspace.inspector.view == InspectorView::Outline
+        {
+            inspector.stack.set_visible_child_name("outline");
+        }
         imp.wanted_pane.set(Some(workspace.sidebar.pane));
         imp.recently_closed
             .replace(workspace.recently_closed.clone());
@@ -1407,6 +1577,150 @@ impl Window {
     /// Paths of the open tabs, in order.
     pub fn tab_paths(&self) -> Vec<VaultPath> {
         self.pages().iter().filter_map(Self::page_path).collect()
+    }
+
+    // --- index and inspector ------------------------------------------------------
+
+    pub fn index(&self) -> &Rc<IndexService> {
+        self.imp().index.get().unwrap()
+    }
+
+    fn schedule_inspector_update(&self) {
+        let imp = self.imp();
+        if !imp.inspector_split.shows_sidebar() {
+            return;
+        }
+        if let Some(id) = imp.inspector_timer.take() {
+            id.remove();
+        }
+        let weak = self.downgrade();
+        let id = glib::timeout_add_local_once(Duration::from_millis(500), move || {
+            if let Some(window) = weak.upgrade() {
+                window.imp().inspector_timer.take();
+                window.update_outline();
+            }
+        });
+        imp.inspector_timer.replace(Some(id));
+    }
+
+    fn update_outline(&self) {
+        let Some(inspector) = self.imp().inspector.get() else {
+            return;
+        };
+        let note = self.selected_note();
+        let headings = note
+            .as_ref()
+            .map(|n| igneous_markdown::parse(&n.text()).headings)
+            .unwrap_or_default();
+        inspector.show_outline(note.and_then(|n| n.path()).as_ref(), &headings);
+    }
+
+    /// Refreshes the inspector for the selected note, if it's showing.
+    pub fn update_inspector(&self) {
+        let imp = self.imp();
+        if !imp.inspector_split.shows_sidebar() {
+            return;
+        }
+        let Some(inspector) = imp.inspector.get().cloned() else {
+            return;
+        };
+        self.update_outline();
+        let Some(path) = self.selected_note().and_then(|n| n.path()) else {
+            inspector.show_links(None);
+            return;
+        };
+        let index = self.index().clone();
+        let mut names = index.aliases(&path);
+        names.insert(0, path.stem().to_owned());
+        let window = self.downgrade();
+        glib::spawn_future_local(async move {
+            let query = path.clone();
+            let result = index
+                .query(move |index| {
+                    (
+                        index.backlinks(&query),
+                        index.unlinked_mentions(&query),
+                        index.outgoing(&query),
+                    )
+                })
+                .await;
+            let Some(window) = window.upgrade() else {
+                return;
+            };
+            // The selection may have moved on while the index was busy.
+            if window.selected_note().and_then(|n| n.path()).as_ref() != Some(&path) {
+                return;
+            }
+            let Some((backlinks, mentions, outgoing)) = result else {
+                return;
+            };
+            inspector.show_links(Some(Links {
+                path,
+                backlinks: backlinks.unwrap_or_default(),
+                mentions: mentions.unwrap_or_default(),
+                outgoing: outgoing.unwrap_or_default(),
+                names,
+            }));
+        });
+    }
+
+    /// Opens a note with the cursor at byte `at`.
+    pub fn open_at(&self, path: &VaultPath, at: usize) {
+        self.open_path(path, false);
+        if let Some(note) = self.selected_note()
+            && note.path().as_ref() == Some(path)
+        {
+            note.set_cursor_byte(at);
+            note.focus_editor();
+        }
+    }
+
+    /// Turns an unlinked mention of `target` into a link.
+    pub fn link_mention(&self, mention: &igneous_index::Mention, target: &VaultPath) {
+        let link_text = self.ctx().link_text(target);
+        let edit = move |text: &str| -> Option<String> {
+            let found = text.get(mention_range(mention))?;
+            let replacement = if found == link_text {
+                format!("[[{found}]]")
+            } else {
+                format!("[[{link_text}|{found}]]")
+            };
+            let mut out = text.to_owned();
+            out.replace_range(mention_range(mention), &replacement);
+            Some(out)
+        };
+        if let Err(e) = self.edit_note(&mention.source, edit) {
+            self.toast(&e);
+        }
+        self.update_inspector();
+    }
+
+    /// Changes a note's text with `edit`, through its open tab if there is
+    /// one (as an undoable edit), otherwise on disk with the usual guard.
+    pub fn edit_note(
+        &self,
+        path: &VaultPath,
+        edit: impl FnOnce(&str) -> Option<String>,
+    ) -> Result<(), String> {
+        if let Some(note) = self
+            .find_page(path)
+            .and_then(|p| p.child().downcast::<NotePage>().ok())
+        {
+            let old = note.text();
+            let new = edit(&old).ok_or("The note changed; try again")?;
+            note.replace_text(&old, &new);
+            note.flush();
+            return Ok(());
+        }
+        let abs = self.ctx().abs(path);
+        let (mut file, stamp) = corefs::read_text(&abs).map_err(|e| e.to_string())?;
+        let new = edit(file.text()).ok_or("The note changed; try again")?;
+        file.set_text(new);
+        let stamp = corefs::write_atomic(&abs, &file, Expect::Contents(&stamp))
+            .map_err(|e| format!("Couldn’t update “{path}”: {e}"))?;
+        self.ctx().expect_write(path, &stamp);
+        self.index().apply(vec![VaultEvent::Modified(path.clone())]);
+        Ok(())
     }
 
     // --- Git -------------------------------------------------------------------
@@ -1667,4 +1981,8 @@ fn mode_to(mode: Mode) -> igneous_core::settings::EditorMode {
         Mode::Source => igneous_core::settings::EditorMode::Source,
         Mode::Reading => igneous_core::settings::EditorMode::Reading,
     }
+}
+
+fn mention_range(mention: &igneous_index::Mention) -> std::ops::Range<usize> {
+    mention.range.clone()
 }

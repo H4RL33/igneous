@@ -133,7 +133,10 @@ impl VaultContext {
                     if self.abs(path).is_file() {
                         files.insert(path.clone());
                     } else if self.abs(path).is_dir() {
-                        for file in Self::scan(&self.vault).into_iter().filter(|f| f.starts_with(path)) {
+                        for file in Self::scan(&self.vault)
+                            .into_iter()
+                            .filter(|f| f.starts_with(path))
+                        {
                             files.insert(file);
                         }
                     }
@@ -154,7 +157,10 @@ impl VaultContext {
                     if self.abs(to).is_file() {
                         files.insert(to.clone());
                     } else {
-                        for file in Self::scan(&self.vault).into_iter().filter(|f| f.starts_with(to)) {
+                        for file in Self::scan(&self.vault)
+                            .into_iter()
+                            .filter(|f| f.starts_with(to))
+                        {
                             files.insert(file);
                         }
                     }

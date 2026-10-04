@@ -188,6 +188,34 @@ impl NotePage {
         self.set_mode(mode);
     }
 
+    /// Replaces the note's text with `new` (which was computed from `old`) as
+    /// one undoable edit, touching only the part that differs.
+    pub fn replace_text(&self, old: &str, new: &str) {
+        let prefix = old
+            .char_indices()
+            .zip(new.chars())
+            .take_while(|((_, a), b)| a == b)
+            .last()
+            .map_or(0, |((i, c), _)| i + c.len_utf8());
+        let suffix = old[prefix..]
+            .chars()
+            .rev()
+            .zip(new[prefix..].chars().rev())
+            .take_while(|(a, b)| a == b)
+            .map(|(c, _)| c.len_utf8())
+            .sum::<usize>()
+            .min(old.len() - prefix)
+            .min(new.len() - prefix);
+        let chars = |s: &str, byte: usize| s[..byte].chars().count() as i32;
+        let buffer = self.buffer();
+        buffer.begin_user_action();
+        let mut start = buffer.iter_at_offset(chars(old, prefix));
+        let mut end = buffer.iter_at_offset(chars(old, old.len() - suffix));
+        buffer.delete(&mut start, &mut end);
+        buffer.insert(&mut start, &new[prefix..new.len() - suffix]);
+        buffer.end_user_action();
+    }
+
     /// Moves the cursor to a heading or block, e.g. after following a link.
     pub fn scroll_to_subpath(&self, subpath: &igneous_markdown::Subpath) {
         let text = self.text();

@@ -8,10 +8,19 @@ template $IgneousWindow: Adw.ApplicationWindow {
   height-request: 294;
 
   Adw.Breakpoint {
+    condition ("max-width: 900sp")
+
+    setters {
+      inspector_split.collapsed: true;
+    }
+  }
+
+  Adw.Breakpoint {
     condition ("max-width: 600sp")
 
     setters {
       split_view.collapsed: true;
+      inspector_split.collapsed: true;
     }
   }
 
@@ -86,7 +95,15 @@ template $IgneousWindow: Adw.ApplicationWindow {
         };
       };
 
-      content: Adw.ToolbarView {
+      content: Adw.OverlaySplitView inspector_split {
+        sidebar-position: end;
+        show-sidebar: false;
+        min-sidebar-width: 240;
+        max-sidebar-width: 360;
+
+        sidebar: Adw.Bin inspector_bin {};
+
+        content: Adw.ToolbarView {
         [top]
         Adw.HeaderBar {
           [start]
@@ -107,6 +124,13 @@ template $IgneousWindow: Adw.ApplicationWindow {
             icon-name: "open-menu-symbolic";
             tooltip-text: _("Main Menu");
             menu-model: primary_menu;
+          }
+
+          [end]
+          ToggleButton {
+            icon-name: "sidebar-show-right-symbolic";
+            tooltip-text: _("Toggle Inspector");
+            active: bind inspector_split.show-sidebar bidirectional;
           }
 
           [end]
@@ -169,6 +193,7 @@ template $IgneousWindow: Adw.ApplicationWindow {
             child: Adw.TabView tab_view {};
           }
         };
+      };
       };
     };
   };

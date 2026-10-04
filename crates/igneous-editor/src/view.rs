@@ -113,6 +113,11 @@ mod imp {
             view.set_pixels_below_lines(2);
             view.add_css_class("igneous-note");
             view.connect_live_preview(&buffer);
+            let completion = view.completion();
+            completion.add_provider(&crate::completion::LinkCompletion::new(&view));
+            completion.set_select_on_show(true);
+            view.hover()
+                .add_provider(&crate::hover::LinkPreview::new(&view));
         }
     }
 

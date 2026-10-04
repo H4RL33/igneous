@@ -1,6 +1,8 @@
-//! The quick switcher (Ctrl+O): fuzzy-find a note by name, or create one.
+//! The quick switcher (Ctrl+O): fuzzy-find a note by name or alias, or
+//! create one. `note#heading` lists the best note's headings.
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use adw::{prelude::*, subclass::prelude::*};
@@ -13,8 +15,88 @@ const LIMIT: usize = 200;
 
 /// What the user picked.
 pub enum Choice {
-    Open { path: VaultPath, new_tab: bool },
-    Create { name: String },
+    /// `at` is a byte offset to put the cursor at (a heading).
+    Open {
+        path: VaultPath,
+        new_tab: bool,
+        at: Option<usize>,
+    },
+    Create {
+        name: String,
+    },
+}
+
+/// A result row, stored in the list model as fields joined by `\x1f`:
+/// the path, then an alias or a heading and its offset.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Hit {
+    Note(VaultPath),
+    Alias(VaultPath, String),
+    Heading(VaultPath, String, usize),
+}
+
+impl Hit {
+    fn encode(&self) -> String {
+        match self {
+            Hit::Note(p) => p.to_string(),
+            Hit::Alias(p, alias) => format!("{p}\x1f{alias}"),
+            Hit::Heading(p, text, at) => format!("{p}\x1f{text}\x1f{at}"),
+        }
+    }
+
+    fn decode(s: &str) -> Option<Hit> {
+        let mut parts = s.split('\x1f');
+        let path = VaultPath::new(parts.next()?).ok()?;
+        Some(match (parts.next(), parts.next()) {
+            (None, _) => Hit::Note(path),
+            (Some(alias), None) => Hit::Alias(path, alias.to_owned()),
+            (Some(text), Some(at)) => Hit::Heading(path, text.to_owned(), at.parse().ok()?),
+        })
+    }
+
+    fn path(&self) -> &VaultPath {
+        match self {
+            Hit::Note(p) | Hit::Alias(p, _) | Hit::Heading(p, _, _) => p,
+        }
+    }
+}
+
+/// Notes matching `query` by name or alias, best first.
+pub fn rank_with_aliases(
+    query: &str,
+    files: &[VaultPath],
+    recent: &[VaultPath],
+    aliases: &HashMap<VaultPath, Vec<String>>,
+    limit: usize,
+) -> Vec<Hit> {
+    let mut hits: Vec<Hit> = rank(query, files, recent, limit)
+        .into_iter()
+        .map(Hit::Note)
+        .collect();
+    let query = query.trim();
+    if query.is_empty() {
+        return hits;
+    }
+    let pattern = Pattern::parse(query, CaseMatching::Ignore, Normalization::Smart);
+    let mut matcher = Matcher::new(Config::DEFAULT);
+    let mut buf = Vec::new();
+    let mut alias_hits: Vec<(u32, Hit)> = Vec::new();
+    for (path, names) in aliases {
+        for alias in names {
+            if let Some(score) = pattern.score(Utf32Str::new(alias, &mut buf), &mut matcher) {
+                alias_hits.push((score, Hit::Alias(path.clone(), alias.clone())));
+            }
+        }
+    }
+    alias_hits.sort_by_key(|(score, _)| std::cmp::Reverse(*score));
+    // Aliases that match better than the note's own name go first.
+    for (_, hit) in alias_hits.into_iter().take(limit) {
+        if !hits.iter().take(3).any(|h| h.path() == hit.path()) {
+            hits.insert(hits.len().min(3), hit);
+        }
+    }
+    hits.truncate(limit);
+    hits
 }
 
 /// The text matched against: the path without `.md`.
@@ -71,6 +153,7 @@ pub fn rank(
 }
 
 type ChooseFn = dyn Fn(Choice);
+type HeadingsFn = dyn Fn(&VaultPath) -> Vec<(String, u8, usize)>;
 
 mod imp {
     use super::*;
@@ -90,6 +173,8 @@ mod imp {
         pub selection: RefCell<Option<gtk::SingleSelection>>,
         pub files: RefCell<Vec<VaultPath>>,
         pub recent: RefCell<Vec<VaultPath>>,
+        pub aliases: RefCell<HashMap<VaultPath, Vec<String>>>,
+        pub headings: RefCell<Option<Rc<HeadingsFn>>>,
         pub on_choose: RefCell<Option<Rc<ChooseFn>>>,
     }
 
@@ -152,15 +237,21 @@ glib::wrapper! {
 }
 
 impl QuickSwitcher {
+    /// `headings` lists a note's headings (text, level, byte offset) for
+    /// `note#heading` queries.
     pub fn new(
         files: Vec<VaultPath>,
         recent: Vec<VaultPath>,
+        aliases: HashMap<VaultPath, Vec<String>>,
+        headings: impl Fn(&VaultPath) -> Vec<(String, u8, usize)> + 'static,
         on_choose: impl Fn(Choice) + 'static,
     ) -> Self {
         let switcher: Self = glib::Object::new();
         let imp = switcher.imp();
         imp.files.replace(files);
         imp.recent.replace(recent);
+        imp.aliases.replace(aliases);
+        imp.headings.replace(Some(Rc::new(headings)));
         imp.on_choose.replace(Some(Rc::new(on_choose)));
         switcher.update();
         switcher
@@ -177,8 +268,43 @@ impl QuickSwitcher {
     fn update(&self) {
         let imp = self.imp();
         let query = self.query();
-        let ranked = rank(&query, &imp.files.borrow(), &imp.recent.borrow(), LIMIT);
-        let strings: Vec<&str> = ranked.iter().map(VaultPath::as_str).collect();
+        let ranked = match query.split_once('#') {
+            // `note#heading`: the headings of the best match for `note`.
+            Some((note, heading)) => {
+                let best = rank(note, &imp.files.borrow(), &imp.recent.borrow(), 1);
+                let headings = imp.headings.borrow().clone();
+                match (best.first(), headings) {
+                    (Some(path), Some(headings)) => {
+                        let found = headings(path);
+                        let heading = heading.trim().to_lowercase();
+                        found
+                            .into_iter()
+                            .filter(|(text, _, _)| text.to_lowercase().contains(&heading))
+                            .map(|(text, level, at)| {
+                                Hit::Heading(
+                                    path.clone(),
+                                    format!(
+                                        "{}{text}",
+                                        "  ".repeat(usize::from(level.saturating_sub(1)))
+                                    ),
+                                    at,
+                                )
+                            })
+                            .collect()
+                    }
+                    _ => Vec::new(),
+                }
+            }
+            None => rank_with_aliases(
+                &query,
+                &imp.files.borrow(),
+                &imp.recent.borrow(),
+                &imp.aliases.borrow(),
+                LIMIT,
+            ),
+        };
+        let encoded: Vec<String> = ranked.iter().map(Hit::encode).collect();
+        let strings: Vec<&str> = encoded.iter().map(String::as_str).collect();
         imp.results.splice(0, imp.results.n_items(), &strings);
         if ranked.is_empty() {
             imp.empty_page.set_description(Some(&if query.is_empty() {
@@ -232,12 +358,19 @@ impl QuickSwitcher {
     }
 
     fn choose_at(&self, position: u32, new_tab: bool) {
-        let Some(path) = self.imp().results.string(position) else {
+        let Some(hit) = self.imp().results.string(position) else {
             return;
         };
-        if let Ok(path) = VaultPath::new(&path) {
-            self.finish(Choice::Open { path, new_tab });
-        }
+        let Some(hit) = Hit::decode(&hit) else { return };
+        let at = match &hit {
+            Hit::Heading(_, _, at) => Some(*at),
+            _ => None,
+        };
+        self.finish(Choice::Open {
+            path: hit.path().clone(),
+            new_tab,
+            at,
+        });
     }
 
     fn finish(&self, choice: Choice) {
@@ -273,23 +406,40 @@ fn row_factory() -> gtk::SignalListItemFactory {
     });
     factory.connect_bind(|_, obj| {
         let item = obj.downcast_ref::<gtk::ListItem>().unwrap();
-        let Some(path) = item.item().and_downcast::<gtk::StringObject>() else {
+        let Some(hit) = item
+            .item()
+            .and_downcast::<gtk::StringObject>()
+            .and_then(|s| Hit::decode(&s.string()))
+        else {
             return;
         };
-        let Ok(path) = VaultPath::new(&path.string()) else {
-            return;
-        };
+        let path = hit.path();
         let row = item.child().and_downcast::<gtk::Box>().unwrap();
         let title = row.first_child().and_downcast::<gtk::Label>().unwrap();
         let folder = title.next_sibling().and_downcast::<gtk::Label>().unwrap();
-        let (name, ext) = crate::files::display_name(&path, false);
-        title.set_label(&match ext {
+        let (name, ext) = crate::files::display_name(path, false);
+        let name = match ext {
             Some(ext) => format!("{name}.{ext}"),
             None => name,
-        });
+        };
         let parent = path.parent().map(|p| p.to_string());
-        folder.set_visible(parent.is_some());
-        folder.set_label(parent.as_deref().unwrap_or(""));
+        match &hit {
+            Hit::Note(_) => {
+                title.set_label(&name);
+                folder.set_visible(parent.is_some());
+                folder.set_label(parent.as_deref().unwrap_or(""));
+            }
+            Hit::Alias(_, alias) => {
+                title.set_label(alias);
+                folder.set_visible(true);
+                folder.set_label(&format!("Alias of {name}"));
+            }
+            Hit::Heading(_, heading, _) => {
+                title.set_label(heading);
+                folder.set_visible(true);
+                folder.set_label(&format!("Heading in {name}"));
+            }
+        }
     });
     factory
 }
@@ -331,6 +481,28 @@ mod tests {
         assert!(rank("zzzz", &files, &[], 10).is_empty());
         // The .md extension isn't part of the match.
         assert!(rank(".md", &files, &[], 10).is_empty());
+    }
+
+    #[test]
+    fn aliases_match() {
+        let files = paths(&["Projects/Igneous.md", "Home.md"]);
+        let mut aliases = HashMap::new();
+        aliases.insert(
+            paths(&["Home.md"])[0].clone(),
+            vec!["Start page".to_owned()],
+        );
+        let hits = rank_with_aliases("start", &files, &[], &aliases, 10);
+        assert_eq!(
+            hits[0],
+            Hit::Alias(paths(&["Home.md"])[0].clone(), "Start page".into())
+        );
+        for hit in [
+            Hit::Note(paths(&["a/b.md"])[0].clone()),
+            Hit::Alias(paths(&["a.md"])[0].clone(), "x y".into()),
+            Hit::Heading(paths(&["a.md"])[0].clone(), "Plans".into(), 42),
+        ] {
+            assert_eq!(Hit::decode(&hit.encode()), Some(hit));
+        }
     }
 
     #[test]

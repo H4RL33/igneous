@@ -794,6 +794,7 @@ dependencies = [
  "gtk4",
  "igneous-markdown",
  "libadwaita",
+ "nucleo-matcher",
  "sourceview5",
  "tempfile",
  "thiserror",
