@@ -251,6 +251,11 @@ impl Controller {
             })
     }
 
+    /// Whether the current note hit the parser fallback.
+    pub fn degraded(&self) -> bool {
+        self.state.borrow().doc.degraded
+    }
+
     pub fn text(&self) -> String {
         self.state.borrow().text.clone()
     }

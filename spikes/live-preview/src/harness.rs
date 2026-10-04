@@ -380,6 +380,8 @@ fn soak(c: Rc<Controller>, app: adw::Application, secs: u64, seed: u64) {
     let rng = Rc::new(RefCell::new(Rng(seed.max(1))));
     let ops = Rc::new(Cell::new(0u64));
     let failures: Rc<RefCell<Vec<String>>> = Rc::default();
+    let dumped = Rc::new(Cell::new(false));
+    let smallest = Rc::new(Cell::new(usize::MAX));
     glib::timeout_add_local(Duration::from_millis(1), move || {
         for _ in 0..20 {
             soak_op(&c, &mut rng.borrow_mut());
@@ -387,16 +389,28 @@ fn soak(c: Rc<Controller>, app: adw::Application, secs: u64, seed: u64) {
             if let Err(e) = c.check_invariants() {
                 failures.borrow_mut().push(format!("op {}: {e}", ops.get()));
             }
+            smallest.set(smallest.get().min(c.text().len()));
+            if c.degraded() && !dumped.get() {
+                let path = std::env::temp_dir().join("igneous-parser-fallback.md");
+                let _ = std::fs::write(&path, c.text());
+                println!(
+                    "   op {}: parser fallback; note saved to {}",
+                    ops.get(),
+                    path.display()
+                );
+                dumped.set(true);
+            }
         }
         if Instant::now() < deadline {
             return glib::ControlFlow::Continue;
         }
         let failures = failures.borrow();
         println!(
-            "== soak: {} operations in {secs}s, {} invariant failures, final note {} bytes",
+            "== soak: {} operations in {secs}s, {} invariant failures, final note {} bytes, smallest {} bytes",
             ops.get(),
             failures.len(),
-            c.text().len()
+            c.text().len(),
+            smallest.get()
         );
         for f in failures.iter().take(5) {
             println!("   {f}");
@@ -417,6 +431,15 @@ fn soak_op(c: &Controller, rng: &mut Rng) {
             let mut iter = buffer.iter_at_offset(at(rng));
             buffer.begin_user_action();
             buffer.insert(&mut iter, snippet);
+            buffer.end_user_action();
+        }
+        // Keep the note large: below 30k characters, add a whole section
+        // instead of deleting.
+        30..48 if total < 30_000 => {
+            let section = SECTION.replace("{i}", &rng.below(1000).to_string());
+            let mut iter = buffer.iter_at_offset(at(rng));
+            buffer.begin_user_action();
+            buffer.insert(&mut iter, &section);
             buffer.end_user_action();
         }
         30..48 => {
