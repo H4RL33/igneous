@@ -1,0 +1,145 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $IgneousWindow: Adw.ApplicationWindow {
+  default-width: 1100;
+  default-height: 760;
+  width-request: 360;
+  height-request: 294;
+
+  Adw.Breakpoint {
+    condition ("max-width: 600sp")
+
+    setters {
+      split_view.collapsed: true;
+    }
+  }
+
+  content: Adw.ToastOverlay toast_overlay {
+    child: Adw.OverlaySplitView split_view {
+      min-sidebar-width: 220;
+      max-sidebar-width: 340;
+
+      sidebar: Adw.ToolbarView {
+        [top]
+        Adw.HeaderBar {
+          [title]
+          Adw.WindowTitle vault_title {}
+
+          [start]
+          Button {
+            icon-name: "document-new-symbolic";
+            tooltip-text: _("New Note");
+            action-name: "win.new-note";
+          }
+
+          [end]
+          Button {
+            icon-name: "folder-new-symbolic";
+            tooltip-text: _("New Folder");
+            action-name: "win.new-folder";
+          }
+        }
+
+        content: ScrolledWindow {
+          hscrollbar-policy: never;
+
+          child: ListView files_view {
+            single-click-activate: true;
+            tab-behavior: item;
+
+            styles [
+              "navigation-sidebar",
+            ]
+          };
+        };
+      };
+
+      content: Adw.ToolbarView {
+        [top]
+        Adw.HeaderBar {
+          [start]
+          ToggleButton {
+            icon-name: "sidebar-show-symbolic";
+            tooltip-text: _("Toggle Sidebar");
+            active: bind split_view.show-sidebar bidirectional;
+          }
+
+          [title]
+          Adw.WindowTitle note_title {
+            title: _("Igneous");
+          }
+
+          [end]
+          MenuButton {
+            primary: true;
+            icon-name: "open-menu-symbolic";
+            tooltip-text: _("Main Menu");
+            menu-model: primary_menu;
+          }
+        }
+
+        [top]
+        Adw.TabBar tab_bar {
+          view: tab_view;
+          autohide: false;
+        }
+
+        content: Stack content_stack {
+          StackPage {
+            name: "empty";
+
+            child: Adw.StatusPage {
+              icon-name: "dev.h4rl3y.igneous-symbolic";
+              title: _("No Note Open");
+              description: _("Pick a note in the sidebar, press Ctrl+O to find one, or Ctrl+N to start a new one");
+            };
+          }
+
+          StackPage {
+            name: "tabs";
+            child: Adw.TabView tab_view {};
+          }
+        };
+      };
+    };
+  };
+}
+
+menu primary_menu {
+  section {
+    item {
+      label: _("_New Note");
+      action: "win.new-note";
+    }
+
+    item {
+      label: _("New _Folder");
+      action: "win.new-folder";
+    }
+
+    item {
+      label: _("_Find Note…");
+      action: "win.quick-switcher";
+    }
+  }
+
+  section {
+    item {
+      label: _("_Open Vault…");
+      action: "app.new-window";
+    }
+  }
+
+  section {
+    item {
+      label: _("_Keyboard Shortcuts");
+      action: "app.shortcuts";
+    }
+
+    item {
+      label: _("_About Igneous");
+      action: "app.about";
+    }
+  }
+}

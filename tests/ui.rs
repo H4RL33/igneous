@@ -1,0 +1,350 @@
+//! UI tests on a copy of the fixture vault. They need a display; run them
+//! with `build-aux/run-ui-tests.sh`, which uses a private headless session.
+
+use std::path::Path;
+use std::time::Duration;
+
+use adw::prelude::*;
+use gtk::glib;
+use igneous::{NoteState, Window};
+use igneous_core::VaultPath;
+
+const FIXTURE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/vaults/basic");
+
+fn copy_dir(from: &Path, to: &Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for entry in std::fs::read_dir(from).unwrap() {
+        let entry = entry.unwrap();
+        let dest = to.join(entry.file_name());
+        if entry.file_type().unwrap().is_dir() {
+            copy_dir(&entry.path(), &dest);
+        } else {
+            std::fs::copy(entry.path(), dest).unwrap();
+        }
+    }
+}
+
+/// A fresh copy of the fixture vault, optionally with an autosave delay.
+fn vault(autosave_ms: Option<u32>) -> tempfile::TempDir {
+    if let Some(settings) = gtk::Settings::default() {
+        settings.set_gtk_error_bell(false);
+        // A legacy GTK 3 setting some desktops carry; libadwaita doesn't
+        // support it and it mixes light and dark styles.
+        #[allow(deprecated)]
+        settings.set_gtk_application_prefer_dark_theme(false);
+    }
+    let dir = tempfile::tempdir().unwrap();
+    copy_dir(Path::new(FIXTURE), dir.path());
+    if let Some(ms) = autosave_ms {
+        std::fs::create_dir_all(dir.path().join(".igneous")).unwrap();
+        std::fs::write(
+            dir.path().join(".igneous/vault.json"),
+            format!("{{\"version\":1,\"editor\":{{\"autosaveDelayMs\":{ms}}}}}"),
+        )
+        .unwrap();
+    }
+    dir
+}
+
+/// Opens and shows a window: GTK only closes windows that have been shown.
+fn open(dir: &tempfile::TempDir) -> Window {
+    let window = Window::for_vault(dir.path()).unwrap();
+    window.present();
+    window
+}
+
+fn p(s: &str) -> VaultPath {
+    VaultPath::new(s).unwrap()
+}
+
+async fn wait(ms: u64) {
+    glib::timeout_future(Duration::from_millis(ms)).await;
+}
+
+#[gtk::test]
+async fn edits_autosave_and_keep_line_endings() {
+    let dir = vault(Some(100));
+    let window = open(&dir);
+    window.open_path(&p("Projects/Windows.md"), false);
+    let note = window.selected_note().unwrap();
+    assert_eq!(
+        note.text(),
+        "# Windows note\n\nThis note uses CRLF line endings.\n"
+    );
+
+    let buffer = note.buffer();
+    buffer.insert(&mut buffer.end_iter(), "More.\n");
+    assert_eq!(note.state(), NoteState::Dirty);
+    wait(600).await;
+    assert_eq!(note.state(), NoteState::Clean);
+    assert_eq!(
+        std::fs::read(dir.path().join("Projects/Windows.md")).unwrap(),
+        b"# Windows note\r\n\r\nThis note uses CRLF line endings.\r\nMore.\r\n"
+    );
+    window.close();
+}
+
+#[gtk::test]
+async fn external_changes_reload_clean_notes() {
+    let dir = vault(Some(100));
+    let window = open(&dir);
+    window.open_path(&p("Daily/2026-10-04.md"), false);
+    let note = window.selected_note().unwrap();
+    wait(300).await;
+    std::fs::write(
+        dir.path().join("Daily/2026-10-04.md"),
+        "# Changed elsewhere\n",
+    )
+    .unwrap();
+    wait(1200).await;
+    assert_eq!(note.text(), "# Changed elsewhere\n");
+    assert_eq!(note.state(), NoteState::Clean);
+    window.close();
+}
+
+#[gtk::test]
+async fn unsaved_edits_are_never_overwritten() {
+    let dir = vault(Some(60_000));
+    let window = open(&dir);
+    window.open_path(&p("Projects/Ideas.md"), false);
+    let note = window.selected_note().unwrap();
+    wait(300).await;
+    let buffer = note.buffer();
+    buffer.insert(&mut buffer.end_iter(), "Mine.\n");
+    std::fs::write(dir.path().join("Projects/Ideas.md"), "Theirs.\n").unwrap();
+    wait(1200).await;
+    assert_eq!(note.state(), NoteState::ChangedOnDisk);
+    note.flush();
+    window.close();
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("Projects/Ideas.md")).unwrap(),
+        "Theirs.\n"
+    );
+}
+
+#[gtk::test]
+async fn renames_follow_open_tabs() {
+    let dir = vault(None);
+    let window = open(&dir);
+    window.open_path(&p("Projects/Igneous/Roadmap.md"), false);
+    window.rename(&p("Projects/Igneous"), &p("Projects/Igneous app"));
+    assert!(dir.path().join("Projects/Igneous app/Roadmap.md").is_file());
+    assert_eq!(
+        window.tab_paths(),
+        vec![p("Projects/Igneous app/Roadmap.md")]
+    );
+    window.rename(
+        &p("Projects/Igneous app/Roadmap.md"),
+        &p("Projects/Igneous app/Plan.md"),
+    );
+    assert_eq!(
+        window.selected_path(),
+        Some(p("Projects/Igneous app/Plan.md"))
+    );
+    window.close();
+}
+
+#[gtk::test]
+async fn workspace_is_restored() {
+    let dir = vault(None);
+    {
+        let window = open(&dir);
+        window.open_path(&p("Home.md"), true);
+        window.open_path(&p("Projects/Ideas.md"), true);
+        window.open_path(&p("Home.md"), false);
+        window.close();
+    }
+    assert!(dir.path().join(".igneous/workspace.json").is_file());
+    let window = open(&dir);
+    assert_eq!(
+        window.tab_paths(),
+        vec![p("Home.md"), p("Projects/Ideas.md")]
+    );
+    assert_eq!(window.selected_path(), Some(p("Home.md")));
+    window.close();
+}
+
+#[gtk::test]
+async fn opening_and_closing_writes_nothing() {
+    let dir = vault(None);
+    let window = open(&dir);
+    wait(300).await;
+    window.close();
+    assert!(!dir.path().join(".igneous").exists());
+    for entry in walk(Path::new(FIXTURE)) {
+        let rel = entry.strip_prefix(FIXTURE).unwrap();
+        assert_eq!(
+            std::fs::read(&entry).unwrap(),
+            std::fs::read(dir.path().join(rel)).unwrap(),
+            "{} changed",
+            rel.display()
+        );
+    }
+}
+
+#[gtk::test]
+async fn file_tree_lists_and_follows_the_disk() {
+    let dir = vault(None);
+    let window = open(&dir);
+    assert_eq!(
+        window.sidebar_paths(),
+        vec![p("Attachments"), p("Daily"), p("Projects"), p("Home.md")]
+    );
+    std::fs::write(dir.path().join("Inbox.md"), "").unwrap();
+    std::fs::remove_file(dir.path().join("Home.md")).unwrap();
+    wait(1200).await;
+    assert_eq!(
+        window.sidebar_paths(),
+        vec![p("Attachments"), p("Daily"), p("Projects"), p("Inbox.md")]
+    );
+    window.close();
+}
+
+#[gtk::test]
+fn application_registers_actions() {
+    let app = igneous::Application::new();
+    app.register(gtk::gio::Cancellable::NONE).unwrap();
+    for action in ["quit", "about", "new-window", "shortcuts"] {
+        assert!(
+            app.lookup_action(action).is_some(),
+            "app.{action} is missing"
+        );
+    }
+    assert_eq!(app.accels_for_action("win.quick-switcher"), ["<Control>o"]);
+}
+
+fn walk(dir: &Path) -> Vec<std::path::PathBuf> {
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            out.extend(walk(&path));
+        } else {
+            out.push(path);
+        }
+    }
+    out
+}
+
+/// Not a test: saves a screenshot of a window for a visual check.
+/// `IGNEOUS_SCREENSHOT=out.png build-aux/run-ui-tests.sh -- --ignored screenshot`
+#[gtk::test]
+#[ignore = "visual check"]
+async fn screenshot() {
+    let Ok(out) = std::env::var("IGNEOUS_SCREENSHOT") else {
+        return;
+    };
+    let dir = vault(None);
+    let window = open(&dir);
+    window.set_default_size(1100, 720);
+    window.open_path(&p("Home.md"), true);
+    window.open_path(&p("Projects/Igneous/Roadmap.md"), true);
+    window.open_path(&p("Home.md"), false);
+    window.present();
+    wait(1500).await;
+    save_png(
+        window.upcast_ref(),
+        AdwApplicationWindowExt::content(&window).unwrap(),
+        &out,
+    );
+    window.close();
+
+    // The vault picker, with one recent vault.
+    let app = igneous::Application::new();
+    let picker = igneous::VaultPicker::new(&app);
+    picker.present();
+    wait(800).await;
+    let content = AdwApplicationWindowExt::content(&picker).unwrap();
+    save_png(
+        picker.upcast_ref(),
+        content,
+        &out.replace(".png", "-picker.png"),
+    );
+    picker.close();
+}
+
+fn save_png(window: &gtk::Window, _content: gtk::Widget, out: &str) {
+    // Paint the whole window: header bars are translucent over its background.
+    let paintable = gtk::WidgetPaintable::new(Some(window));
+    let snapshot = gtk::Snapshot::new();
+    paintable.snapshot(&snapshot, window.width() as f64, window.height() as f64);
+    let texture = window
+        .renderer()
+        .unwrap()
+        .render_texture(snapshot.to_node().unwrap(), None);
+    texture.save_to_png(out).unwrap();
+}
+
+/// Opt-in: opens copies of real vaults, loads every note, closes, and checks
+/// that no note changed by a single byte. Prints only counts.
+/// `IGNEOUS_CORPUS=/vault/one:/vault/two build-aux/run-ui-tests.sh -p igneous --test ui -- --ignored corpus`
+#[gtk::test]
+#[ignore = "needs IGNEOUS_CORPUS"]
+async fn corpus_round_trip() {
+    let Ok(corpus) = std::env::var("IGNEOUS_CORPUS") else {
+        return;
+    };
+    for source in corpus.split(':').filter(|s| !s.is_empty()) {
+        let dir = tempfile::tempdir().unwrap();
+        copy_visible(Path::new(source), dir.path());
+        let before: Vec<(std::path::PathBuf, Vec<u8>)> = walk(dir.path())
+            .into_iter()
+            .map(|p| {
+                let bytes = std::fs::read(&p).unwrap();
+                (p, bytes)
+            })
+            .collect();
+        let window = open(&dir);
+        wait(300).await;
+        let notes: Vec<VaultPath> = before
+            .iter()
+            .filter(|(p, _)| p.extension().is_some_and(|e| e == "md"))
+            .filter_map(|(p, _)| VaultPath::from_fs(dir.path(), p).ok())
+            .collect();
+        for note in &notes {
+            window.open_path(note, false);
+        }
+        window.close();
+        let mut changed = 0;
+        for (path, bytes) in &before {
+            if std::fs::read(path).ok().as_ref() != Some(bytes) {
+                changed += 1;
+            }
+        }
+        let extra: Vec<_> = walk(dir.path())
+            .into_iter()
+            .filter(|p| !before.iter().any(|(b, _)| b == p))
+            .map(|p| p.strip_prefix(dir.path()).unwrap().display().to_string())
+            .collect();
+        eprintln!(
+            "{} files, {} notes opened, {} changed, new files: {:?}",
+            before.len(),
+            notes.len(),
+            changed,
+            extra
+        );
+        assert_eq!(changed, 0);
+        assert!(
+            extra.iter().all(|p| p == ".igneous/workspace.json"),
+            "{extra:?}"
+        );
+    }
+}
+
+/// Copies a vault without its dot-folders (`.git`, `.obsidian`, …).
+fn copy_visible(from: &Path, to: &Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for entry in std::fs::read_dir(from).unwrap() {
+        let entry = entry.unwrap();
+        if entry.file_name().to_string_lossy().starts_with('.') {
+            continue;
+        }
+        let dest = to.join(entry.file_name());
+        let kind = entry.file_type().unwrap();
+        if kind.is_dir() {
+            copy_visible(&entry.path(), &dest);
+        } else if kind.is_file() {
+            std::fs::copy(entry.path(), dest).unwrap();
+        }
+    }
+}

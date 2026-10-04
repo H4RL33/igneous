@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Obsidian Flavoured Markdown for Igneous's Source mode: the built-in
+  Markdown definition plus wikilinks, embeds, tags, highlights, comments,
+  callouts, block IDs, math and frontmatter.
+-->
+<language id="igneous-markdown" name="Markdown (Obsidian)" version="2.0" _section="Markup" hidden="true">
+  <metadata>
+    <property name="block-comment-start">%%</property>
+    <property name="block-comment-end">%%</property>
+  </metadata>
+
+  <styles>
+    <style id="frontmatter" name="Frontmatter" map-to="def:preprocessor"/>
+    <style id="comment" name="Comment" map-to="def:comment"/>
+    <style id="callout" name="Callout" map-to="def:type"/>
+    <style id="embed" name="Embed" map-to="markdown:image-marker"/>
+    <style id="wikilink" name="Wikilink" map-to="markdown:link-text"/>
+    <style id="highlight" name="Highlight" map-to="def:note"/>
+    <style id="strikethrough" name="Strikethrough" map-to="def:deletion"/>
+    <style id="math" name="Math" map-to="markdown:code-span"/>
+    <style id="tag" name="Tag" map-to="def:keyword"/>
+    <style id="block-id" name="Block ID" map-to="def:comment"/>
+  </styles>
+
+  <definitions>
+    <context id="frontmatter" style-ref="frontmatter" first-line-only="true" class="no-spell-check">
+      <start>^---\s*$</start>
+      <end>^---\s*$</end>
+    </context>
+
+    <context id="comment" style-ref="comment" class="comment" class-disabled="no-spell-check">
+      <start>%%</start>
+      <end>%%</end>
+    </context>
+
+    <context id="callout" style-ref="callout" class="no-spell-check">
+      <match>^\s*(?:&gt;\s*)+\[![^\]\s]+\][+-]?</match>
+    </context>
+
+    <context id="embed" style-ref="embed" class="no-spell-check">
+      <match>!\[\[[^\[\]\n]+\]\]</match>
+    </context>
+
+    <context id="wikilink" style-ref="wikilink" class="no-spell-check">
+      <match>\[\[[^\[\]\n]+\]\]</match>
+    </context>
+
+    <context id="highlight" style-ref="highlight">
+      <match>==[^=\s](?:[^=\n]*[^=\s])?==</match>
+    </context>
+
+    <context id="strikethrough" style-ref="strikethrough">
+      <match>~~[^~\n]+~~</match>
+    </context>
+
+    <context id="math-block" style-ref="math" class="no-spell-check">
+      <start>\$\$</start>
+      <end>\$\$</end>
+    </context>
+
+    <context id="math" style-ref="math" class="no-spell-check">
+      <match>\$[^\s$](?:[^$\n]*[^\s$])?\$</match>
+    </context>
+
+    <context id="tag" style-ref="tag" class="no-spell-check">
+      <match>(?&lt;![^\s])#[\w/-]*[^\W\d_][\w/-]*</match>
+    </context>
+
+    <context id="block-id" style-ref="block-id" class="no-spell-check">
+      <match>(?&lt;=\s)\^[A-Za-z0-9-]+\s*$</match>
+    </context>
+
+    <context id="igneous-markdown">
+      <include>
+        <context ref="frontmatter"/>
+        <context ref="comment"/>
+        <context ref="callout"/>
+        <context ref="embed"/>
+        <context ref="wikilink"/>
+        <context ref="highlight"/>
+        <context ref="strikethrough"/>
+        <context ref="math-block"/>
+        <context ref="math"/>
+        <context ref="tag"/>
+        <context ref="block-id"/>
+        <context ref="markdown:markdown"/>
+      </include>
+    </context>
+  </definitions>
+</language>

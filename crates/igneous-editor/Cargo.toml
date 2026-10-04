@@ -1,0 +1,16 @@
+[package]
+name = "igneous-editor"
+description = "The note editor widget for Igneous"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+adw.workspace = true
+gtk.workspace = true
+sourceview.workspace = true
+
+[build-dependencies]
+glib-build-tools.workspace = true

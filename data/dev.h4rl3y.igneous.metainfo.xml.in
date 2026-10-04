@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>@APP_ID@</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>BSD-3-Clause</project_license>
+  <name>Igneous</name>
+  <summary>Read and edit Markdown vaults</summary>
+  <description>
+    <p>
+      Igneous opens any folder of Markdown notes, including Obsidian vaults, and
+      edits it in place. Notes stay plain files that work in other apps.
+    </p>
+  </description>
+  <developer id="dev.h4rl3y">
+    <name>Harley Welsh</name>
+  </developer>
+  <launchable type="desktop-id">@APP_ID@.desktop</launchable>
+  <content_rating type="oars-1.1"/>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+  <releases>
+    <release version="@VERSION@" date="2026-10-04">
+      <description>
+        <p>Development preview.</p>
+      </description>
+    </release>
+  </releases>
+</component>

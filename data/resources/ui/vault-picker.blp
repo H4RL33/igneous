@@ -1,0 +1,63 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $IgneousVaultPicker: Adw.ApplicationWindow {
+  title: _("Igneous");
+  default-width: 520;
+  default-height: 640;
+  width-request: 360;
+  height-request: 400;
+
+  content: Adw.ToastOverlay toast_overlay {
+    child: Adw.ToolbarView {
+      [top]
+      Adw.HeaderBar {}
+
+      content: ScrolledWindow {
+        hscrollbar-policy: never;
+
+        child: Adw.Clamp {
+          maximum-size: 480;
+
+          child: Box {
+            orientation: vertical;
+            spacing: 12;
+            margin-bottom: 24;
+            margin-start: 12;
+            margin-end: 12;
+
+            Adw.StatusPage status_page {
+              title: _("Open a Vault");
+              description: _("Igneous works with any folder of Markdown notes, including Obsidian vaults");
+
+              child: Button {
+                label: _("_Open Folder…");
+                use-underline: true;
+                halign: center;
+                action-name: "picker.open-folder";
+
+                styles [
+                  "pill",
+                  "suggested-action",
+                ]
+              };
+            }
+
+            Adw.PreferencesGroup recent_group {
+              title: _("Recent Vaults");
+              visible: false;
+
+              ListBox recent_list {
+                selection-mode: none;
+
+                styles [
+                  "boxed-list",
+                ]
+              }
+            }
+          };
+        };
+      };
+    };
+  };
+}

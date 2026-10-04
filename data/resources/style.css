@@ -1,0 +1,12 @@
+/* Igneous's own styling. Colours come only from libadwaita's variables. */
+
+textview.igneous-note {
+  font-size: 1.05em;
+}
+
+.file-row .extension {
+  font-size: 0.8em;
+  padding: 0 4px;
+  border-radius: 4px;
+  background-color: alpha(currentColor, 0.1);
+}

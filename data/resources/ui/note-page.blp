@@ -1,0 +1,19 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $IgneousNotePage: Adw.Bin {
+  child: Box {
+    orientation: vertical;
+
+    Adw.Banner banner {
+      revealed: false;
+    }
+
+    ScrolledWindow scrolled {
+      vexpand: true;
+      hscrollbar-policy: never;
+
+      child: $IgneousNoteView view {};
+    }
+  };
+}

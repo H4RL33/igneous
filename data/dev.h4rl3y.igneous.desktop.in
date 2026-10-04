@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Igneous
+Comment=Read and edit Markdown vaults
+Exec=igneous %F
+Icon=@APP_ID@
+Terminal=false
+Type=Application
+Categories=GNOME;GTK;Office;Utility;TextEditor;
+Keywords=notes;markdown;obsidian;vault;wiki;knowledge;
+StartupNotify=true

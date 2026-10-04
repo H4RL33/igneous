@@ -4,3 +4,5 @@
 *.swp
 *~
 .flatpak-builder/
+/subprojects/*
+!/subprojects/*.wrap
