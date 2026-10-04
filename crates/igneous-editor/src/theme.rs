@@ -765,7 +765,10 @@ pub fn scheme_xml(theme: &Theme, dark: bool, accent: Color) -> (String, String) 
             "diff:diff-file",
             format!(r#"foreground="{}" bold="true""#, c("heading")),
         ),
-        ("diff:special-case", format!(r#"foreground="{}""#, c("syntax"))),
+        (
+            "diff:special-case",
+            format!(r#"foreground="{}""#, c("syntax")),
+        ),
         // Code in other languages.
         (
             "def:keyword",

@@ -16,12 +16,17 @@ use igneous_core::settings::{
 use igneous_core::watch::VaultEvent;
 use igneous_core::{TextFile, VaultPath};
 use igneous_editor::theme::{Catalog, Theme};
+use igneous_git::{Commit, SyncKind};
 
 use crate::application::Application;
+use crate::changes::ChangesPane;
 use crate::files::FileTree;
 use crate::image_page::{self, ImagePage};
 use crate::note_page::NotePage;
 use crate::quick_switcher::{Choice, QuickSwitcher};
+use crate::sync::{State as SyncState, SyncService};
+use crate::sync_button::SyncButton;
+use crate::text_page::{Contents, TextPage};
 use crate::vault::VaultContext;
 use crate::{config, gsettings};
 
@@ -41,7 +46,19 @@ mod imp {
         #[template_child]
         pub vault_title: TemplateChild<adw::WindowTitle>,
         #[template_child]
+        pub sidebar_switcher: TemplateChild<adw::InlineViewSwitcher>,
+        #[template_child]
+        pub sidebar_stack: TemplateChild<adw::ViewStack>,
+        #[template_child]
         pub files_view: TemplateChild<gtk::ListView>,
+        #[template_child]
+        pub changes_page: TemplateChild<adw::ViewStackPage>,
+        #[template_child]
+        pub changes_bin: TemplateChild<adw::Bin>,
+        #[template_child]
+        pub sync_slot: TemplateChild<adw::Bin>,
+        #[template_child]
+        pub sync_banner: TemplateChild<adw::Banner>,
         #[template_child]
         pub note_title: TemplateChild<adw::WindowTitle>,
         #[template_child]
@@ -61,6 +78,12 @@ mod imp {
         pub themes: RefCell<Catalog>,
         pub theme_id: RefCell<String>,
         pub style_handlers: RefCell<Vec<glib::SignalHandlerId>>,
+        pub sync: OnceCell<Rc<SyncService>>,
+        pub sync_button: OnceCell<Rc<SyncButton>>,
+        pub changes: OnceCell<Rc<ChangesPane>>,
+        /// The sidebar pane to show once it exists (Changes appears only
+        /// after Git has been found).
+        pub wanted_pane: Cell<Option<SidebarPane>>,
     }
 
     #[glib::object_subclass]
@@ -220,6 +243,22 @@ fn install_actions(klass: &mut <imp::Window as ObjectSubclass>::Class) {
         }
     });
     klass.install_property_action("win.tab-pinned", "menu-page-pinned");
+
+    // Git.
+    klass.install_action("win.sync-now", None, |w, _, _| w.sync_now(SyncKind::Full));
+    klass.install_action("win.pull", None, |w, _, _| w.sync_now(SyncKind::Pull));
+    klass.install_action("win.show-changes", None, |w, _, _| w.show_changes());
+    klass.install_action("win.publish-branch", None, |w, _, _| w.publish_branch());
+    klass.install_action("win.note-history", None, |w, _, _| {
+        if let Some(path) = w.selected_path() {
+            w.show_history(&path);
+        }
+    });
+    klass.install_action("win.file-history", string, |w, _, p| {
+        if let Some(path) = path_param(p) {
+            w.show_history(&path);
+        }
+    });
 }
 
 impl Window {
@@ -297,6 +336,40 @@ impl Window {
             move |_, _, _, _| window.schedule_workspace_save()
         ));
         imp.tree.set(tree).ok().unwrap();
+        imp.sidebar_stack
+            .connect_visible_child_name_notify(glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                move |_| window.schedule_workspace_save()
+            ));
+
+        // Git sync.
+        self.set_git_actions_enabled(false);
+        let sync = SyncService::new(ctx.root(), ctx.vault.igneous_dir());
+        let weak = self.downgrade();
+        sync.set_before_commit(move || {
+            if let Some(window) = weak.upgrade() {
+                window.flush_all();
+            }
+        });
+        let weak = self.downgrade();
+        sync.connect_changed(move || {
+            if let Some(window) = weak.upgrade() {
+                window.on_sync_changed();
+            }
+        });
+        let button = SyncButton::new(&sync);
+        imp.sync_slot.set_child(Some(&button.button));
+        imp.sync_button.set(button).ok().unwrap();
+        let changes = ChangesPane::new(&sync, self);
+        imp.changes_bin.set_child(Some(&changes.widget));
+        imp.changes.set(changes).ok().unwrap();
+        imp.sync_banner.connect_button_clicked(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |_| window.show_changes()
+        ));
+        imp.sync.set(sync).ok().unwrap();
 
         // Tabs.
         let view = imp.tab_view.get();
@@ -352,9 +425,11 @@ impl Window {
             move |_| window.schedule_workspace_save()
         ));
 
-        // Save when the window loses focus.
+        // Save when the window loses focus; check Git when it comes back.
         self.connect_is_active_notify(|window| {
-            if !window.is_active() {
+            if window.is_active() {
+                window.sync().refresh();
+            } else {
                 window.flush_all();
             }
         });
@@ -518,8 +593,21 @@ impl Window {
                 self.remember_recent(path);
             }
             None => {
-                imp.note_title.set_title("Igneous");
-                imp.note_title.set_subtitle("");
+                let text_page = imp
+                    .tab_view
+                    .selected_page()
+                    .and_then(|p| p.child().downcast::<TextPage>().ok());
+                match text_page {
+                    Some(page) => {
+                        imp.note_title.set_title(&page.title());
+                        imp.note_title
+                            .set_subtitle(page.path().as_ref().map_or("", |p| p.as_str()));
+                    }
+                    None => {
+                        imp.note_title.set_title("Igneous");
+                        imp.note_title.set_subtitle("");
+                    }
+                }
             }
         }
         self.tree().select(path.as_ref());
@@ -576,7 +664,7 @@ impl Window {
         }
     }
 
-    fn flush_all(&self) {
+    pub fn flush_all(&self) {
         for note in self.notes() {
             note.flush();
         }
@@ -585,6 +673,7 @@ impl Window {
     // --- changes on disk -------------------------------------------------------
 
     pub fn on_vault_events(&self, events: Vec<VaultEvent>) {
+        self.sync().refresh();
         let ctx = self.ctx();
         ctx.apply_events(&events);
         self.tree().refresh_for_events(&events);
@@ -1017,8 +1106,13 @@ impl Window {
 
     fn apply_editor_theme(&self) {
         let scheme = self.editor_scheme();
-        for note in self.notes() {
-            note.set_style_scheme(scheme.as_ref());
+        for page in self.pages() {
+            let child = page.child();
+            if let Some(note) = child.downcast_ref::<NotePage>() {
+                note.set_style_scheme(scheme.as_ref());
+            } else if let Some(text) = child.downcast_ref::<TextPage>() {
+                text.set_style_scheme(scheme.as_ref());
+            }
         }
     }
 
@@ -1071,7 +1165,10 @@ impl Window {
             .selected_page()
             .map(|p| imp.tab_view.page_position(&p) as usize);
         workspace.sidebar.visible = imp.split_view.shows_sidebar();
-        workspace.sidebar.pane = SidebarPane::Files;
+        workspace.sidebar.pane = match imp.sidebar_stack.visible_child_name().as_deref() {
+            Some("changes") => SidebarPane::Changes,
+            _ => SidebarPane::Files,
+        };
         workspace.sidebar.expanded = self.tree().expanded_folders();
         workspace.recently_closed = imp.recently_closed.borrow().clone();
         workspace.recent_files = imp.recent_files.borrow().clone();
@@ -1100,6 +1197,7 @@ impl Window {
         imp.restoring.set(true);
         self.tree().expand(&workspace.sidebar.expanded);
         imp.split_view.set_show_sidebar(workspace.sidebar.visible);
+        imp.wanted_pane.set(Some(workspace.sidebar.pane));
         imp.recently_closed
             .replace(workspace.recently_closed.clone());
         imp.recent_files.replace(workspace.recent_files.clone());
@@ -1169,9 +1267,209 @@ impl Window {
             .collect()
     }
 
+    /// The text of the selected tab, if it shows text.
+    pub fn selected_tab_text(&self) -> Option<String> {
+        let child = self.imp().tab_view.selected_page()?.child();
+        if let Some(note) = child.downcast_ref::<NotePage>() {
+            Some(note.text())
+        } else {
+            child.downcast_ref::<TextPage>().map(TextPage::text)
+        }
+    }
+
     /// Paths of the open tabs, in order.
     pub fn tab_paths(&self) -> Vec<VaultPath> {
         self.pages().iter().filter_map(Self::page_path).collect()
+    }
+
+    // --- Git -------------------------------------------------------------------
+
+    pub fn sync(&self) -> &Rc<SyncService> {
+        self.imp().sync.get().unwrap()
+    }
+
+    fn set_git_actions_enabled(&self, enabled: bool) {
+        for action in [
+            "win.sync-now",
+            "win.pull",
+            "win.show-changes",
+            "win.publish-branch",
+            "win.note-history",
+            "win.file-history",
+        ] {
+            self.action_set_enabled(action, enabled);
+        }
+    }
+
+    fn on_sync_changed(&self) {
+        let imp = self.imp();
+        let sync = self.sync();
+        let available = sync.is_available();
+        self.set_git_actions_enabled(available);
+        imp.changes_page.set_visible(available);
+        imp.sidebar_switcher.set_visible(available);
+        if available && let Some(pane) = imp.wanted_pane.take() {
+            imp.restoring.set(true);
+            if pane == SidebarPane::Changes {
+                imp.sidebar_stack.set_visible_child_name("changes");
+            }
+            imp.restoring.set(false);
+        }
+        let status = sync.status();
+        let count = status.as_ref().map_or(0, |s| s.entries.len());
+        imp.changes_page.set_badge_number(count as u32);
+        let paused = sync.state() == SyncState::Paused;
+        if paused {
+            let n = status.as_ref().map_or(0, |s| s.conflicts().count());
+            imp.sync_banner.set_title(&match n {
+                0 => "Sync paused: a merge is waiting to be committed".to_owned(),
+                1 => "Sync paused: 1 file has conflicts".to_owned(),
+                n => format!("Sync paused: {n} files have conflicts"),
+            });
+        }
+        imp.sync_banner.set_revealed(paused);
+        let rebasing = status
+            .as_ref()
+            .is_some_and(|s| s.in_progress == Some(igneous_git::InProgress::Rebase));
+        for note in self.notes() {
+            note.set_rebasing(rebasing);
+        }
+    }
+
+    fn sync_now(&self, kind: SyncKind) {
+        let sync = self.sync().clone();
+        let window = self.downgrade();
+        glib::spawn_future_local(async move {
+            let Some(result) = sync.run(kind, true).await else {
+                return;
+            };
+            let Some(window) = window.upgrade() else {
+                return;
+            };
+            match result {
+                Ok(report) => window.toast(&crate::sync::describe(&report)),
+                Err(e) => window.toast(&e.to_string()),
+            }
+        });
+    }
+
+    fn publish_branch(&self) {
+        let sync = self.sync().clone();
+        let window = self.downgrade();
+        glib::spawn_future_local(async move {
+            let result = sync.publish().await;
+            if let (Some(result), Some(window)) = (result, window.upgrade()) {
+                match result {
+                    Ok(()) => window.toast("Branch published"),
+                    Err(e) => window.toast(&e.to_string()),
+                }
+            }
+        });
+    }
+
+    pub fn show_changes(&self) {
+        let imp = self.imp();
+        if !self.sync().is_available() {
+            return;
+        }
+        imp.split_view.set_show_sidebar(true);
+        imp.sidebar_stack.set_visible_child_name("changes");
+        if let Some(changes) = imp.changes.get() {
+            changes.focus_message();
+        }
+    }
+
+    fn show_history(&self, path: &VaultPath) {
+        crate::history::show(self, self.sync(), path);
+    }
+
+    /// Opens (or refreshes) a tab with a file's uncommitted changes.
+    pub fn open_changes(&self, path: &VaultPath, staged: bool, untracked: bool) {
+        let sync = self.sync().clone();
+        let Some(git) = sync.git() else { return };
+        let repo_path = git.to_repo(path.as_str());
+        let window = self.downgrade();
+        let path = path.clone();
+        glib::spawn_future_local(async move {
+            let result = sync
+                .call(move |git| git.diff(&repo_path, staged, untracked))
+                .await;
+            let Some(window) = window.upgrade() else {
+                return;
+            };
+            match result {
+                Some(Ok(diff)) => {
+                    let text = if diff.is_empty() {
+                        "No changes.\n".to_owned()
+                    } else {
+                        diff
+                    };
+                    window.open_text_page(&path, Contents::Diff { staged }, &text);
+                }
+                Some(Err(e)) => window.toast(&format!("Couldn’t show the changes: {e}")),
+                None => {}
+            }
+        });
+    }
+
+    /// Opens a file as it was in `commit`, read-only.
+    pub fn open_version(&self, sync: &Rc<SyncService>, path: &VaultPath, commit: Commit) {
+        let window = self.downgrade();
+        let path = path.clone();
+        let hash = commit.hash.clone();
+        let old_path = commit.path.clone();
+        let sync = sync.clone();
+        glib::spawn_future_local(async move {
+            let result = sync.call(move |git| git.show(&hash, &old_path)).await;
+            let Some(window) = window.upgrade() else {
+                return;
+            };
+            match result {
+                Some(Ok(bytes)) => {
+                    let text = match TextFile::from_bytes(&bytes) {
+                        Ok(file) => file.text().to_owned(),
+                        Err(_) => String::from_utf8_lossy(&bytes).into_owned(),
+                    };
+                    window.open_text_page(
+                        &path,
+                        Contents::Version {
+                            hash: commit.hash,
+                            short: commit.short,
+                        },
+                        &text,
+                    );
+                }
+                Some(Err(e)) => window.toast(&format!("Couldn’t open that version: {e}")),
+                None => {}
+            }
+        });
+    }
+
+    fn open_text_page(&self, path: &VaultPath, contents: Contents, text: &str) {
+        let imp = self.imp();
+        let page = TextPage::new(path, contents.clone(), text, self.editor_scheme().as_ref());
+        let existing = self.pages().into_iter().find(|p| {
+            p.child().downcast_ref::<TextPage>().is_some_and(|t| {
+                t.path().as_ref() == Some(path) && t.contents() == Some(contents.clone())
+            })
+        });
+        let position = existing.as_ref().map(|p| imp.tab_view.page_position(p));
+        let tab = match position {
+            Some(position) => imp.tab_view.insert(&page, position),
+            None => imp
+                .tab_view
+                .add_page(&page, imp.tab_view.selected_page().as_ref()),
+        };
+        if let Some(old) = existing {
+            imp.tab_view.close_page(&old);
+        }
+        tab.set_title(&page.title());
+        tab.set_tooltip(&glib::markup_escape_text(path.as_str()));
+        tab.set_icon(Some(&gio::ThemedIcon::new(match page.contents() {
+            Some(Contents::Version { .. }) => "document-open-recent-symbolic",
+            _ => "document-edit-symbolic",
+        })));
+        imp.tab_view.set_selected_page(&tab);
     }
 
     // --- tab menu property -----------------------------------------------------

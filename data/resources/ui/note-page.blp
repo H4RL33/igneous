@@ -9,6 +9,73 @@ template $IgneousNotePage: Adw.Bin {
       revealed: false;
     }
 
+    // Shown while the note has conflict blocks left by a Git merge.
+    Revealer conflict_revealer {
+      transition-type: slide_down;
+
+      child: Adw.WrapBox {
+        child-spacing: 6;
+        line-spacing: 6;
+        margin-start: 12;
+        margin-end: 12;
+        margin-top: 6;
+        margin-bottom: 6;
+
+        Label conflict_label {
+          xalign: 0;
+
+          styles [
+            "heading",
+          ]
+        }
+
+        Button {
+          label: _("Keep _Mine");
+          use-underline: true;
+          tooltip-text: _("Keep this computer’s version of the conflict at the cursor");
+          action-name: "note.keep-mine";
+        }
+
+        Button {
+          label: _("Keep _Theirs");
+          use-underline: true;
+          tooltip-text: _("Keep the remote version of the conflict at the cursor");
+          action-name: "note.keep-theirs";
+        }
+
+        Button {
+          label: _("Keep _Both");
+          use-underline: true;
+          tooltip-text: _("Keep both versions, this computer’s first");
+          action-name: "note.keep-both";
+        }
+
+        Button {
+          icon-name: "go-up-symbolic";
+          tooltip-text: _("Previous Conflict");
+          action-name: "note.previous-conflict";
+
+          styles [
+            "flat",
+          ]
+        }
+
+        Button {
+          icon-name: "go-down-symbolic";
+          tooltip-text: _("Next Conflict");
+          action-name: "note.next-conflict";
+
+          styles [
+            "flat",
+          ]
+        }
+
+        styles [
+          "conflict-bar",
+        ]
+      };
+    }
+
     ScrolledWindow scrolled {
       vexpand: true;
       hscrollbar-policy: never;

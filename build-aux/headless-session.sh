@@ -7,6 +7,7 @@
 # - a D-Bus session bus that starts no services (test-session.conf);
 # - in-memory GSettings, local-only GIO, no portals, no accessibility bus;
 # - no sound server, so GTK's error bell is silent;
+# - a Git configuration of its own (no signing, hooks or editors from yours);
 # - GTK's simple input method instead of Wayland text-input. In GTK 4.22 an
 #   editor focused before the session's text-input object exists is never
 #   cleared from the input method's state, and GTK crashes on a later
@@ -21,12 +22,16 @@ cleanup() { rm -rf "$sandbox"; }
 trap cleanup EXIT INT TERM
 for d in runtime config data cache state; do mkdir -p "$sandbox/$d"; done
 chmod 700 "$sandbox/runtime"
+mkdir -p "$sandbox/config/git"
+printf '[user]\n\tname = Igneous Tests\n\temail = tests@igneous.invalid\n[init]\n\tdefaultBranch = main\n[commit]\n\tgpgsign = false\n' \
+  >"$sandbox/config/git/config"
 
 unset DISPLAY WAYLAND_DISPLAY DBUS_SESSION_BUS_ADDRESS
 export XDG_RUNTIME_DIR="$sandbox/runtime" XDG_CONFIG_HOME="$sandbox/config" \
   XDG_DATA_HOME="$sandbox/data" XDG_CACHE_HOME="$sandbox/cache" XDG_STATE_HOME="$sandbox/state" \
   GSETTINGS_BACKEND=memory GIO_USE_VFS=local GTK_A11Y=none NO_AT_BRIDGE=1 GDK_DEBUG=no-portals \
-  GTK_IM_MODULE=gtk-im-context-simple IGNEOUS_HEADLESS=1
+  GTK_IM_MODULE=gtk-im-context-simple IGNEOUS_HEADLESS=1 \
+  GIT_CONFIG_GLOBAL="$sandbox/config/git/config" GIT_CONFIG_NOSYSTEM=1
 
 dbus-run-session --config-file="$here/test-session.conf" -- sh -c '
   mutter --headless --wayland --no-x11 --virtual-monitor 1280x1024 \

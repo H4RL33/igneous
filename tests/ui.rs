@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use adw::prelude::*;
 use gtk::glib;
-use igneous::{NoteState, Window};
+use igneous::{NoteState, SyncState, Window};
 use igneous_core::VaultPath;
 use sourceview::prelude::*;
 
@@ -250,6 +250,207 @@ async fn vault_themes_are_found() {
     window.close();
 }
 
+// --- Git sync ------------------------------------------------------------------
+//
+// These rely on the sealed session's own Git configuration (identity, no
+// signing), set up by build-aux/headless-session.sh.
+
+fn git(cwd: &Path, args: &[&str]) -> String {
+    let out = std::process::Command::new("git")
+        .current_dir(cwd)
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8_lossy(&out.stdout).into_owned()
+}
+
+/// The fixture vault as a repository whose `main` is pushed to a bare
+/// remote. The second directory holds the remote and any other clones.
+fn synced_vault() -> (tempfile::TempDir, tempfile::TempDir) {
+    let dir = vault(Some(100));
+    let remotes = tempfile::tempdir().unwrap();
+    git(remotes.path(), &["init", "-q", "--bare", "remote.git"]);
+    let remote = remotes.path().join("remote.git");
+    git(dir.path(), &["init", "-q"]);
+    git(dir.path(), &["add", "-A"]);
+    git(dir.path(), &["commit", "-q", "-m", "init"]);
+    git(
+        dir.path(),
+        &["remote", "add", "origin", remote.to_str().unwrap()],
+    );
+    git(dir.path(), &["push", "-q", "-u", "origin", "main"]);
+    (dir, remotes)
+}
+
+/// Another computer: a clone of the remote.
+fn other_clone(remotes: &tempfile::TempDir) -> std::path::PathBuf {
+    let path = remotes.path().join("other");
+    if !path.exists() {
+        git(remotes.path(), &["clone", "-q", "remote.git", "other"]);
+    }
+    path
+}
+
+fn remote_log(remotes: &tempfile::TempDir) -> String {
+    git(
+        &remotes.path().join("remote.git"),
+        &["log", "--format=%s", "main"],
+    )
+}
+
+/// Waits up to `ms` for `f` to hold.
+async fn until(ms: u64, mut f: impl FnMut() -> bool) -> bool {
+    for _ in 0..ms / 50 {
+        if f() {
+            return true;
+        }
+        wait(50).await;
+    }
+    f()
+}
+
+#[gtk::test]
+async fn git_sync_round_trip() {
+    let (dir, remotes) = synced_vault();
+    let window = open(&dir);
+    assert!(until(5000, || window.sync().is_available()).await);
+
+    window.open_path(&p("Home.md"), false);
+    let note = window.selected_note().unwrap();
+    let buffer = note.buffer();
+    buffer.insert(&mut buffer.end_iter(), "Synced from Igneous.\n");
+    note.flush();
+
+    // The change shows in the Changes pane's data and as a diff.
+    window.sync().refresh_now();
+    assert!(
+        until(3000, || window
+            .sync()
+            .status()
+            .is_some_and(|s| s.entry("Home.md").is_some()))
+        .await
+    );
+    window.open_changes(&p("Home.md"), false, false);
+    assert!(
+        until(3000, || window
+            .selected_tab_text()
+            .is_some_and(|t| t.contains("+Synced from Igneous.")))
+        .await
+    );
+
+    // Sync now commits and pushes.
+    WidgetExt::activate_action(&window, "win.sync-now", None).unwrap();
+    assert!(
+        until(10_000, || remote_log(&remotes)
+            .starts_with("vault backup: "))
+        .await
+    );
+    assert!(until(3000, || window.sync().state() == SyncState::Idle).await);
+    assert!(!window.sync().status().unwrap().is_dirty());
+
+    // Changes from elsewhere arrive with a pull, and open notes reload.
+    window.open_path(&p("Daily/2026-10-04.md"), true);
+    let daily = window.selected_note().unwrap();
+    let other = other_clone(&remotes);
+    std::fs::write(other.join("Daily/2026-10-04.md"), "# Written elsewhere\n").unwrap();
+    git(&other, &["commit", "-q", "-am", "elsewhere"]);
+    git(&other, &["push", "-q"]);
+    WidgetExt::activate_action(&window, "win.pull", None).unwrap();
+    assert!(until(10_000, || daily.text() == "# Written elsewhere\n").await);
+    assert_eq!(daily.state(), NoteState::Clean);
+    window.close();
+}
+
+#[gtk::test]
+async fn conflicts_pause_sync_until_resolved() {
+    let (dir, remotes) = synced_vault();
+    let other = other_clone(&remotes);
+    let home = std::fs::read_to_string(dir.path().join("Home.md")).unwrap();
+    std::fs::write(other.join("Home.md"), format!("Theirs\n{home}")).unwrap();
+    git(&other, &["commit", "-q", "-am", "theirs"]);
+    git(&other, &["push", "-q"]);
+
+    let window = open(&dir);
+    assert!(until(5000, || window.sync().is_available()).await);
+    window.open_path(&p("Home.md"), false);
+    let note = window.selected_note().unwrap();
+    let buffer = note.buffer();
+    buffer.insert(&mut buffer.start_iter(), "Mine\n");
+
+    WidgetExt::activate_action(&window, "win.sync-now", None).unwrap();
+    assert!(until(10_000, || window.sync().state() == SyncState::Paused).await);
+    assert_eq!(window.sync().status().unwrap().conflicts().count(), 1);
+    // The note reloads with the conflict, and the bar resolves it.
+    assert!(until(3000, || note.has_conflicts()).await);
+    WidgetExt::activate_action(&note, "note.keep-mine", None).unwrap();
+    assert_eq!(note.text(), format!("Mine\n{home}"));
+    assert!(!note.has_conflicts());
+    note.flush();
+
+    // Automatic passes stay off until the merge is committed.
+    WidgetExt::activate_action(&window, "win.sync-now", None).unwrap();
+    wait(500).await;
+    assert_eq!(window.sync().state(), SyncState::Paused);
+    let result = window
+        .sync()
+        .call(|git| {
+            git.stage(&["Home.md"])?;
+            git.conclude()
+        })
+        .await
+        .unwrap();
+    result.unwrap();
+    WidgetExt::activate_action(&window, "win.sync-now", None).unwrap();
+    assert!(until(10_000, || remote_log(&remotes).lines().count() == 4).await);
+    assert_eq!(window.sync().state(), SyncState::Idle);
+    git(&other, &["pull", "-q"]);
+    assert_eq!(
+        std::fs::read_to_string(other.join("Home.md")).unwrap(),
+        format!("Mine\n{home}")
+    );
+    window.close();
+}
+
+#[gtk::test]
+async fn history_opens_old_versions() {
+    let (dir, _remotes) = synced_vault();
+    let original = std::fs::read_to_string(dir.path().join("Home.md")).unwrap();
+    std::fs::write(dir.path().join("Home.md"), "# Rewritten\n").unwrap();
+    git(dir.path(), &["commit", "-q", "-am", "rewrite"]);
+
+    let window = open(&dir);
+    assert!(until(5000, || window.sync().is_available()).await);
+    let log = window
+        .sync()
+        .call(|git| git.log("Home.md", 10))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(log.len(), 2);
+    window.open_version(window.sync(), &p("Home.md"), log[1].clone());
+    assert!(
+        until(3000, || window.selected_tab_text().as_deref()
+            == Some(original.as_str()))
+        .await
+    );
+    window.close();
+}
+
+#[gtk::test]
+async fn vaults_without_git_hide_sync() {
+    let dir = vault(None);
+    let window = open(&dir);
+    wait(500).await;
+    assert!(!window.sync().is_available());
+    assert_eq!(window.sync().state(), SyncState::Unavailable);
+    window.close();
+}
+
 #[gtk::test]
 fn application_registers_actions() {
     let app = igneous::Application::new();
@@ -326,6 +527,23 @@ async fn screenshot() {
         &out.replace(".png", "-preferences.png"),
     );
     window.close();
+
+    // The Changes pane and a diff, in a vault with uncommitted changes.
+    if std::env::var("IGNEOUS_SCREENSHOT_GIT").is_ok() {
+        let (dir, _remotes) = synced_vault();
+        std::fs::write(dir.path().join("Home.md"), "# Home\n\nRewritten today.\n").unwrap();
+        std::fs::write(dir.path().join("Projects/New idea.md"), "An idea.\n").unwrap();
+        std::fs::write(dir.path().join("Projects/Ideas.md"), "Staged.\n").unwrap();
+        git(dir.path(), &["add", "Projects/Ideas.md"]);
+        let window = open(&dir);
+        window.set_default_size(width, 720);
+        assert!(until(5000, || window.sync().is_available()).await);
+        WidgetExt::activate_action(&window, "win.show-changes", None).unwrap();
+        window.open_changes(&p("Home.md"), false, false);
+        wait(1500).await;
+        save_png(window.upcast_ref(), &out.replace(".png", "-git.png"));
+        window.close();
+    }
 
     // The vault picker, with one recent vault.
     let app = igneous::Application::new();

@@ -452,6 +452,11 @@ pub fn show_context_menu(widget: &gtk::Widget, item: Option<&FileItem>, x: f64, 
         edit.append_item(&entry("Move to _Trash", "win.file-trash", p.as_str()));
         menu.append_section(None, &edit);
         let show = gio::Menu::new();
+        if !folder {
+            let history = entry("_History", "win.file-history", p.as_str());
+            history.set_attribute_value("hidden-when", Some(&"action-disabled".to_variant()));
+            show.append_item(&history);
+        }
         show.append_item(&entry("_Show in Files", "win.file-show", p.as_str()));
         menu.append_section(None, &show);
     }

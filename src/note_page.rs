@@ -4,6 +4,9 @@
 //! window closes or loses focus. A save never overwrites changes made on disk
 //! since the note was loaded: instead a banner offers to reload or keep this
 //! version.
+//!
+//! A note left with conflict blocks by a Git merge shows a bar with Keep Mine,
+//! Keep Theirs and Keep Both for the conflict at the cursor.
 
 use std::cell::{Cell, OnceCell, RefCell};
 use std::rc::Rc;
@@ -14,6 +17,7 @@ use gtk::glib;
 use igneous_core::fs::{self, Expect, FileStamp, ReadError, WriteError};
 use igneous_core::{TextFile, VaultPath};
 use igneous_editor::NoteView;
+use igneous_git::conflicts::{self, Keep};
 use sourceview::prelude::*;
 
 use crate::vault::VaultContext;
@@ -43,6 +47,10 @@ mod imp {
         #[template_child]
         pub banner: TemplateChild<adw::Banner>,
         #[template_child]
+        pub conflict_revealer: TemplateChild<gtk::Revealer>,
+        #[template_child]
+        pub conflict_label: TemplateChild<gtk::Label>,
+        #[template_child]
         pub scrolled: TemplateChild<gtk::ScrolledWindow>,
         #[template_child]
         pub view: TemplateChild<NoteView>,
@@ -55,6 +63,9 @@ mod imp {
         pub loading: Cell<bool>,
         pub autosave: RefCell<Option<glib::SourceId>>,
         pub save_error: RefCell<Option<String>>,
+        /// A rebase is in progress, so the upper side of a conflict is the
+        /// remote's version rather than ours.
+        pub rebasing: Cell<bool>,
     }
 
     #[glib::object_subclass]
@@ -66,6 +77,21 @@ mod imp {
         fn class_init(klass: &mut Self::Class) {
             NoteView::ensure_type();
             klass.bind_template();
+            klass.install_action("note.keep-mine", None, |page, _, _| {
+                page.resolve_conflict_block(Side::Mine)
+            });
+            klass.install_action("note.keep-theirs", None, |page, _, _| {
+                page.resolve_conflict_block(Side::Theirs)
+            });
+            klass.install_action("note.keep-both", None, |page, _, _| {
+                page.resolve_conflict_block(Side::Both)
+            });
+            klass.install_action("note.previous-conflict", None, |page, _, _| {
+                page.jump_to_conflict(false)
+            });
+            klass.install_action("note.next-conflict", None, |page, _, _| {
+                page.jump_to_conflict(true)
+            });
         }
 
         fn instance_init(obj: &glib::subclass::InitializingObject<Self>) {
@@ -82,6 +108,14 @@ mod imp {
             buffer.connect_changed(move |_| {
                 if let Some(page) = page.upgrade() {
                     page.on_changed();
+                }
+            });
+            let page = self.obj().downgrade();
+            buffer.connect_cursor_position_notify(move |_| {
+                if let Some(page) = page.upgrade()
+                    && page.has_conflicts()
+                {
+                    page.update_conflicts();
                 }
             });
             let page = self.obj().downgrade();
@@ -180,6 +214,7 @@ impl NotePage {
         imp.stamp.replace(stamp);
         self.set_state(state);
         self.imp().view.set_editable(state != State::ReadOnly);
+        self.update_conflicts();
     }
 
     fn set_state(&self, state: State) {
@@ -276,6 +311,7 @@ impl NotePage {
                 imp.file.replace(file);
                 imp.stamp.replace(Some(stamp));
                 self.set_state(State::Clean);
+                self.update_conflicts();
                 true
             }
             Err(WriteError::ChangedOnDisk { current: None }) => {
@@ -444,4 +480,102 @@ impl NotePage {
     pub fn focus_editor(&self) {
         self.imp().view.grab_focus();
     }
+
+    // --- Git conflicts -----------------------------------------------------------
+
+    pub fn set_rebasing(&self, rebasing: bool) {
+        self.imp().rebasing.set(rebasing);
+    }
+
+    /// Shows or hides the conflict bar, and says which conflict is current.
+    pub fn update_conflicts(&self) {
+        let imp = self.imp();
+        let text = self.text();
+        let found = if text.contains("<<<<<<<") {
+            conflicts::find(&text)
+        } else {
+            Vec::new()
+        };
+        imp.conflict_revealer.set_reveal_child(!found.is_empty());
+        if found.is_empty() {
+            return;
+        }
+        let current = current_conflict(&found, self.cursor_byte());
+        imp.conflict_label
+            .set_label(&format!("Conflict {} of {}", current + 1, found.len()));
+    }
+
+    pub fn has_conflicts(&self) -> bool {
+        self.imp().conflict_revealer.reveals_child()
+    }
+
+    fn resolve_conflict_block(&self, side: Side) {
+        let text = self.text();
+        let found = conflicts::find(&text);
+        if found.is_empty() {
+            return;
+        }
+        let conflict = &found[current_conflict(&found, self.cursor_byte())];
+        // In a rebase the local commits are replayed onto the remote ones,
+        // so the upper side is theirs.
+        let upper_is_mine = !self.imp().rebasing.get();
+        let keep = match (side, upper_is_mine) {
+            (Side::Both, _) => Keep::Both,
+            (Side::Mine, true) | (Side::Theirs, false) => Keep::Upper,
+            (Side::Mine, false) | (Side::Theirs, true) => Keep::Lower,
+        };
+        let replacement = conflicts::resolve(&text, conflict, keep);
+        let chars = |byte: usize| text[..byte].chars().count() as i32;
+        let buffer = self.buffer();
+        let mut start = buffer.iter_at_offset(chars(conflict.range.start));
+        let mut end = buffer.iter_at_offset(chars(conflict.range.end));
+        buffer.begin_user_action();
+        buffer.delete(&mut start, &mut end);
+        buffer.insert(&mut start, &replacement);
+        buffer.end_user_action();
+        let at = buffer.iter_at_offset(chars(conflict.range.start));
+        buffer.place_cursor(&at);
+        self.update_conflicts();
+        self.jump_to_conflict_from(conflict.range.start, true);
+    }
+
+    fn jump_to_conflict(&self, forward: bool) {
+        self.jump_to_conflict_from(self.cursor_byte(), forward);
+    }
+
+    fn jump_to_conflict_from(&self, from: usize, forward: bool) {
+        let text = self.text();
+        let found = conflicts::find(&text);
+        let target = if forward {
+            found
+                .iter()
+                .find(|c| c.range.start > from)
+                .or(found.first())
+        } else {
+            found
+                .iter()
+                .rev()
+                .find(|c| c.range.start < from && !c.range.contains(&from))
+                .or(found.last())
+        };
+        if let Some(conflict) = target {
+            self.set_cursor_byte(conflict.range.start);
+            self.update_conflicts();
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum Side {
+    Mine,
+    Theirs,
+    Both,
+}
+
+/// The conflict containing `cursor`, else the next one, else the last.
+fn current_conflict(found: &[conflicts::Conflict], cursor: usize) -> usize {
+    found
+        .iter()
+        .position(|c| c.range.end > cursor)
+        .unwrap_or(found.len().saturating_sub(1))
 }

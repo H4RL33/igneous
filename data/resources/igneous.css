@@ -15,3 +15,26 @@ textview.igneous-note {
   background-color: alpha(currentColor, 0.12);
   opacity: 0.8;
 }
+
+/* Git change letters in the Changes pane. */
+.change-badge {
+  font-family: monospace;
+  font-weight: 700;
+  font-size: 0.8em;
+  min-width: 1.6em;
+  padding: 1px 4px;
+  border-radius: 6px;
+  background-color: alpha(currentColor, 0.1);
+}
+
+.change-badge.change-m { color: var(--warning-color); }
+.change-badge.change-a { color: var(--success-color); }
+.change-badge.change-d,
+.change-badge.change-u { color: var(--error-color); }
+.change-badge.change-r { color: var(--accent-color); }
+
+/* The bar above a note with merge conflicts. */
+.conflict-bar {
+  background-color: color-mix(in srgb, var(--error-bg-color) 12%, transparent);
+  border-bottom: 1px solid var(--border-color);
+}

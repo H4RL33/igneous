@@ -1,19 +1,25 @@
 //! Igneous: read and edit Markdown vaults on GNOME.
 
 mod application;
+mod changes;
 mod config;
 mod files;
 mod gsettings;
+mod history;
 mod image_page;
 mod note_page;
 mod preferences;
 mod quick_switcher;
+mod sync;
+mod sync_button;
+mod text_page;
 mod vault;
 mod vault_picker;
 mod window;
 
 pub use application::Application;
 pub use note_page::{NotePage, State as NoteState};
+pub use sync::{State as SyncState, SyncService};
 pub use vault_picker::VaultPicker;
 pub use window::Window;
 

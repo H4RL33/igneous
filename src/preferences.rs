@@ -1,10 +1,10 @@
-//! The Preferences dialog. For now it has one page: Appearance, with the
-//! editor theme.
+//! The Preferences dialog: Appearance (the editor theme) and Sync (Git).
 
 use std::cell::RefCell;
 
 use adw::{prelude::*, subclass::prelude::*};
 use gtk::{gio, glib};
+use igneous_core::settings::{GitSettings, SyncMethod};
 use igneous_editor::theme::Origin;
 
 use crate::window::Window;
@@ -76,7 +76,164 @@ impl Preferences {
             }
         });
         prefs.imp().dark_handler.replace(Some(handler));
+        prefs.add_sync_page(window);
         prefs
+    }
+
+    // --- Sync ----------------------------------------------------------------
+
+    fn add_sync_page(&self, window: &Window) {
+        let page = adw::PreferencesPage::builder()
+            .title("Sync")
+            .icon_name("view-refresh-symbolic")
+            .build();
+        self.add(&page);
+        let sync = window.sync().clone();
+        if !sync.is_available() {
+            let group = adw::PreferencesGroup::builder()
+                .title("Git Sync")
+                .description(
+                    "This vault isn’t in a Git repository. To sync it, make it one \
+                     (for example with “git init” and “git remote add”), then reopen the vault.",
+                )
+                .build();
+            page.add(&group);
+            return;
+        }
+        let settings = sync.settings();
+
+        let schedule = adw::PreferencesGroup::builder()
+            .title("Automatic Sync")
+            .description("Saved with this vault, in .igneous/git.json")
+            .build();
+        let enabled = adw::SwitchRow::builder()
+            .title("Sync Automatically")
+            .subtitle("Commit, pull and push on a schedule")
+            .active(settings.enabled)
+            .build();
+        let sync_every = minutes_row(
+            "Commit and Sync Every",
+            "Minutes; 0 turns it off",
+            settings.sync_interval,
+        );
+        let pull_every = minutes_row(
+            "Pull Every",
+            "Minutes; 0 turns it off",
+            settings.pull_interval,
+        );
+        let pull_on_open = adw::SwitchRow::builder()
+            .title("Pull When the Vault Opens")
+            .active(settings.pull_on_open)
+            .build();
+        for row in [&sync_every, &pull_every] {
+            enabled
+                .bind_property("active", row, "sensitive")
+                .sync_create()
+                .build();
+        }
+        enabled
+            .bind_property("active", &pull_on_open, "sensitive")
+            .sync_create()
+            .build();
+        schedule.add(&enabled);
+        schedule.add(&sync_every);
+        schedule.add(&pull_every);
+        schedule.add(&pull_on_open);
+
+        let how = adw::PreferencesGroup::builder().title("Syncing").build();
+        let method = adw::ComboRow::builder()
+            .title("Bring In Remote Changes By")
+            .model(&gtk::StringList::new(&["Merging", "Rebasing"]))
+            .selected(match settings.method {
+                SyncMethod::Merge => 0,
+                SyncMethod::Rebase => 1,
+            })
+            .build();
+        let push = adw::SwitchRow::builder()
+            .title("Push After Committing")
+            .active(settings.push)
+            .build();
+        how.add(&method);
+        how.add(&push);
+
+        let messages = adw::PreferencesGroup::builder()
+            .title("Commit Messages")
+            .description(
+                "{{date}}, {{hostname}}, {{numFiles}} and {{files}} are filled in. \
+                 The date format uses Moment.js tokens, such as YYYY-MM-DD HH:mm.",
+            )
+            .build();
+        let message = adw::EntryRow::builder()
+            .title("Message")
+            .text(&settings.commit_message)
+            .show_apply_button(true)
+            .build();
+        let date_format = adw::EntryRow::builder()
+            .title("Date Format")
+            .text(&settings.date_format)
+            .show_apply_button(true)
+            .build();
+        messages.add(&message);
+        messages.add(&date_format);
+
+        for group in [&schedule, &how, &messages] {
+            page.add(group);
+        }
+
+        // Every change is saved straight away.
+        let save = {
+            let prefs = self.downgrade();
+            let sync = sync.clone();
+            let enabled = enabled.clone();
+            let sync_every = sync_every.clone();
+            let pull_every = pull_every.clone();
+            let pull_on_open = pull_on_open.clone();
+            let method = method.clone();
+            let push = push.clone();
+            let message = message.clone();
+            let date_format = date_format.clone();
+            std::rc::Rc::new(move || {
+                let mut settings: GitSettings = sync.settings();
+                settings.enabled = enabled.is_active();
+                settings.sync_interval = sync_every.value() as u32;
+                settings.pull_interval = pull_every.value() as u32;
+                settings.pull_on_open = pull_on_open.is_active();
+                settings.method = if method.selected() == 1 {
+                    SyncMethod::Rebase
+                } else {
+                    SyncMethod::Merge
+                };
+                settings.push = push.is_active();
+                let text = message.text();
+                if !text.trim().is_empty() {
+                    settings.commit_message = text.to_string();
+                }
+                let text = date_format.text();
+                if !text.trim().is_empty() {
+                    settings.date_format = text.to_string();
+                }
+                if settings == sync.settings() {
+                    return;
+                }
+                if let (Err(e), Some(prefs)) = (sync.set_settings(settings), prefs.upgrade()) {
+                    prefs.add_toast(adw::Toast::new(&e));
+                }
+            })
+        };
+        for row in [&enabled, &pull_on_open, &push] {
+            let save = save.clone();
+            row.connect_active_notify(move |_| save());
+        }
+        for row in [&sync_every, &pull_every] {
+            let save = save.clone();
+            row.connect_value_notify(move |_| save());
+        }
+        let on_method = save.clone();
+        method.connect_selected_notify(move |_| on_method());
+        for row in [&message, &date_format] {
+            let save = save.clone();
+            row.connect_apply(move |_| save());
+        }
     }
 
     /// One preview per theme, in the variant for the current light/dark style.
@@ -168,4 +325,12 @@ impl Preferences {
             |_| {},
         );
     }
+}
+
+fn minutes_row(title: &str, subtitle: &str, value: u32) -> adw::SpinRow {
+    let row = adw::SpinRow::with_range(0.0, 1440.0, 1.0);
+    row.set_title(title);
+    row.set_subtitle(subtitle);
+    row.set_value(f64::from(value));
+    row
 }

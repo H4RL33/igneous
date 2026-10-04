@@ -41,17 +41,48 @@ template $IgneousWindow: Adw.ApplicationWindow {
           }
         }
 
-        content: ScrolledWindow {
-          hscrollbar-policy: never;
+        [top]
+        Adw.InlineViewSwitcher sidebar_switcher {
+          stack: sidebar_stack;
+          display-mode: both;
+          margin-start: 12;
+          margin-end: 12;
+          margin-bottom: 6;
+          visible: false;
 
-          child: ListView files_view {
-            single-click-activate: true;
-            tab-behavior: item;
+          styles [
+            "flat",
+          ]
+        }
 
-            styles [
-              "navigation-sidebar",
-            ]
-          };
+        content: Adw.ViewStack sidebar_stack {
+          Adw.ViewStackPage {
+            name: "files";
+            title: _("Files");
+            icon-name: "folder-symbolic";
+
+            child: ScrolledWindow {
+              hscrollbar-policy: never;
+
+              child: ListView files_view {
+                single-click-activate: true;
+                tab-behavior: item;
+
+                styles [
+                  "navigation-sidebar",
+                ]
+              };
+            };
+          }
+
+          Adw.ViewStackPage changes_page {
+            name: "changes";
+            title: _("Changes");
+            icon-name: "document-edit-symbolic";
+            visible: false;
+
+            child: Adw.Bin changes_bin {};
+          }
         };
       };
 
@@ -77,6 +108,15 @@ template $IgneousWindow: Adw.ApplicationWindow {
             tooltip-text: _("Main Menu");
             menu-model: primary_menu;
           }
+
+          [end]
+          Adw.Bin sync_slot {}
+        }
+
+        [top]
+        Adw.Banner sync_banner {
+          button-label: _("_Resolve");
+          revealed: false;
         }
 
         [top]
@@ -121,6 +161,20 @@ menu primary_menu {
     item {
       label: _("_Find Note…");
       action: "win.quick-switcher";
+    }
+  }
+
+  section {
+    item {
+      label: _("_Sync Now");
+      action: "win.sync-now";
+      hidden-when: "action-disabled";
+    }
+
+    item {
+      label: _("Note _History");
+      action: "win.note-history";
+      hidden-when: "action-disabled";
     }
   }
 

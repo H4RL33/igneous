@@ -177,10 +177,7 @@ mod tests {
         let c = &found[0];
         assert_eq!(resolve(TEXT, c, Keep::Upper), "mine\n");
         assert_eq!(resolve(TEXT, c, Keep::Lower), "theirs\nmore theirs\n");
-        assert_eq!(
-            resolve(TEXT, c, Keep::Both),
-            "mine\ntheirs\nmore theirs\n"
-        );
+        assert_eq!(resolve(TEXT, c, Keep::Both), "mine\ntheirs\nmore theirs\n");
         let mut text = TEXT.to_owned();
         text.replace_range(c.range.clone(), &resolve(TEXT, c, Keep::Upper));
         assert!(text.starts_with("# Home\nmine\nmiddle\n"));
