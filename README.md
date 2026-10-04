@@ -34,7 +34,7 @@ build-aux/run-ui-tests.sh        # every test; GTK tests run in a sealed headles
 build-aux/ci.sh                  # everything CI checks
 ```
 
-Run GTK tests only through these scripts. `build-aux/headless-session.sh` keeps test sessions away from your desktop's sockets, services and settings.
+Run GTK tests only through these scripts. `build-aux/headless-session.sh` keeps test sessions away from your desktop's sockets, services and settings. As a safety net, Cargo starts every test binary through `build-aux/test-runner.sh`, which hides your display and session bus from tests run any other way, so a stray `cargo test` can't open windows on your desktop.
 
 ## Licence
 

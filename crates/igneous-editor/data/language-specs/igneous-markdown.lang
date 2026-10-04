@@ -21,6 +21,7 @@
     <style id="math" name="Math" map-to="markdown:code-span"/>
     <style id="tag" name="Tag" map-to="def:keyword"/>
     <style id="block-id" name="Block ID" map-to="def:comment"/>
+    <style id="conflict-marker" name="Conflict marker" map-to="def:error"/>
   </styles>
 
   <definitions>
@@ -71,8 +72,14 @@
       <match>(?&lt;=\s)\^[A-Za-z0-9-]+\s*$</match>
     </context>
 
+    <!-- Left behind by a Git merge that stopped for conflicts. -->
+    <context id="conflict-marker" style-ref="conflict-marker" class="no-spell-check">
+      <match>^(?:&lt;{7}|\|{7}|&gt;{7})(?: .*)?$|^={7}$</match>
+    </context>
+
     <context id="igneous-markdown">
       <include>
+        <context ref="conflict-marker"/>
         <context ref="frontmatter"/>
         <context ref="comment"/>
         <context ref="callout"/>

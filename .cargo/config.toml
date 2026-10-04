@@ -1,0 +1,4 @@
+# Keeps GTK tests away from the desktop unless they run in the sealed
+# headless session (see build-aux/test-runner.sh).
+[target.'cfg(target_os = "linux")']
+runner = "build-aux/test-runner.sh"

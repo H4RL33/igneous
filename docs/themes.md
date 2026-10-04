@@ -164,6 +164,15 @@ Roles you don't set use the default in the table below. A default that names ano
 | `error` | `red` |
 | `warning` | `orange` |
 
+**Git**
+
+| Role | Default | Colours |
+|---|---|---|
+| `diff-added` | `green` | Added lines in a diff |
+| `diff-removed` | `red` | Removed lines in a diff |
+| `conflict` | `red` | Conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`) |
+| `conflict-background` | 12% of the way from background to red | Behind conflict markers |
+
 ### Problems
 
 - **Ignored:** unknown keys and roles produce a warning but don't stop the theme from loading. That way, themes written for a newer Igneous still work.

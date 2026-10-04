@@ -175,6 +175,11 @@ const ROLES: &[(&str, Fallback)] = &[
     ("special", P("cyan")),
     ("error", P("red")),
     ("warning", P("orange")),
+    // Git.
+    ("diff-added", P("green")),
+    ("diff-removed", P("red")),
+    ("conflict", P("red")),
+    ("conflict-background", Mix("background", "red", 0.12)),
 ];
 
 /// Names of every role a theme can set.
@@ -738,6 +743,29 @@ pub fn scheme_xml(theme: &Theme, dark: bool, accent: Color) -> (String, String) 
             "igneous-markdown:block-id",
             format!(r#"foreground="{}""#, c("block-id")),
         ),
+        (
+            "igneous-markdown:conflict-marker",
+            format!(
+                r#"foreground="{}" background="{}" bold="true""#,
+                c("conflict"),
+                c("conflict-background")
+            ),
+        ),
+        // Diffs.
+        (
+            "diff:added-line",
+            format!(r#"foreground="{}""#, c("diff-added")),
+        ),
+        (
+            "diff:removed-line",
+            format!(r#"foreground="{}""#, c("diff-removed")),
+        ),
+        ("diff:location", format!(r#"foreground="{}""#, c("syntax"))),
+        (
+            "diff:diff-file",
+            format!(r#"foreground="{}" bold="true""#, c("heading")),
+        ),
+        ("diff:special-case", format!(r#"foreground="{}""#, c("syntax"))),
         // Code in other languages.
         (
             "def:keyword",

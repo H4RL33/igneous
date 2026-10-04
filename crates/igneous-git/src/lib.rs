@@ -8,6 +8,7 @@
 //! - [`status`] parses `git status --porcelain=v2`.
 //! - [`sync`] runs commit-and-sync and pull-only passes.
 //! - [`template`] renders commit messages.
+//! - [`conflicts`] finds and resolves conflict blocks in a file.
 //!
 //! Some operations are missing on purpose: there's no force-push, no
 //! `reset --hard`, and no automatic conflict resolution. [`Git::discard`] is
@@ -16,6 +17,7 @@
 #![forbid(unsafe_code)]
 
 mod cli;
+pub mod conflicts;
 mod error;
 pub mod status;
 pub mod sync;

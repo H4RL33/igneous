@@ -26,7 +26,7 @@ unset DISPLAY WAYLAND_DISPLAY DBUS_SESSION_BUS_ADDRESS
 export XDG_RUNTIME_DIR="$sandbox/runtime" XDG_CONFIG_HOME="$sandbox/config" \
   XDG_DATA_HOME="$sandbox/data" XDG_CACHE_HOME="$sandbox/cache" XDG_STATE_HOME="$sandbox/state" \
   GSETTINGS_BACKEND=memory GIO_USE_VFS=local GTK_A11Y=none NO_AT_BRIDGE=1 GDK_DEBUG=no-portals \
-  GTK_IM_MODULE=gtk-im-context-simple
+  GTK_IM_MODULE=gtk-im-context-simple IGNEOUS_HEADLESS=1
 
 dbus-run-session --config-file="$here/test-session.conf" -- sh -c '
   mutter --headless --wayland --no-x11 --virtual-monitor 1280x1024 \
