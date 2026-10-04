@@ -1,0 +1,17 @@
+[package]
+name = "igneous-git"
+description = "Git sync for Igneous, built on the git command"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+igneous-core.workspace = true
+jiff.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
