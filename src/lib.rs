@@ -13,6 +13,7 @@ mod index;
 mod inspector;
 mod note_page;
 mod preferences;
+mod query_data;
 mod quick_switcher;
 mod sync;
 mod sync_button;
