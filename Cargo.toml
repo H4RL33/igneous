@@ -32,6 +32,7 @@ members = [
     "crates/igneous-core",
     "crates/igneous-editor",
     "crates/igneous-git",
+    "crates/igneous-graph",
     "crates/igneous-markdown",
     "spikes/live-preview",
 ]
@@ -47,6 +48,7 @@ authors = ["Harley Welsh <git@harleywelsh.com>"]
 igneous-core = { path = "crates/igneous-core" }
 igneous-editor = { path = "crates/igneous-editor" }
 igneous-git = { path = "crates/igneous-git" }
+igneous-graph = { path = "crates/igneous-graph" }
 igneous-markdown = { path = "crates/igneous-markdown" }
 
 anyhow = "1"
