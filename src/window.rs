@@ -23,6 +23,8 @@ use igneous_markdown::LinkRef;
 use crate::application::Application;
 use crate::changes::ChangesPane;
 use crate::files::FileTree;
+use crate::graph_data::GraphSource;
+use crate::graph_page::GraphPage;
 use crate::image_page::{self, ImagePage};
 use crate::index::IndexService;
 use crate::inspector::{Inspector, Links};
@@ -100,6 +102,7 @@ mod imp {
         pub index: OnceCell<Rc<IndexService>>,
         pub inspector: OnceCell<Rc<Inspector>>,
         pub inspector_timer: RefCell<Option<glib::SourceId>>,
+        pub graph_timer: RefCell<Option<glib::SourceId>>,
     }
 
     #[glib::object_subclass]
@@ -217,6 +220,9 @@ fn install_actions(klass: &mut <imp::Window as ObjectSubclass>::Class) {
         }
     });
     klass.install_action("win.go-forward", None, |w, _, _| w.go(true));
+    klass.install_action("win.graph", None, |w, _, _| {
+        w.open_graph();
+    });
     klass.install_action("win.command-palette", None, |w, _, _| {
         crate::command_palette::show(w)
     });
@@ -459,6 +465,7 @@ impl Window {
         index.connect_changed(move || {
             if let Some(window) = weak.upgrade() {
                 window.update_inspector();
+                window.schedule_graph_refresh();
             }
         });
         imp.index.set(index).ok().unwrap();
@@ -661,6 +668,10 @@ impl Window {
                     .set_subtitle(&folder.unwrap_or_else(|| self.ctx().name()));
                 self.remember_recent(path);
             }
+            None if self.selected_graph().is_some() => {
+                imp.note_title.set_title("Graph");
+                imp.note_title.set_subtitle(&self.ctx().name());
+            }
             None => {
                 let text_page = imp
                     .tab_view
@@ -755,6 +766,11 @@ impl Window {
 
     fn tab_state(page: &adw::TabPage) -> Option<TabState> {
         let child = page.child();
+        if child.is::<GraphPage>() {
+            let mut state = TabState::new(TabKind::Graph, None);
+            state.pinned = page.is_pinned();
+            return Some(state);
+        }
         let (kind, cursor) = if let Some(note) = child.downcast_ref::<NotePage>() {
             (TabKind::Note, note.cursor_byte())
         } else if child.is::<ImagePage>() {
@@ -1453,6 +1469,7 @@ impl Window {
         if let Some(inspector) = imp.inspector.get() {
             workspace.inspector.view = match inspector.stack.visible_child_name().as_deref() {
                 Some("outline") => InspectorView::Outline,
+                Some("graph") => InspectorView::LocalGraph,
                 _ => InspectorView::Backlinks,
             };
         }
@@ -1485,10 +1502,12 @@ impl Window {
         imp.split_view.set_show_sidebar(workspace.sidebar.visible);
         imp.inspector_split
             .set_show_sidebar(workspace.inspector.visible);
-        if let Some(inspector) = imp.inspector.get()
-            && workspace.inspector.view == InspectorView::Outline
-        {
-            inspector.stack.set_visible_child_name("outline");
+        if let Some(inspector) = imp.inspector.get() {
+            match workspace.inspector.view {
+                InspectorView::Outline => inspector.stack.set_visible_child_name("outline"),
+                InspectorView::LocalGraph => inspector.stack.set_visible_child_name("graph"),
+                InspectorView::Backlinks => {}
+            }
         }
         imp.wanted_pane.set(Some(workspace.sidebar.pane));
         imp.recently_closed
@@ -1496,6 +1515,14 @@ impl Window {
         imp.recent_files.replace(workspace.recent_files.clone());
         let mut active = None;
         for (i, tab) in workspace.tabs.iter().enumerate() {
+            if tab.kind == TabKind::Graph {
+                let page = self.open_graph();
+                imp.tab_view.set_page_pinned(&page, tab.pinned);
+                if workspace.active_tab == Some(i) {
+                    active = Some(page);
+                }
+                continue;
+            }
             let Some(path) = &tab.path else { continue };
             if !self.ctx().abs(path).is_file() {
                 continue;
@@ -1625,7 +1652,12 @@ impl Window {
             return;
         };
         self.update_outline();
-        let Some(path) = self.selected_note().and_then(|n| n.path()) else {
+        let selected = self.selected_note().and_then(|n| n.path());
+        inspector.local_graph.show(selected.clone());
+        if !inspector.local_graph.has_source() {
+            self.schedule_graph_refresh();
+        }
+        let Some(path) = selected else {
             inspector.show_links(None);
             return;
         };
@@ -1721,6 +1753,151 @@ impl Window {
         self.ctx().expect_write(path, &stamp);
         self.index().apply(vec![VaultEvent::Modified(path.clone())]);
         Ok(())
+    }
+
+    // --- graph -------------------------------------------------------------------
+
+    fn selected_graph(&self) -> Option<GraphPage> {
+        self.imp()
+            .tab_view
+            .selected_page()
+            .and_then(|p| p.child().downcast::<GraphPage>().ok())
+    }
+
+    /// The graph tab, if one is open.
+    pub fn graph_page(&self) -> Option<GraphPage> {
+        self.pages()
+            .iter()
+            .find_map(|p| p.child().downcast::<GraphPage>().ok())
+    }
+
+    /// Opens the graph tab, or switches to it.
+    pub fn open_graph(&self) -> adw::TabPage {
+        let imp = self.imp();
+        if let Some(page) = self
+            .pages()
+            .into_iter()
+            .find(|p| p.child().is::<GraphPage>())
+        {
+            imp.tab_view.set_selected_page(&page);
+            return page;
+        }
+        let graph = GraphPage::new(self.ctx().vault.igneous_dir());
+        let weak = self.downgrade();
+        graph.view().connect_activate(move |path, new_tab| {
+            if let Some(window) = weak.upgrade() {
+                window.open_path(path, new_tab);
+            }
+        });
+        let weak = self.downgrade();
+        graph.connect_settings_changed(move |settings| {
+            if let Some(inspector) = weak
+                .upgrade()
+                .and_then(|w| w.imp().inspector.get().cloned())
+            {
+                inspector.local_graph.set_settings(settings);
+            }
+        });
+        let page = imp
+            .tab_view
+            .add_page(&graph, imp.tab_view.selected_page().as_ref());
+        page.set_title("Graph");
+        page.set_icon(Some(&gio::ThemedIcon::new("network-workgroup-symbolic")));
+        imp.tab_view.set_selected_page(&page);
+        self.refresh_graphs();
+        page
+    }
+
+    /// Rebuilds the graphs soon, coalescing bursts of index changes.
+    fn schedule_graph_refresh(&self) {
+        let imp = self.imp();
+        if let Some(id) = imp.graph_timer.take() {
+            id.remove();
+        }
+        let weak = self.downgrade();
+        let id = glib::timeout_add_local_once(Duration::from_millis(300), move || {
+            if let Some(window) = weak.upgrade() {
+                window.imp().graph_timer.take();
+                window.refresh_graphs();
+            }
+        });
+        imp.graph_timer.replace(Some(id));
+    }
+
+    /// Gives the graph tab and the local graph fresh data from the index,
+    /// if either is showing.
+    pub fn refresh_graphs(&self) {
+        let imp = self.imp();
+        let graph = self.graph_page();
+        let local = imp
+            .inspector
+            .get()
+            .filter(|_| imp.inspector_split.shows_sidebar())
+            .map(|i| i.local_graph.clone());
+        if local.is_none()
+            && let Some(inspector) = imp.inspector.get()
+        {
+            inspector.local_graph.invalidate();
+        }
+        if graph.is_none() && local.is_none() {
+            return;
+        }
+        let index = self.index().clone();
+        let weak = self.downgrade();
+        glib::spawn_future_local(async move {
+            let notes = index.note_data().await;
+            let edges = index
+                .query(|index| index.graph_edges())
+                .await
+                .and_then(Result::ok)
+                .unwrap_or_default();
+            let Some(window) = weak.upgrade() else { return };
+            let source = Rc::new(GraphSource { notes, edges });
+            let settings = window.graph_settings();
+            if let Some(graph) = window.graph_page() {
+                graph.set_source(source.clone());
+            }
+            if let Some(inspector) = window.imp().inspector.get() {
+                inspector.local_graph.set_source(source, &settings);
+            }
+        });
+    }
+
+    /// The labels of the inspector's local graph, root first. For tests.
+    #[doc(hidden)]
+    pub fn local_graph_labels(&self) -> Vec<String> {
+        self.imp()
+            .inspector
+            .get()
+            .map(|i| {
+                i.local_graph
+                    .view
+                    .model()
+                    .graph
+                    .nodes
+                    .iter()
+                    .map(|n| n.label.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Shows an inspector page ("backlinks", "outgoing", "outline" or
+    /// "graph").
+    pub fn show_inspector(&self, page: &str) {
+        let imp = self.imp();
+        imp.inspector_split.set_show_sidebar(true);
+        if let Some(inspector) = imp.inspector.get() {
+            inspector.stack.set_visible_child_name(page);
+        }
+    }
+
+    /// The vault's graph settings (from the graph tab if it's open).
+    fn graph_settings(&self) -> igneous_core::settings::GraphSettings {
+        match self.graph_page() {
+            Some(page) => page.settings(),
+            None => vault_settings::load(&self.ctx().vault.igneous_dir()).unwrap_or_default(),
+        }
     }
 
     // --- Git -------------------------------------------------------------------

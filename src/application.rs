@@ -109,6 +109,7 @@ impl Application {
             ("win.preferences", &["<Control>comma"]),
             ("win.sync-now", &["<Control><Alt>s"]),
             ("win.command-palette", &["<Control>p"]),
+            ("win.graph", &["<Control>g"]),
             ("win.go-back", &["<Alt>Left"]),
             ("win.toggle-reading", &["<Control>e"]),
             ("win.go-forward", &["<Alt>Right"]),

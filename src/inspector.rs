@@ -1,5 +1,5 @@
 //! The inspector, beside the note: what links here (linked and unlinked
-//! mentions), what the note links to, and its outline.
+//! mentions), what the note links to, its outline, and its local graph.
 
 use std::rc::Rc;
 
@@ -9,6 +9,7 @@ use igneous_core::VaultPath;
 use igneous_index::{LinkHit, Mention, OutLink};
 use igneous_markdown::Heading;
 
+use crate::local_graph::LocalGraph;
 use crate::window::Window;
 
 pub struct Inspector {
@@ -17,6 +18,7 @@ pub struct Inspector {
     backlinks: gtk::Box,
     outgoing: gtk::Box,
     outline: gtk::Box,
+    pub local_graph: Rc<LocalGraph>,
     window: glib::WeakRef<Window>,
 }
 
@@ -55,6 +57,18 @@ impl Inspector {
         );
         let outgoing = page(&stack, "outgoing", "Outgoing", "mail-forward-symbolic");
         let outline = page(&stack, "outline", "Outline", "view-list-bullet-symbolic");
+        let weak = window.downgrade();
+        let local_graph = LocalGraph::new(move |path, new_tab| {
+            if let Some(window) = weak.upgrade() {
+                window.open_path(path, new_tab);
+            }
+        });
+        stack.add_titled_with_icon(
+            &local_graph.widget,
+            Some("graph"),
+            "Graph",
+            "network-workgroup-symbolic",
+        );
         let switcher = adw::InlineViewSwitcher::builder()
             .stack(&stack)
             .display_mode(adw::InlineViewSwitcherDisplayMode::Icons)
@@ -77,6 +91,7 @@ impl Inspector {
             backlinks,
             outgoing,
             outline,
+            local_graph,
             window: window.downgrade(),
         })
     }

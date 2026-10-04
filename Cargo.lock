@@ -756,6 +756,7 @@ dependencies = [
  "igneous-core",
  "igneous-editor",
  "igneous-git",
+ "igneous-graph",
  "igneous-index",
  "igneous-markdown",
  "igneous-query",
