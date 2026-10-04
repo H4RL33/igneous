@@ -1,0 +1,143 @@
+[
+  {
+    "name": "When style = `space`, a space is added to blockquotes missing a space after the indicator",
+    "before": ">Blockquotes will have a space added if one is not present\n> Will be left as is.\n\n> Nested blockquotes are also updated\n>>Nesting levels are handled correctly\n>> Even when only partially needing updates\n> >Updated as well\n>>>>>>> Is handled too\n> > >>> As well\n\n> <strong>Note that html is not affected in blockquotes</strong>",
+    "after": "> Blockquotes will have a space added if one is not present\n> Will be left as is.\n\n> Nested blockquotes are also updated\n> > Nesting levels are handled correctly\n> > Even when only partially needing updates\n> > Updated as well\n> > > > > > > Is handled too\n> > > > > As well\n\n> <strong>Note that html is not affected in blockquotes</strong>",
+    "source": "example"
+  },
+  {
+    "name": "When style = `no space`, spaces are removed after a blockquote indicator",
+    "before": ">    Multiple spaces are removed\n> > Nesting is handled\n> > > > >  Especially when multiple levels are involved\n> >>> > Even when partially correct already, it is handled",
+    "after": ">Multiple spaces are removed\n>>Nesting is handled\n>>>>>Especially when multiple levels are involved\n>>>>>Even when partially correct already, it is handled",
+    "options": {
+      "style": "no space"
+    },
+    "source": "example"
+  },
+  {
+    "name": "Nested blockquotes retain the spacing introduced by rewriting each level",
+    "before": ">>ab",
+    "after": "> > ab",
+    "options": {
+      "style": "space"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Fenced code and math block lines keep their markers while surrounding quote lines gain spaces",
+    "before": ">before\n>```\n>  code\n>```\n>$$\n>  x\n>$$\n>after",
+    "after": "> before\n>```\n>  code\n>```\n>$$\n>  x\n>$$\n> after",
+    "options": {
+      "style": "space"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Fenced code and math block lines keep their markers while surrounding quote lines lose spaces",
+    "before": "> before\n> ```\n>   code\n> ```\n> $$\n>   x\n> $$\n> after",
+    "after": ">before\n> ```\n>   code\n> ```\n> $$\n>   x\n> $$\n>after",
+    "options": {
+      "style": "no space"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Make sure we properly handle adding spaces to blockquote indicators instead of adding them to values that are not at the start of the line",
+    "before": "> Using a C++ \"member of pointer\" operator: `pointer->field`\n>`>`",
+    "after": "> Using a C++ \"member of pointer\" operator: `pointer->field`\n> `>`",
+    "options": {
+      "style": "space"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Make sure we properly handle removing spaces from blockquote indicators instead of removing them from values that are not at the start of the line",
+    "before": "> Using a C++ \"member of pointer\" operator: `pointer-> field`\n> `> `",
+    "after": ">Using a C++ \"member of pointer\" operator: `pointer-> field`\n>`> `",
+    "options": {
+      "style": "no space"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Multiple spaces after a blockquote indicator is converted into one space",
+    "before": ">   Text here\n>     >           More Text Here\n> \t > \t >Some More Text\n>>>>\tJust a Tab",
+    "after": "> Text here\n> > More Text Here\n> > > Some More Text\n> > > > Just a Tab",
+    "options": {
+      "style": "space"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Multiple spaces after a blockquote indicator is not converted into one space when it is a list item or checklist line when `style=space`",
+    "before": ">   Text here\n>   - List item 1\n>\t * List item 2\n>   + List item 3\n>   1. Ordered item 1\n>   2) Ordered item 2\n>   - [ ] Checklist item\n>- List item 4",
+    "after": "> Text here\n>   - List item 1\n> \t * List item 2\n>   + List item 3\n>   1. Ordered item 1\n>   2) Ordered item 2\n>   - [ ] Checklist item\n> - List item 4",
+    "options": {
+      "style": "space"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Multiple spaces after a blockquote indicator should be removed except when dealing with list mark lines when `style=no space`",
+    "before": ">   Text here\n>   - List item 1\n>\t * List item 2\n>   + List item 3\n>   1. Ordered item 1\n>   2) Ordered item 2\n>   - [ ] Checklist item\n>- List item 4\n> >  > \t > - List item 5\n> >  > \t > > - List item 6",
+    "after": ">Text here\n>   - List item 1\n>\t * List item 2\n>   + List item 3\n>   1. Ordered item 1\n>   2) Ordered item 2\n>   - [ ] Checklist item\n>- List item 4\n>>>> - List item 5\n>>>>> - List item 6",
+    "options": {
+      "style": "no space"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Blockquote lines with nothing on them do not get a space added after the indicator",
+    "before": "> a\n>\n> b",
+    "after": "> a\n>\n> b",
+    "options": {
+      "style": "space"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Nested blockquote lines with nothing on them do not get a space added after the indicator",
+    "before": "> > a\n> >\n> > b",
+    "after": "> > a\n> >\n> > b",
+    "options": {
+      "style": "space"
+    },
+    "source": "test"
+  },
+  {
+    "name": "An existing trailing space on an empty blockquote line is removed",
+    "before": "> a\n> \n> b",
+    "after": "> a\n>\n> b",
+    "options": {
+      "style": "space"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Code blocks in a blockquote should not have their spacing affected since that can remove indentation for code",
+    "before": "> Example blockquote\n>Wrongly indented line\n>\n>```javascript\n> function greet() {\n>     console.log(\"Hello mom!\")\n> }\n> ```",
+    "after": "> Example blockquote\n> Wrongly indented line\n>\n>```javascript\n> function greet() {\n>     console.log(\"Hello mom!\")\n> }\n> ```",
+    "options": {
+      "style": "space"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Math blocks in a blockquote should not have their spacing affected since that can remove indentation for lists",
+    "before": ">[!INFO] Linter sublist latex repro\n> text\n> - list item 1\n>     $$\n>     f = ma\n>     $$\n>     - sublist item 1\n>         $$\n>         y = ax + b\n>         $$",
+    "after": "> [!INFO] Linter sublist latex repro\n> text\n> - list item 1\n>     $$\n>     f = ma\n>     $$\n>     - sublist item 1\n>         $$\n>         y = ax + b\n>         $$",
+    "options": {
+      "style": "space"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Code blocks in a blockquote should not have their spacing affected since that can remove indentation for lists",
+    "before": ">[!INFO] Linter sublist code repro\n> text\n> - list item 1\n>     ```\n>     f = ma\n>     ```\n>     - sublist item 1\n>         ```\n>         y = ax + b\n>         ```",
+    "after": "> [!INFO] Linter sublist code repro\n> text\n> - list item 1\n>     ```\n>     f = ma\n>     ```\n>     - sublist item 1\n>         ```\n>         y = ax + b\n>         ```",
+    "options": {
+      "style": "space"
+    },
+    "source": "test"
+  }
+]

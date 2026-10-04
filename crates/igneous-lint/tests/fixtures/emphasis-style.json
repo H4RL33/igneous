@@ -1,0 +1,65 @@
+[
+  {
+    "name": "Emphasis indicators should use underscores when style is set to 'underscore'",
+    "before": "# Emphasis Cases\n\n*Test emphasis*\n* Test not emphasized *\nThis is *emphasized* mid sentence\nThis is *emphasized* mid sentence with a second *emphasis* on the same line\nThis is ***bold and emphasized***\nThis is ***nested bold** and ending emphasized*\nThis is ***nested emphasis* and ending bold**\n\n**Test bold**\n\n* List Item1 with *emphasized text*\n* List Item2",
+    "after": "# Emphasis Cases\n\n_Test emphasis_\n* Test not emphasized *\nThis is _emphasized_ mid sentence\nThis is _emphasized_ mid sentence with a second _emphasis_ on the same line\nThis is _**bold and emphasized**_\nThis is _**nested bold** and ending emphasized_\nThis is **_nested emphasis_ and ending bold**\n\n**Test bold**\n\n* List Item1 with _emphasized text_\n* List Item2",
+    "options": {
+      "style": "underscore"
+    },
+    "source": "example"
+  },
+  {
+    "name": "Emphasis indicators should use asterisks when style is set to 'asterisk'",
+    "before": "# Emphasis Cases\n\n_Test emphasis_\n_ Test not emphasized _\nThis is _emphasized_ mid sentence\nThis is _emphasized_ mid sentence with a second _emphasis_ on the same line\nThis is ___bold and emphasized___\nThis is ___nested bold__ and ending emphasized_\nThis is ___nested emphasis_ and ending bold__\n\n__Test bold__",
+    "after": "# Emphasis Cases\n\n*Test emphasis*\n_ Test not emphasized _\nThis is *emphasized* mid sentence\nThis is *emphasized* mid sentence with a second *emphasis* on the same line\nThis is *__bold and emphasized__*\nThis is *__nested bold__ and ending emphasized*\nThis is __*nested emphasis* and ending bold__\n\n__Test bold__",
+    "options": {
+      "style": "asterisk"
+    },
+    "source": "example"
+  },
+  {
+    "name": "Emphasis indicators should use consistent style based on first emphasis indicator in a file when style is set to 'consistent'",
+    "before": "# Emphasis First Emphasis Is an Asterisk\n\n*First emphasis*\nThis is _emphasized_ mid sentence\nThis is *emphasized* mid sentence with a second _emphasis_ on the same line\nThis is *__bold and emphasized__*\nThis is *__nested bold__ and ending emphasized*\nThis is **_nested emphasis_ and ending bold**\n\n__Test bold__",
+    "after": "# Emphasis First Emphasis Is an Asterisk\n\n*First emphasis*\nThis is *emphasized* mid sentence\nThis is *emphasized* mid sentence with a second *emphasis* on the same line\nThis is *__bold and emphasized__*\nThis is *__nested bold__ and ending emphasized*\nThis is ***nested emphasis* and ending bold**\n\n__Test bold__",
+    "options": {
+      "style": "consistent"
+    },
+    "source": "example"
+  },
+  {
+    "name": "Emphasis indicators should use consistent style based on first emphasis indicator in a file when style is set to 'consistent'",
+    "before": "# Emphasis First Emphasis Is an Underscore\n\n**_First emphasis_**\nThis is _emphasized_ mid sentence\nThis is *emphasized* mid sentence with a second _emphasis_ on the same line\nThis is *__bold and emphasized__*\nThis is _**nested bold** and ending emphasized_\nThis is __*nested emphasis* and ending bold__\n\n__Test bold__",
+    "after": "# Emphasis First Emphasis Is an Underscore\n\n**_First emphasis_**\nThis is _emphasized_ mid sentence\nThis is _emphasized_ mid sentence with a second _emphasis_ on the same line\nThis is ___bold and emphasized___\nThis is _**nested bold** and ending emphasized_\nThis is ___nested emphasis_ and ending bold__\n\n__Test bold__",
+    "options": {
+      "style": "consistent"
+    },
+    "source": "example"
+  },
+  {
+    "name": "nested emphasis keeps disjoint delimiters under asterisk style",
+    "before": "*)*g**",
+    "after": "*)*g**",
+    "options": {
+      "style": "asterisk"
+    },
+    "source": "test"
+  },
+  {
+    "name": "nested emphasis converts both delimiter pairs under underscore style",
+    "before": "*)*g**",
+    "after": "_)_g__",
+    "options": {
+      "style": "underscore"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Make sure inline math is unaffected",
+    "before": "- $m_{pq} = int^{infty}_{-infty}int^{infty}_{-infty} x^p y^q f(x,y) dxdy$",
+    "after": "- $m_{pq} = int^{infty}_{-infty}int^{infty}_{-infty} x^p y^q f(x,y) dxdy$",
+    "options": {
+      "style": "asterisk"
+    },
+    "source": "test"
+  }
+]

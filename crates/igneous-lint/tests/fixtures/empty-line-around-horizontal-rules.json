@@ -1,0 +1,110 @@
+[
+  {
+    "name": "Horizontal rules that start a document do not get an empty line before them.",
+    "before": "***\n\n\nContent",
+    "after": "***\n\nContent",
+    "source": "example"
+  },
+  {
+    "name": "Horizontal rules that end a document do not get an empty line after them.",
+    "before": "***\nContent\n***",
+    "after": "***\n\nContent\n\n***",
+    "source": "example"
+  },
+  {
+    "name": "All types of horizontal rules are affected by this rule",
+    "before": "- Content 1\n***\n- Content 2\n---\n- Content 3\n___\n- Content 4",
+    "after": "- Content 1\n\n***\n\n- Content 2\n\n---\n\n- Content 3\n\n___\n\n- Content 4",
+    "source": "example"
+  },
+  {
+    "name": "YAML frontmatter is not affected by this rule",
+    "before": "---\nprop: value\n---\n\nContent",
+    "after": "---\nprop: value\n---\n\nContent",
+    "source": "example"
+  },
+  {
+    "name": "Paragraphs above `---` are treated as a heading and not spaced apart",
+    "before": "Content\n---",
+    "after": "Content\n---",
+    "source": "example"
+  },
+  {
+    "name": "Horizontal rules that start a document do get an empty line before them.",
+    "before": "***\n\n\nContent",
+    "after": "***\n\nContent",
+    "source": "test"
+  },
+  {
+    "name": "Horizontal rules that end a document do not get an empty line after them.",
+    "before": "***\nContent\n***",
+    "after": "***\n\nContent\n\n***",
+    "source": "test"
+  },
+  {
+    "name": "YAML frontmatter is not affected by this rule",
+    "before": "---\nprop: value\n---\n\nContent",
+    "after": "---\nprop: value\n---\n\nContent",
+    "source": "test"
+  },
+  {
+    "name": "All types of horizontal rules are affected by this rule",
+    "before": "- Content 1\n***\n- Content 2\n---\n- Content 3\n___\n- Content 4",
+    "after": "- Content 1\n\n***\n\n- Content 2\n\n---\n\n- Content 3\n\n___\n\n- Content 4",
+    "source": "test"
+  },
+  {
+    "name": "Paragraphs above `---` are treated as a heading and not spaced apart",
+    "before": "Content\n---",
+    "after": "Content\n---",
+    "source": "test"
+  },
+  {
+    "name": "Horizontal rules between blockquotes",
+    "before": "> Blockquote\n> > Nested Blockquote\n---\n> Blockquote\n> > Nested Blockquote",
+    "after": "> Blockquote\n> > Nested Blockquote\n\n---\n\n> Blockquote\n> > Nested Blockquote",
+    "source": "test"
+  },
+  {
+    "name": "Horizontal rules inside blockquotes",
+    "before": "> Blockquote\n---\n> > Nested Blockquote\n> Blockquote\n> > Nested Blockquote",
+    "after": "> Blockquote\n\n---\n\n> > Nested Blockquote\n> Blockquote\n> > Nested Blockquote",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that basic dash horizontal rules have lines added around them",
+    "before": "- asdf\n---\n- qwer",
+    "after": "- asdf\n\n---\n\n- qwer",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that basic asterisk horizontal rules have lines added around them",
+    "before": "asdf\n***\nqwer",
+    "after": "asdf\n\n***\n\nqwer",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that basic underscore horizontal rules have lines added around them",
+    "before": "asdf\n___\nqwer",
+    "after": "asdf\n\n___\n\nqwer",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that horizontal rules for frontmatter don't have lines added around them",
+    "before": "---\nprop: value\n---\n\nasdf\n___\nqwer",
+    "after": "---\nprop: value\n---\n\nasdf\n\n___\n\nqwer",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that empty lines around horizontal rules handles an empty line prior to the horizontal rule that is nested one blockquote level more than the horizontal rule is",
+    "before": "> AAA\n>\n> > **BBB:**\n> >\n> > - CCC\n> > \n> -----",
+    "after": "> AAA\n>\n> > **BBB:**\n> >\n> > - CCC\n> >\n> -----",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that empty lines around horizontal rules handles an empty line after the horizontal rule that is nested one blockquote level more than the horizontal rule is",
+    "before": "> AAA\n>\n> -----\n> > **BBB:**\n> >\n> > - CCC",
+    "after": "> AAA\n>\n> -----\n>\n> > **BBB:**\n> >\n> > - CCC",
+    "source": "test"
+  }
+]

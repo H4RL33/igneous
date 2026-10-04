@@ -1,0 +1,477 @@
+[
+  {
+    "name": "Adds a header with the date.",
+    "before": "# H1",
+    "after": "---\ndate created: Wednesday, January 1st 2020, 12:00:00 am\ndate modified: Thursday, January 2nd 2020, 12:00:05 am\n---\n# H1",
+    "options": {
+      "fileCreatedTime": "2020-01-01T00:00:00-00:00",
+      "fileModifiedTime": "2020-01-02T00:00:00-00:00",
+      "currentTime": {
+        "$time": "2020-01-02T00:00:05"
+      },
+      "alreadyModified": false
+    },
+    "source": "example"
+  },
+  {
+    "name": "dateCreated option is false",
+    "before": "# H1",
+    "after": "---\ndate modified: Thursday, January 2nd 2020, 12:00:05 am\n---\n# H1",
+    "options": {
+      "dateCreated": false,
+      "fileCreatedTime": "2020-01-01T00:00:00-00:00",
+      "fileModifiedTime": "2020-01-01T00:00:00-00:00",
+      "currentTime": {
+        "$time": "2020-01-02T00:00:05"
+      },
+      "alreadyModified": false
+    },
+    "source": "example"
+  },
+  {
+    "name": "Date created key is set",
+    "before": "# H1",
+    "after": "---\ncreated: Wednesday, January 1st 2020, 12:00:00 am\n---\n# H1",
+    "options": {
+      "dateCreated": true,
+      "dateModified": false,
+      "dateCreatedKey": "created",
+      "fileCreatedTime": "2020-01-01T00:00:00-00:00",
+      "currentTime": {
+        "$time": "2020-01-02T00:00:03"
+      },
+      "alreadyModified": false
+    },
+    "source": "example"
+  },
+  {
+    "name": "Date modified key is set",
+    "before": "# H1",
+    "after": "---\nmodified: Wednesday, January 1st 2020, 4:00:00 pm\n---\n# H1",
+    "options": {
+      "dateCreated": false,
+      "dateModified": true,
+      "dateModifiedKey": "modified",
+      "fileModifiedTime": "2020-01-01T00:00:00-00:00",
+      "currentTime": {
+        "$time": "2020-01-01T16:00:00"
+      },
+      "alreadyModified": false
+    },
+    "source": "example"
+  },
+  {
+    "name": "Header is set with convert to UTC option true",
+    "before": "# H1",
+    "after": "---\ndate created: 2020-01-01T14:00:00+00:00\ndate modified: 2020-01-02T02:00:05+00:00\n---\n# H1",
+    "options": {
+      "format": "YYYY-MM-DDTHH:mm:ssZ",
+      "fileCreatedTime": "2020-01-01T09:00:00-05:00",
+      "fileModifiedTime": "2020-01-01T21:00:00-05:00",
+      "currentTime": {
+        "$time": "2020-01-01T21:00:05-05:00"
+      },
+      "alreadyModified": false,
+      "convertToUTC": true
+    },
+    "source": "example"
+  },
+  {
+    "name": "dateCreated option is false with convert to UTC option true",
+    "before": "# H1",
+    "after": "---\ndate modified: 2020-01-02T02:00:05+00:00\n---\n# H1",
+    "options": {
+      "format": "YYYY-MM-DDTHH:mm:ssZ",
+      "dateCreated": false,
+      "fileCreatedTime": "2020-01-01T09:00:00-05:00",
+      "fileModifiedTime": "2020-01-01T21:00:00-05:00",
+      "currentTime": {
+        "$time": "2020-01-01T21:00:05-05:00"
+      },
+      "alreadyModified": false,
+      "convertToUTC": true
+    },
+    "source": "example"
+  },
+  {
+    "name": "Date created key is set with convert to UTC option true",
+    "before": "# H1",
+    "after": "---\ncreated: 2020-01-01T14:00:00+00:00\n---\n# H1",
+    "options": {
+      "format": "YYYY-MM-DDTHH:mm:ssZ",
+      "dateCreated": true,
+      "dateModified": false,
+      "dateCreatedKey": "created",
+      "fileCreatedTime": "2020-01-01T09:00:00-05:00",
+      "currentTime": {
+        "$time": "2020-01-01T21:00:05-05:00"
+      },
+      "alreadyModified": false,
+      "convertToUTC": true
+    },
+    "source": "example"
+  },
+  {
+    "name": "Date modified key is set with convert to UTC option true",
+    "before": "# H1",
+    "after": "---\nmodified: 2020-01-02T02:00:05+00:00\n---\n# H1",
+    "options": {
+      "format": "YYYY-MM-DDTHH:mm:ssZ",
+      "dateCreated": false,
+      "dateModified": true,
+      "dateModifiedKey": "modified",
+      "fileModifiedTime": "2020-01-01T21:00:00-05:00",
+      "currentTime": {
+        "$time": "2020-01-01T21:00:05-05:00"
+      },
+      "alreadyModified": false,
+      "convertToUTC": true
+    },
+    "source": "example"
+  },
+  {
+    "name": "Doesn't add date created if already there",
+    "before": "---\ndate created: 2019-01-01\n---",
+    "after": "---\ndate created: 2019-01-01\n---",
+    "options": {
+      "dateModified": false,
+      "format": ""
+    },
+    "source": "test"
+  },
+  {
+    "name": "Respects created key",
+    "before": "---\ncreated: 2019-01-01\n---",
+    "after": "---\ncreated: 2019-01-01\n---",
+    "options": {
+      "dateModified": false,
+      "dateCreatedKey": "created",
+      "format": ""
+    },
+    "source": "test"
+  },
+  {
+    "name": "When format ends in whitespace, date created is not changed when time updates",
+    "before": "---\ncreated: Wednesday, January 1st 2020, 12:00 am\nmodified: Thursday, January 2nd 2020, 12:00 am\n---",
+    "after": "---\ncreated: Wednesday, January 1st 2020, 12:00 am\nmodified: Thursday, January 2nd 2020, 12:00 am\n---",
+    "options": {
+      "dateCreated": true,
+      "dateCreatedKey": "created",
+      "dateModified": true,
+      "dateModifiedKey": "modified",
+      "format": "dddd, MMMM Do YYYY, h:mm a ",
+      "currentTime": {
+        "$time": "2020-01-02T00:01:00"
+      },
+      "alreadyModified": false,
+      "dateCreatedSourceOfTruth": "frontmatter",
+      "fileModifiedTime": "2020-01-02T00:00:00-00"
+    },
+    "source": "test"
+  },
+  {
+    "name": "When the date format changes and `dateCreatedSourceOfTruth = frontmatter`, date created value is based on the one in the YAML frontmatter.",
+    "before": "---\ncreated: Wednesday, January 1st 2020, 12:00:00 am\n---",
+    "after": "---\ncreated: 2020, 12:00:00 am\n---",
+    "options": {
+      "dateModified": false,
+      "dateCreatedKey": "created",
+      "dateCreatedSourceOfTruth": "frontmatter",
+      "format": "YYYY, h:mm:ss a",
+      "locale": "en"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Respects modified key when nothing has changed",
+    "before": "---\nmodified: Wednesday, January 1st 2020, 12:00:00 am\n---",
+    "after": "---\nmodified: Wednesday, January 1st 2020, 12:00:00 am\n---",
+    "options": {
+      "dateCreated": false,
+      "dateModifiedKey": "modified",
+      "fileModifiedTime": "2020-01-01T00:00:00-00:00",
+      "currentTime": {
+        "$time": "2020-01-02T00:00:00"
+      },
+      "alreadyModified": false
+    },
+    "source": "test"
+  },
+  {
+    "name": "Updates modified value when nothing has changed, but date modified is more than 5 seconds different than the file metadata",
+    "before": "---\nmodified: Wednesday, January 1st 2020, 12:00:00 am\n---",
+    "after": "---\nmodified: Thursday, January 2nd 2020, 12:00:00 am\n---",
+    "options": {
+      "dateCreated": false,
+      "dateModifiedKey": "modified",
+      "fileModifiedTime": "2020-01-02T00:00:03-00:00",
+      "currentTime": {
+        "$time": "2020-01-02T00:00:00"
+      },
+      "alreadyModified": false
+    },
+    "source": "test"
+  },
+  {
+    "name": "Updates modified value when format has changed",
+    "before": "---\nmodified: Wednesday, January 1st 2020, 12:00:00 am\n---",
+    "after": "---\nmodified: Wednesday, January 1st 2020\n---",
+    "options": {
+      "dateCreated": false,
+      "dateModifiedKey": "modified",
+      "fileModifiedTime": "2020-01-01T00:00:00-00:00",
+      "currentTime": {
+        "$time": "2020-01-01T00:00:00"
+      },
+      "alreadyModified": false,
+      "format": "dddd, MMMM Do YYYY"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Updates modified value when format has changed",
+    "before": "---\nmodified: Wednesday, January 1st 2020, 12:00:00 am\n---",
+    "after": "---\nmodified: Wednesday, January 1st 2020\n---",
+    "options": {
+      "dateCreated": false,
+      "dateModifiedKey": "modified",
+      "fileModifiedTime": "2020-01-01T00:00:00-00:00",
+      "currentTime": {
+        "$time": "2020-01-01T00:00:00"
+      },
+      "alreadyModified": false,
+      "format": "dddd, MMMM Do YYYY"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Updates modified key when something has changed outside of the YAML timestamp rule",
+    "before": "---\nmodified: Wednesday, January 1st 2020, 12:00:00 am\n---",
+    "after": "---\nmodified: Saturday, February 1st 2020, 12:00:00 am\n---",
+    "options": {
+      "dateCreated": false,
+      "dateModifiedKey": "modified",
+      "fileModifiedTime": "2020-01-30T00:00:00-00:00",
+      "currentTime": {
+        "$time": "2020-02-01T00:00:00"
+      },
+      "alreadyModified": true
+    },
+    "source": "test"
+  },
+  {
+    "name": "Updates modified key when something has changed inside of the YAML timestamp rule",
+    "before": "---\nmodified: Thursday, January 2nd 2020, 12:00:00 am\n---",
+    "after": "---\nmodified: Thursday, January 2nd 2020, 12:00:05 am\ncreated: Wednesday, January 1st 2020, 12:00:00 am\n---",
+    "options": {
+      "dateCreatedKey": "created",
+      "dateModifiedKey": "modified",
+      "fileCreatedTime": "2020-01-01T00:00:00-00:00",
+      "fileModifiedTime": "2020-01-02T00:00:00-00:00",
+      "currentTime": {
+        "$time": "2020-01-02T00:00:05"
+      },
+      "alreadyModified": false
+    },
+    "source": "test"
+  },
+  {
+    "name": "Updates modified key when present, but lacks a value",
+    "before": "---\ntag: tag1\nmodified: \nlocation: \"path\"\n---",
+    "after": "---\ntag: tag1\nmodified: Saturday, February 1st 2020, 12:00:00 am\nlocation: \"path\"\n---",
+    "options": {
+      "dateCreated": false,
+      "dateModifiedKey": "modified",
+      "fileModifiedTime": "2020-01-30T00:00:00-00:00",
+      "alreadyModified": false,
+      "currentTime": {
+        "$time": "2020-02-01T00:00:00"
+      }
+    },
+    "source": "test"
+  },
+  {
+    "name": "Updates created key when present, but lacks a value",
+    "before": "---\ntag: tag1\ncreated: \nlocation: \"path\"\n---",
+    "after": "---\ntag: tag1\ncreated: Saturday, February 1st 2020, 12:00:00 am\nlocation: \"path\"\n---",
+    "options": {
+      "dateModified": false,
+      "dateCreatedKey": "created",
+      "fileCreatedTime": "2020-02-01T00:00:00-00:00",
+      "alreadyModified": false
+    },
+    "source": "test"
+  },
+  {
+    "name": "Updates created value when format has changed",
+    "before": "---\ntag: tag1\ncreated: Saturday, February 1st 2020, 12:00:00 am\nlocation: \"path\"\n---",
+    "after": "---\ntag: tag1\ncreated: Saturday, February 1st 2020\nlocation: \"path\"\n---",
+    "options": {
+      "dateModified": false,
+      "dateCreatedKey": "created",
+      "fileCreatedTime": "2020-02-01T00:00:00-00:00",
+      "alreadyModified": false,
+      "format": "dddd, MMMM Do YYYY"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Updates modified value when format has changed causing created value updated",
+    "before": "---\ntag: tag1\nmodified: Saturday, February 1st 2020, 12:00:00 am\ncreated: Wednesday, January 1st 2020\nlocation: \"path\"\n---",
+    "after": "---\ntag: tag1\nmodified: Tuesday, February 4th 2020, 6:00:00 pm\ncreated: Wednesday, January 1st 2020, 12:00:00 am\nlocation: \"path\"\n---",
+    "options": {
+      "dateCreatedKey": "created",
+      "dateModifiedKey": "modified",
+      "fileCreatedTime": "2020-01-01T00:00:00-00:00",
+      "currentTime": {
+        "$time": "2020-02-04T18:00:00"
+      },
+      "alreadyModified": false
+    },
+    "source": "test"
+  },
+  {
+    "name": "When no changes are made, and frontmatter is the source of truth, do not update date modified when no change in modification time has been made",
+    "before": "---\ntag: tag1\nmodified: Tuesday, February 4th 2020, 6:00:00 pm\ncreated: Wednesday, January 1st 2020, 12:00:00 am\nlocation: \"path\"\n---",
+    "after": "---\ntag: tag1\nmodified: Tuesday, February 4th 2020, 6:00:00 pm\ncreated: Wednesday, January 1st 2020, 12:00:00 am\nlocation: \"path\"\n---",
+    "options": {
+      "dateCreatedKey": "created",
+      "dateModifiedKey": "modified",
+      "fileCreatedTime": "2020-01-01T00:00:00-00:00",
+      "fileModifiedTime": "2020-02-04T18:00:00-00:00",
+      "currentTime": {
+        "$time": "2020-02-04T18:00:07"
+      },
+      "alreadyModified": false,
+      "dateCreatedSourceOfTruth": "frontmatter"
+    },
+    "source": "test"
+  },
+  {
+    "name": "When creation date exists and frontmatter is the source of truth and convert to UTC are true, creation date should remain unchanged",
+    "before": "---\ncreated: 2019-12-31T14:00:00+00:00\n---",
+    "after": "---\ncreated: 2019-12-31T14:00:00+00:00\n---",
+    "options": {
+      "format": "YYYY-MM-DDTHH:mm:ssZ",
+      "dateCreated": true,
+      "dateCreatedKey": "created",
+      "dateModified": false,
+      "fileCreatedTime": "2020-01-01T09:00:00-05:00",
+      "currentTime": {
+        "$time": "2020-01-01T21:00:05-05:00"
+      },
+      "dateCreatedSourceOfTruth": "frontmatter",
+      "convertToUTC": true
+    },
+    "source": "test"
+  },
+  {
+    "name": "When timestamp format has changed and convert to UTC is true, updated timestamps should be in UTC",
+    "before": "---\ncreated: Wed, 1 Jan 2020 09:00:00 -05:00\nmodified: Wed, 1 Jan 2020 18:00:00 -05:00\n---",
+    "after": "---\ncreated: 2020-01-01T14:00:00+00:00\nmodified: 2020-01-02T02:00:05+00:00\n---",
+    "options": {
+      "format": "YYYY-MM-DDTHH:mm:ssZ",
+      "dateCreated": true,
+      "dateCreatedKey": "created",
+      "dateModified": true,
+      "dateModifiedKey": "modified",
+      "fileCreatedTime": "2020-01-01T09:00:00-05:00",
+      "fileModifiedTime": "2020-01-01T21:00:00-05:00",
+      "currentTime": {
+        "$time": "2020-01-01T21:00:05-05:00"
+      },
+      "convertToUTC": true
+    },
+    "source": "test"
+  },
+  {
+    "name": "When changes are made prior to the YAML timestamp rule and user and Linter edits are the source of truth, update date modified",
+    "before": "---\ntag: tag1\nmodified: Tuesday, February 4th 2020, 6:00:00 pm\ncreated: Wednesday, January 1st 2020, 12:00:00 am\nlocation: \"path\"\n---",
+    "after": "---\ntag: tag1\nmodified: Tuesday, February 4th 2020, 6:00:07 pm\ncreated: Wednesday, January 1st 2020, 12:00:00 am\nlocation: \"path\"\n---",
+    "options": {
+      "dateCreatedKey": "created",
+      "dateModifiedKey": "modified",
+      "fileCreatedTime": "2020-01-01T00:00:00-00:00",
+      "fileModifiedTime": "2020-02-04T18:00:00-00:00",
+      "currentTime": {
+        "$time": "2020-02-04T18:00:07"
+      },
+      "alreadyModified": true,
+      "dateCreatedSourceOfTruth": "frontmatter",
+      "dateModifiedSourceOfTruth": "user or Linter edits"
+    },
+    "source": "test"
+  },
+  {
+    "name": "When no changes are made prior to the YAML timestamp rule, the created date format is different from the current format in settings, and user and Linter edits are the source of truth, update date modified",
+    "before": "---\ntag: tag1\nmodified: Tuesday, February 4th 2020, 6:00:00 pm\ncreated: Wednesday, January 1st 2020, 12:00 am\nlocation: \"path\"\n---",
+    "after": "---\ntag: tag1\nmodified: Tuesday, February 4th 2020, 6:00:07 pm\ncreated: Wednesday, January 1st 2020, 12:00:00 am\nlocation: \"path\"\n---",
+    "options": {
+      "dateCreatedKey": "created",
+      "dateModifiedKey": "modified",
+      "fileCreatedTime": "2020-01-01T00:00:00-00:00",
+      "fileModifiedTime": "2020-02-04T18:00:00-00:00",
+      "currentTime": {
+        "$time": "2020-02-04T18:00:07"
+      },
+      "alreadyModified": false,
+      "dateCreatedSourceOfTruth": "frontmatter",
+      "dateModifiedSourceOfTruth": "user or Linter edits"
+    },
+    "source": "test"
+  },
+  {
+    "name": "When no changes are made prior to the YAML timestamp rule, the modified date format is different from the current format in settings, and user and Linter edits are the source of truth, update date modified",
+    "before": "---\ntag: tag1\nmodified: Tuesday, February 4th 2020, 6:00 pm\ncreated: Wednesday, January 1st 2020, 12:00:00 am\nlocation: \"path\"\n---",
+    "after": "---\ntag: tag1\nmodified: Tuesday, February 4th 2020, 6:00:07 pm\ncreated: Wednesday, January 1st 2020, 12:00:00 am\nlocation: \"path\"\n---",
+    "options": {
+      "dateCreatedKey": "created",
+      "dateModifiedKey": "modified",
+      "fileCreatedTime": "2020-01-01T00:00:00-00:00",
+      "fileModifiedTime": "2020-02-04T18:00:00-00:00",
+      "currentTime": {
+        "$time": "2020-02-04T18:00:07"
+      },
+      "alreadyModified": false,
+      "dateCreatedSourceOfTruth": "frontmatter",
+      "dateModifiedSourceOfTruth": "user or Linter edits"
+    },
+    "source": "test"
+  },
+  {
+    "name": "When no changes are made prior to the YAML timestamp rule, the file system date modified is more than 5 seconds different from the date modified, and user and Linter edits are the source of truth, do not update date modified",
+    "before": "---\ntag: tag1\nmodified: Tuesday, February 4th 2020, 6:00:00 pm\ncreated: Wednesday, January 1st 2020, 12:00:00 am\nlocation: \"path\"\n---",
+    "after": "---\ntag: tag1\nmodified: Tuesday, February 4th 2020, 6:00:00 pm\ncreated: Wednesday, January 1st 2020, 12:00:00 am\nlocation: \"path\"\n---",
+    "options": {
+      "dateCreatedKey": "created",
+      "dateModifiedKey": "modified",
+      "fileCreatedTime": "2020-01-01T00:00:00-00:00",
+      "fileModifiedTime": "2020-02-05T18:00:00-00:00",
+      "currentTime": {
+        "$time": "2020-02-05T18:00:07"
+      },
+      "alreadyModified": false,
+      "dateCreatedSourceOfTruth": "frontmatter",
+      "dateModifiedSourceOfTruth": "user or Linter edits"
+    },
+    "source": "test"
+  },
+  {
+    "name": "When the format for the file has escaped characters, if it matches the original format and the source of truth is not filesystem, then it should not update the date modified",
+    "before": "---\nmodified_on: \"[[2025-10-11]]\"\n---",
+    "after": "---\nmodified_on: \"[[2025-10-11]]\"\n---",
+    "options": {
+      "dateCreated": false,
+      "format": "\"[[[]YYYY-MM-DD[]]]\"",
+      "dateModifiedKey": "modified_on",
+      "fileCreatedTime": "2020-01-01T00:00:00-00:00",
+      "fileModifiedTime": "2020-02-05T18:00:00-00:00",
+      "currentTime": {
+        "$time": "2026-02-05T18:00:07"
+      },
+      "alreadyModified": false,
+      "dateModifiedSourceOfTruth": "user or Linter edits"
+    },
+    "source": "test"
+  }
+]

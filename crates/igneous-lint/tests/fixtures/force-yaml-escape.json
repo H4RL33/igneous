@@ -1,0 +1,22 @@
+[
+  {
+    "name": "YAML without anything to escape",
+    "before": "---\nkey: value\notherKey: []\n---",
+    "after": "---\nkey: value\notherKey: []\n---",
+    "source": "example"
+  },
+  {
+    "name": "Force YAML keys to be escaped with double quotes where not already escaped with `Force YAML escape on keys = 'key'\\n'title'\\n'bool'`",
+    "before": "---\nkey: 'Already escaped value'\ntitle: This is a title\nbool: false\nunaffected: value\n---\n\n_Note that the force YAML key option should not be used with arrays._",
+    "after": "---\nkey: 'Already escaped value'\ntitle: \"This is a title\"\nbool: \"false\"\nunaffected: value\n---\n\n_Note that the force YAML key option should not be used with arrays._",
+    "options": {
+      "forceYamlEscape": [
+        "key",
+        "title",
+        "bool"
+      ],
+      "defaultEscapeCharacter": "\""
+    },
+    "source": "example"
+  }
+]

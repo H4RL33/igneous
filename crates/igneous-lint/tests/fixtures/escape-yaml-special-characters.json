@@ -1,0 +1,56 @@
+[
+  {
+    "name": "YAML without anything to escape",
+    "before": "---\nkey: value\notherKey: []\n---",
+    "after": "---\nkey: value\notherKey: []\n---",
+    "source": "example"
+  },
+  {
+    "name": "YAML with unescaped values",
+    "before": "---\nkey: value: with colon in the middle\nsecondKey: value with ' a single quote present\nthirdKey: \"already escaped: value\"\nfourthKey: value with \" a double quote present\nfifthKey: value with both ' \" a double and single quote present is not escaped, but is invalid YAML\nsixthKey: colon:between characters is fine\notherKey: []\n---",
+    "after": "---\nkey: \"value: with colon in the middle\"\nsecondKey: \"value with ' a single quote present\"\nthirdKey: \"already escaped: value\"\nfourthKey: 'value with \" a double quote present'\nfifthKey: value with both ' \" a double and single quote present is not escaped, but is invalid YAML\nsixthKey: colon:between characters is fine\notherKey: []\n---",
+    "source": "example"
+  },
+  {
+    "name": "YAML with unescaped values in an expanded list with `Default escape character = '`",
+    "before": "---\nkey:\n  - value: with colon in the middle\n  - value with ' a single quote present\n  - 'already escaped: value'\n  - value with \" a double quote present\n  - value with both ' \" a double and single quote present is not escaped, but is invalid YAML\n  - colon:between characters is fine\n---",
+    "after": "---\nkey:\n  - 'value: with colon in the middle'\n  - \"value with ' a single quote present\"\n  - 'already escaped: value'\n  - 'value with \" a double quote present'\n  - value with both ' \" a double and single quote present is not escaped, but is invalid YAML\n  - colon:between characters is fine\n---",
+    "options": {
+      "defaultEscapeCharacter": "'"
+    },
+    "source": "example"
+  },
+  {
+    "name": "YAML with unescaped values with arrays",
+    "before": "---\narray: [value: with colon in the middle, value with ' a single quote present, \"already escaped: value\", value with \" a double quote present, value with both ' \" a double and single quote present is not escaped but is invalid YAML, colon:between characters is fine]\nnestedArray: [[value: with colon in the middle, value with ' a single quote present], [\"already escaped: value\", value with \" a double quote present], value with both ' \" a double and single quote present is not escaped but is invalid YAML, colon:between characters is fine]\nnestedArray2: [[value: with colon in the middle], value with ' a single quote present]\n---\n\n_Note that escaped commas in a YAML array will be treated as a separator._",
+    "after": "---\narray: [\"value: with colon in the middle\", \"value with ' a single quote present\", \"already escaped: value\", 'value with \" a double quote present', value with both ' \" a double and single quote present is not escaped but is invalid YAML, colon:between characters is fine]\nnestedArray: [[\"value: with colon in the middle\", \"value with ' a single quote present\"], [\"already escaped: value\", 'value with \" a double quote present'], value with both ' \" a double and single quote present is not escaped but is invalid YAML, colon:between characters is fine]\nnestedArray2: [[\"value: with colon in the middle\"], \"value with ' a single quote present\"]\n---\n\n_Note that escaped commas in a YAML array will be treated as a separator._",
+    "options": {
+      "tryToEscapeSingleLineArrays": true
+    },
+    "source": "example"
+  },
+  {
+    "name": "Make sure that dictionaries in a multiline array do not accidentally get escaped",
+    "before": "---\ngists:\n  - id: testing123\n    url: 'https://gist.github.com/testing123'\n    createdAt: '2022-11-01T16:07:48Z'\n    updatedAt: '2022-11-01T16:35:11Z'\n    filename: file1.md\n    isPublic: true\n---",
+    "after": "---\ngists:\n  - id: testing123\n    url: 'https://gist.github.com/testing123'\n    createdAt: '2022-11-01T16:07:48Z'\n    updatedAt: '2022-11-01T16:35:11Z'\n    filename: file1.md\n    isPublic: true\n---",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that a multiline array with a key value pair in it gets escaped if there are no subsequent key value pairs at the same indentation level",
+    "before": "---\ngists:\n  - id: testing123\nurl: 'https://gist.github.com/testing123'\n---",
+    "after": "---\ngists:\n  - \"id: testing123\"\nurl: 'https://gist.github.com/testing123'\n---",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that a multiline array with a key value pair in it gets escaped if and does not throw an error if there are no further lines after it",
+    "before": "---\ngists:\n  - id: testing123\n---",
+    "after": "---\ngists:\n  - \"id: testing123\"\n---",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that block scalars get skipped for escape yaml-special-characters",
+    "before": "---\noverview: |-\n  This is the System area. It holds the system's own infrastructure and governance.\n\n  This vault holds only the System area at present.\n---",
+    "after": "---\noverview: |-\n  This is the System area. It holds the system's own infrastructure and governance.\n\n  This vault holds only the System area at present.\n---",
+    "source": "test"
+  }
+]

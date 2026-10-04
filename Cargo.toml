@@ -38,6 +38,7 @@ members = [
     "crates/igneous-git",
     "crates/igneous-graph",
     "crates/igneous-index",
+    "crates/igneous-lint",
     "crates/igneous-markdown",
     "crates/igneous-query",
     "spikes/live-preview",
@@ -56,6 +57,7 @@ igneous-editor = { path = "crates/igneous-editor" }
 igneous-git = { path = "crates/igneous-git" }
 igneous-graph = { path = "crates/igneous-graph" }
 igneous-index = { path = "crates/igneous-index" }
+igneous-lint = { path = "crates/igneous-lint" }
 igneous-markdown = { path = "crates/igneous-markdown" }
 igneous-query = { path = "crates/igneous-query" }
 
@@ -74,6 +76,7 @@ rusqlite = { version = "0.40", features = ["bundled"] }
 saphyr = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+similar = "2.7"
 smallvec = { version = "1", features = ["union", "const_generics"] }
 tempfile = "3"
 thiserror = "2"

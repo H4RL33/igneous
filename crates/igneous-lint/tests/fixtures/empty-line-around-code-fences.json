@@ -1,0 +1,92 @@
+[
+  {
+    "name": "Fenced code blocks that start a document do not get an empty line before them.",
+    "before": "``` js\nvar temp = 'text';\n// this is a code block\n```\nText after code block.",
+    "after": "``` js\nvar temp = 'text';\n// this is a code block\n```\n\nText after code block.",
+    "source": "example"
+  },
+  {
+    "name": "Fenced code blocks that end a document do not get an empty line after them.",
+    "before": "# Heading 1\n```\nHere is a code block\n```",
+    "after": "# Heading 1\n\n```\nHere is a code block\n```",
+    "source": "example"
+  },
+  {
+    "name": "Fenced code blocks that are in a blockquote have the proper empty line added",
+    "before": "# Make sure that code blocks in blockquotes are accounted for correctly\n> ```js\n> var text = 'this is some text';\n> ```\n>\n> ```js\n> var other text = 'this is more text';\n> ```\n\n**Note that the blanks blockquote lines added do not have whitespace after them**\n\n# Doubly nested code block\n\n> > ```js\n> > var other text = 'this is more text';\n> > ```",
+    "after": "# Make sure that code blocks in blockquotes are accounted for correctly\n\n> ```js\n> var text = 'this is some text';\n> ```\n>\n> ```js\n> var other text = 'this is more text';\n> ```\n\n**Note that the blanks blockquote lines added do not have whitespace after them**\n\n# Doubly nested code block\n\n> > ```js\n> > var other text = 'this is more text';\n> > ```",
+    "source": "example"
+  },
+  {
+    "name": "Nested fenced code blocks get empty lines added around them",
+    "before": "```markdown\n# Header\n\n````JavaScript\nvar text = 'some string';\n````\n```",
+    "after": "```markdown\n# Header\n\n````JavaScript\nvar text = 'some string';\n````\n\n```",
+    "source": "example"
+  },
+  {
+    "name": "Make sure multiple blank lines at the start and end are removed",
+    "before": "\n\n```JavaScript\nvar text = 'some string';\n```\n\n",
+    "after": "```JavaScript\nvar text = 'some string';\n```",
+    "source": "test"
+  },
+  {
+    "name": "Make sure multiple blank lines at the start and end are removed when dealing with blockquotes or callouts",
+    "before": ">\n> \n> ```JavaScript\n> var text = 'some string';\n> ```\n> \n>",
+    "after": "> ```JavaScript\n> var text = 'some string';\n> ```",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that there is only 1 empty line be around a fenced code block even if the code block is indented",
+    "before": "1. 修改 php.ini\n\n    ```\n    upload_max_filesize = 20M\n    post_max_size = 20M\n    ```\n\n2. 修改 Nginx 配置文件\n\n    ```\n    client_max_body_size    20m; # 文件最大大小\n    ```\n\n1111\n\n  ```\n  int a = 0;\n  ```\n\n2222",
+    "after": "1. 修改 php.ini\n\n    ```\n    upload_max_filesize = 20M\n    post_max_size = 20M\n    ```\n\n2. 修改 Nginx 配置文件\n\n    ```\n    client_max_body_size    20m; # 文件最大大小\n    ```\n\n1111\n\n  ```\n  int a = 0;\n  ```\n\n2222",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that a callout with a code block is not broken apart",
+    "before": "> [!abstract]- Mentions\n> ```dataview\n> XXX\n> ```",
+    "after": "> [!abstract]- Mentions\n>\n> ```dataview\n> XXX\n> ```",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that a callout with a code block followed by another callout does not get merged",
+    "before": "> [!abstract]- Mentions\n> ```dataview\n> XXX\n> ```\n\n> [!abstract]- Mentions2\n>\n> Other content",
+    "after": "> [!abstract]- Mentions\n>\n> ```dataview\n> XXX\n> ```\n\n> [!abstract]- Mentions2\n>\n> Other content",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that a nested callout with a code block does not get broken apart",
+    "before": "> [!abstract]- Mentions\n> > [!abstract]- Mentions2\n> > ```dataview\n> > XXX\n> > ```",
+    "after": "> [!abstract]- Mentions\n> > [!abstract]- Mentions2\n> >\n> > ```dataview\n> > XXX\n> > ```",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that a nested callout with a code block does not get joined together",
+    "before": "> [!multi-column]\n>\n> > ```\n> > some query or basic code-block\n> > ```\n>\n> > ```\n> > another query or basic code-block\n> > ```",
+    "after": "> [!multi-column]\n>\n> > ```\n> > some query or basic code-block\n> > ```\n>\n> > ```\n> > another query or basic code-block\n> > ```",
+    "source": "test"
+  },
+  {
+    "name": "Indented code blocks in a blockquote should be deterministic and not make changes in this case",
+    "before": "> 1. OpenCV Installation:\n> \n> \t- After Python is installed, open Command Prompt as administrator\n> \t- Install OpenCV by running:\n>\n> \t\t``` title: unwarp\n>         pip install opencv-python\n>         ```\n>\n> \t- Verify installation:\n>\n> \t\t``` title: unwarp\n>         python -c \"import cv2\"\n>         ```\n>\n> \t- Enables Extract Image Scans operation",
+    "after": "> 1. OpenCV Installation:\n> \n> \t- After Python is installed, open Command Prompt as administrator\n> \t- Install OpenCV by running:\n>\n> \t\t``` title: unwarp\n>         pip install opencv-python\n>         ```\n>\n> \t- Verify installation:\n>\n> \t\t``` title: unwarp\n>         python -c \"import cv2\"\n>         ```\n>\n> \t- Enables Extract Image Scans operation",
+    "source": "test"
+  },
+  {
+    "name": "Indented code blocks in a very nested blockquote should be deterministic and not make changes in this case",
+    "before": "> > > > 1. OpenCV Installation:\n> > > > \n> > > > \t- After Python is installed, open Command Prompt as administrator\n> > > > \t- Install OpenCV by running:\n> > > >\n> > > > \t\t``` title: unwarp\n> > > >         pip install opencv-python\n> > > >         ```\n> > > >\n> > > > \t- Verify installation:\n> > > >\n> > > > \t\t``` title: unwarp\n> > > >         python -c \"import cv2\"\n> > > >         ```\n> > > >\n> > > > \t- Enables Extract Image Scans operation",
+    "after": "> > > > 1. OpenCV Installation:\n> > > > \n> > > > \t- After Python is installed, open Command Prompt as administrator\n> > > > \t- Install OpenCV by running:\n> > > >\n> > > > \t\t``` title: unwarp\n> > > >         pip install opencv-python\n> > > >         ```\n> > > >\n> > > > \t- Verify installation:\n> > > >\n> > > > \t\t``` title: unwarp\n> > > >         python -c \"import cv2\"\n> > > >         ```\n> > > >\n> > > > \t- Enables Extract Image Scans operation",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that empty lines around code fences handles an empty line prior to the code fence that is nested one blockquote level more than the code fence is",
+    "before": "> AAA\n>\n> > **BBB:**\n> >\n> > - CCC\n> > \n> ```\n> Some code\n> ```",
+    "after": "> AAA\n>\n> > **BBB:**\n> >\n> > - CCC\n> >\n> ```\n> Some code\n> ```",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that empty lines around table handles an empty line after the code fence that is nested one blockquote level more than the code fence is",
+    "before": "> AAA\n>\n> ```\n> Some code\n> ```\n> > **BBB:**\n> >\n> > - CCC",
+    "after": "> AAA\n>\n> ```\n> Some code\n> ```\n>\n> > **BBB:**\n> >\n> > - CCC",
+    "source": "test"
+  }
+]

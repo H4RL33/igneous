@@ -1,0 +1,86 @@
+[
+  {
+    "name": "Removes empty list markers.",
+    "before": "- item 1\n-\n- item 2\n\n* list 2 item 1\n    *\n* list 2 item 2\n\n+ list 3 item 1\n+\n+ list 3 item 2",
+    "after": "- item 1\n- item 2\n\n* list 2 item 1\n* list 2 item 2\n\n+ list 3 item 1\n+ list 3 item 2",
+    "source": "example"
+  },
+  {
+    "name": "Removes empty ordered list markers.",
+    "before": "1. item 1\n2.\n3. item 2\n\n1. list 2 item 1\n2. list 2 item 2\n3. \n\n_Note that this rule does not make sure that the ordered list is sequential after removal_",
+    "after": "1. item 1\n3. item 2\n\n1. list 2 item 1\n2. list 2 item 2\n\n_Note that this rule does not make sure that the ordered list is sequential after removal_",
+    "source": "example"
+  },
+  {
+    "name": "Removes empty checklist markers.",
+    "before": "- [ ]  item 1\n- [x]\n- [ ] item 2\n- [ ]   \n\n_Note that this will affect checked and uncheck checked list items_",
+    "after": "- [ ]  item 1\n- [ ] item 2\n\n_Note that this will affect checked and uncheck checked list items_",
+    "source": "example"
+  },
+  {
+    "name": "Removes empty list, checklist, and ordered list markers in callouts/blockquotes",
+    "before": "> Checklist in blockquote\n> - [ ]  item 1\n> - [x]\n> - [ ] item 2\n> - [ ]   \n\n> Ordered List in blockquote\n> > 1. item 1\n> > 2.\n> > 3. item 2\n> > 4.  \n\n> Regular lists in blockquote\n>\n> - item 1\n> -\n> - item 2\n>\n> List 2\n>\n> * item 1\n>     *\n> * list 2 item 2\n>\n> List 3\n>\n> + item 1\n> + \n> + item 2",
+    "after": "> Checklist in blockquote\n> - [ ]  item 1\n> - [ ] item 2\n\n> Ordered List in blockquote\n> > 1. item 1\n> > 3. item 2\n\n> Regular lists in blockquote\n>\n> - item 1\n> - item 2\n>\n> List 2\n>\n> * item 1\n> * list 2 item 2\n>\n> List 3\n>\n> + item 1\n> + item 2",
+    "source": "example"
+  },
+  {
+    "name": "Leaves empty markers inside fenced code alone",
+    "before": "```\n-\n- [ ]\n```\n-\noutside",
+    "after": "```\n-\n- [ ]\n```\noutside",
+    "source": "test"
+  },
+  {
+    "name": "Leaves empty markers inside disabled sections alone",
+    "before": "<!-- linter-disable -->\n-\n- [ ]\n<!-- linter-enable -->\n-\noutside",
+    "after": "<!-- linter-disable -->\n-\n- [ ]\n<!-- linter-enable -->\noutside",
+    "source": "test"
+  },
+  {
+    "name": "Preserves masking behavior after indented code ending in a quote marker",
+    "before": "    >\n-",
+    "after": "    >",
+    "source": "test"
+  },
+  {
+    "name": "The trailing-marker pass sees the line break left by earlier removals",
+    "before": "text\n-\n-",
+    "after": "text",
+    "source": "test"
+  },
+  {
+    "name": "Remove empty list markers that do not have a new line after them",
+    "before": "* Some list item 1\n*",
+    "after": "* Some list item 1",
+    "source": "test"
+  },
+  {
+    "name": "Remove empty list markers that are the only line in the file",
+    "before": "*",
+    "after": "",
+    "source": "test"
+  },
+  {
+    "name": "Don't remove number if it is the only content of the line",
+    "before": "42",
+    "after": "42",
+    "source": "test"
+  },
+  {
+    "name": "Don't remove number if not followed by `.` or `)`",
+    "before": "42z",
+    "after": "42z",
+    "source": "test"
+  },
+  {
+    "name": "Remove number followed by `.`",
+    "before": "42.",
+    "after": "",
+    "source": "test"
+  },
+  {
+    "name": "Remove number followed by `)`",
+    "before": "42)",
+    "after": "",
+    "source": "test"
+  }
+]

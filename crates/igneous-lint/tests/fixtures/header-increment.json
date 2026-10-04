@@ -1,0 +1,110 @@
+[
+  {
+    "name": "Heading levels are decremented as needed",
+    "before": "# H1\n### H3\n### H3\n#### H4\n###### H6\n\nWe skipped a 2nd level heading",
+    "after": "# H1\n## H3\n## H3\n### H4\n#### H6\n\nWe skipped a 2nd level heading",
+    "source": "example"
+  },
+  {
+    "name": "Skipped headings in sections that would be decremented will result in those headings not having the same meaning",
+    "before": "# H1\n### H3\n\nWe skip from 1 to 3\n\n###### H6\n\nWe skip from 3 to 6 leaving out 4, 5, and 6. Thus headings level 4 and 5 will be treated like H3 above until another H2 or H1 is encountered\n\n##### H5\n\nWe skipped 5 previously so it will be treated the same as the H3 above since it was the next lowest header that was to be decremented\n\n## H2\n\nThis resets the decrement section so the H6 below is decremented to an H3\n\n###### H6",
+    "after": "# H1\n## H3\n\nWe skip from 1 to 3\n\n### H6\n\nWe skip from 3 to 6 leaving out 4, 5, and 6. Thus headings level 4 and 5 will be treated like H3 above until another H2 or H1 is encountered\n\n## H5\n\nWe skipped 5 previously so it will be treated the same as the H3 above since it was the next lowest header that was to be decremented\n\n# H2\n\nThis resets the decrement section so the H6 below is decremented to an H3\n\n## H6",
+    "source": "example"
+  },
+  {
+    "name": "When `Start header increment at heading level 2 = true`, H1s become H2s and the other headers are incremented accordingly",
+    "before": "# H1 becomes H2\n#### H4 becomes H3\n###### H6\n## H2\n###### H6\n# H1\n## H2",
+    "after": "## H1 becomes H2\n### H4 becomes H3\n#### H6\n## H2\n### H6\n## H1\n### H2",
+    "options": {
+      "startAtH2": true
+    },
+    "source": "example"
+  },
+  {
+    "name": "Does not count or rewrite headings inside fenced code",
+    "before": "```\n# inside heading\n```\n### outside heading",
+    "after": "```\n# inside heading\n```\n# outside heading",
+    "source": "test"
+  },
+  {
+    "name": "Does not count or rewrite headings inside disabled sections",
+    "before": "<!-- linter-disable -->\n# inside heading\n<!-- linter-enable -->\n\n### outside heading",
+    "after": "<!-- linter-disable -->\n# inside heading\n<!-- linter-enable -->\n\n# outside heading",
+    "source": "test"
+  },
+  {
+    "name": "Handles large increments",
+    "before": "# H1\n#### H4\n###### H6",
+    "after": "# H1\n## H4\n### H6",
+    "source": "test"
+  },
+  {
+    "name": "Handles change from decrement to regular increment",
+    "before": "# H1\n#### H4\n###### H6\n##### H5\n## H2",
+    "after": "# H1\n## H4\n### H6\n## H5\n# H2",
+    "source": "test"
+  },
+  {
+    "name": "Handles a variety of changes in header size",
+    "before": "# H1\n### H3\n#### H4\n###### H6\n## H2\n# H1\n## H2\n### H3\n#### H4\n###### H6\n##### H5\n### H3",
+    "after": "# H1\n## H3\n### H4\n#### H6\n# H2\n# H1\n## H2\n### H3\n#### H4\n##### H6\n#### H5\n### H3",
+    "source": "test"
+  },
+  {
+    "name": "H1s become H2s and all other headers are shifted accordingly when an H1 starts a file",
+    "before": "# H1\n### H3\n#### H4\n# H1\n#### H4\n###### H6",
+    "after": "## H1\n### H3\n#### H4\n## H1\n### H4\n#### H6",
+    "options": {
+      "startAtH2": true
+    },
+    "source": "test"
+  },
+  {
+    "name": "When H1 does not start the file, H1s are converted to H2 where they are and the next header is an H3",
+    "before": "### H3\n#### H4\n# H1\n##### H5\n###### H6",
+    "after": "## H3\n### H4\n## H1\n### H5\n#### H6",
+    "options": {
+      "startAtH2": true
+    },
+    "source": "test"
+  },
+  {
+    "name": "When H1 does not exist in the file, the minimum header is an H2 and incrementing starts from that level",
+    "before": "### H3\n#### H4\n## H2\n#### H4\n###### H6\n\nNothing gets promoted above H2",
+    "after": "## H3\n### H4\n## H2\n### H4\n#### H6\n\nNothing gets promoted above H2",
+    "options": {
+      "startAtH2": true
+    },
+    "source": "test"
+  },
+  {
+    "name": "When decreasing the heading level, when the previous value was decreased and the next value is 1 more than the decreased value, but the same as the value just decremented, make sure the header is decremented with `startAtH2 = true`",
+    "before": "## HHELLO\n#### HHELLO\n## HHELLO\n## HHELLO\n## HHELLO",
+    "after": "## HHELLO\n### HHELLO\n## HHELLO\n## HHELLO\n## HHELLO",
+    "options": {
+      "startAtH2": true
+    },
+    "source": "test"
+  },
+  {
+    "name": "When decreasing the heading level, when the previous value was decreased and the next value is 1 more than the decreased value, but the same as the value just decremented, make sure the header is decremented",
+    "before": "## Second\n### Third\n## Second again\n### Third again",
+    "after": "# Second\n## Third\n# Second again\n## Third again",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that when all header levels are present and we need to start at H2, that the H6 is left as an H6 since H7 is not valid",
+    "before": "# H1\n## H2\n### H3\n#### H4\n##### H5\n###### H6",
+    "after": "## H1\n### H2\n#### H3\n##### H4\n###### H5\n###### H6",
+    "options": {
+      "startAtH2": true
+    },
+    "source": "test"
+  },
+  {
+    "name": "Make sure that headers with tags in them are incremented like normal",
+    "before": "# Page Title\n## Foo #tag\n### Bar\n### Baz",
+    "after": "# Page Title\n## Foo #tag\n### Bar\n### Baz",
+    "source": "test"
+  }
+]

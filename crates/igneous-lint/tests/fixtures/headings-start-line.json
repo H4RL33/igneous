@@ -1,0 +1,38 @@
+[
+  {
+    "name": "Removes spaces prior to a heading",
+    "before": "   ## Other heading preceded by 2 spaces ##\n_Note that if the spacing is enough for the header to be considered to be part of a codeblock it will not be affected by this rule._",
+    "after": "## Other heading preceded by 2 spaces ##\n_Note that if the spacing is enough for the header to be considered to be part of a codeblock it will not be affected by this rule._",
+    "source": "example"
+  },
+  {
+    "name": "Tags are not affected by this",
+    "before": "  #test\n  # Heading &amp;",
+    "after": "  #test\n# Heading &amp;",
+    "source": "example"
+  },
+  {
+    "name": "Leaves heading indentation inside fenced code alone",
+    "before": "```\n  # inside\n```\n  # outside",
+    "after": "```\n  # inside\n```\n# outside",
+    "source": "test"
+  },
+  {
+    "name": "Leaves heading indentation inside disabled sections alone",
+    "before": "<!-- linter-disable -->\n  # inside\n<!-- linter-enable -->\n  # outside",
+    "after": "<!-- linter-disable -->\n  # inside\n<!-- linter-enable -->\n# outside",
+    "source": "test"
+  },
+  {
+    "name": "Trims indentation before a heading containing a multiline disabled section",
+    "before": "  # <!-- linter-disable -->\n<!-- linter-enable --> tail",
+    "after": "# <!-- linter-disable -->\n<!-- linter-enable --> tail",
+    "source": "test"
+  },
+  {
+    "name": "Leaves blank lines and heading text unchanged",
+    "before": "\n\n  ## heading!  ##\r\n\n # next\n",
+    "after": "\n\n## heading!  ##\r\n\n# next\n",
+    "source": "test"
+  }
+]

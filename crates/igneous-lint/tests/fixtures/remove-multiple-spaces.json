@@ -1,0 +1,86 @@
+[
+  {
+    "name": "Removing double and triple space.",
+    "before": "Lorem ipsum   dolor  sit amet.",
+    "after": "Lorem ipsum dolor sit amet.",
+    "source": "example"
+  },
+  {
+    "name": "Make sure spaces at the end of the line are ignored",
+    "before": "# Hello world\n\nParagraph contents are here  \nSecond paragraph contents here  ",
+    "after": "# Hello world\n\nParagraph contents are here  \nSecond paragraph contents here  ",
+    "source": "test"
+  },
+  {
+    "name": "Make sure spaces at the start of the line are ignored",
+    "before": "Paragraph contents are here\nSecond paragraph here...\n",
+    "after": "Paragraph contents are here\nSecond paragraph here...\n",
+    "source": "test"
+  },
+  {
+    "name": "Make sure non-letter followed or preceeded by 2 spaces has them cut down to 1 space",
+    "before": "# Hello world\n\nParagraph contents  (something). Something else  .",
+    "after": "# Hello world\n\nParagraph contents (something). Something else .",
+    "source": "test"
+  },
+  {
+    "name": "Links followed by parentheses do not prevent other removal of multiple spaces in a row",
+    "before": "[Link text](path/fileName.md) (2 spaces in between  text)",
+    "after": "[Link text](path/fileName.md) (2 spaces in between text)",
+    "source": "test"
+  },
+  {
+    "name": "Tables are ignored",
+    "before": "# Table 1\n\n| Column 1 | Column 2 | Column 3 |\n|----------|----------|----------|\n| foo      | bar      | blob     |\n| baz      | qux      | trust    |\n| quux     | quuz     | glob     |\n\n# Table 2\n\n| Column 1 | Column 2 |\n|----------|----------|\n| foo      | bar      |\n| baz      | qux      |\n| quux     | quuz     |\n\nNew paragraph.",
+    "after": "# Table 1\n\n| Column 1 | Column 2 | Column 3 |\n|----------|----------|----------|\n| foo      | bar      | blob     |\n| baz      | qux      | trust    |\n| quux     | quuz     | glob     |\n\n# Table 2\n\n| Column 1 | Column 2 |\n|----------|----------|\n| foo      | bar      |\n| baz      | qux      |\n| quux     | quuz     |\n\nNew paragraph.",
+    "source": "test"
+  },
+  {
+    "name": "Callouts and blockquotes allow multiple spaces at start to allow for code and list item indentation",
+    "before": "# List Item in Callout\n\n> [!info] Unordered List\n> - First Level\n> - First Level\n>   - Second Level\n>     - Third Level\n> - First Level\n\n# Code in Callout\n\n> [!info] Code\n>     Line 1\n>     Line 2\n>     Line 3\n\n# List Item in Blockquote\n\n> Unordered List\n> - First Level\n> - First Level\n>   - Second Level\n>     - Third Level\n> - First Level\n\n# Code in Blockquote\n\n> Code\n>     Line 1\n>     Line 2\n>     Line 3",
+    "after": "# List Item in Callout\n\n> [!info] Unordered List\n> - First Level\n> - First Level\n>   - Second Level\n>     - Third Level\n> - First Level\n\n# Code in Callout\n\n> [!info] Code\n>     Line 1\n>     Line 2\n>     Line 3\n\n# List Item in Blockquote\n\n> Unordered List\n> - First Level\n> - First Level\n>   - Second Level\n>     - Third Level\n> - First Level\n\n# Code in Blockquote\n\n> Code\n>     Line 1\n>     Line 2\n>     Line 3",
+    "source": "test"
+  },
+  {
+    "name": "Tables indented after a blockquote indicator are ignored",
+    "before": ">     | Field | Length | Value | Description |\n>     |---|---|---|---|\n>     | Header | 2 | 0x55 0xAA | |\n>     | Version | 1 | 0x00 | |",
+    "after": ">     | Field | Length | Value | Description |\n>     |---|---|---|---|\n>     | Header | 2 | 0x55 0xAA | |\n>     | Version | 1 | 0x00 | |",
+    "source": "test"
+  },
+  {
+    "name": "Multiple spaces after \">\" are still removed if not the start of a line",
+    "before": "# Text with > with multiple spaces after it\n\nText >  other text",
+    "after": "# Text with > with multiple spaces after it\n\nText > other text",
+    "source": "test"
+  },
+  {
+    "name": "Multiple spaces are not removed in a math block",
+    "before": "$$\nx = left { \begin{array}{ll}\n                 y   & mbox{if $y>0$}   \\\n                 z+y & mbox{otherwise}\n             end{array}\n    \right.\n$$",
+    "after": "$$\nx = left { \begin{array}{ll}\n                 y   & mbox{if $y>0$}   \\\n                 z+y & mbox{otherwise}\n             end{array}\n    \right.\n$$",
+    "source": "test"
+  },
+  {
+    "name": "Multiple spaces are not removed in inline math",
+    "before": "$ x =  2y $",
+    "after": "$ x =  2y $",
+    "source": "test"
+  },
+  {
+    "name": "A nested callout/blockquote should not have list item proceeding space removed",
+    "before": "> [!goal]+ Two goals of object-oriented design\n>\n> > [!def]- Cohesion\n> > - How strongly related the parts are inside a class\n> > - About a class\n> > - A class is *cohesive* if the data and behaviour of these objects makes sense\n> > - **High cohesion**:\n> >     - A class does one job, and does it well\n> > - **Low cohesion**:\n> >     - Class has parts that do not relate to each other\n> > - e.g., `Customer` class might have `getName`, `getAddress`, but also `sendEmail` that sends an email to the customer → Weird; not a major responsibility of the customer → ==not cohesive",
+    "after": "> [!goal]+ Two goals of object-oriented design\n>\n> > [!def]- Cohesion\n> > - How strongly related the parts are inside a class\n> > - About a class\n> > - A class is *cohesive* if the data and behaviour of these objects makes sense\n> > - **High cohesion**:\n> >     - A class does one job, and does it well\n> > - **Low cohesion**:\n> >     - Class has parts that do not relate to each other\n> > - e.g., `Customer` class might have `getName`, `getAddress`, but also `sendEmail` that sends an email to the customer → Weird; not a major responsibility of the customer → ==not cohesive",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that remove multiple spaces works when it comes right after a list with a sublist in it",
+    "before": "- first item\n     - xxxxxxxxxxxxxxxxxxxxxxxxx\n\ntest    test",
+    "after": "- first item\n     - xxxxxxxxxxxxxxxxxxxxxxxxx\n\ntest test",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that spaces within an embed are preserved",
+    "before": "![](<./a  b.md>)",
+    "after": "![](<./a  b.md>)",
+    "source": "test"
+  }
+]

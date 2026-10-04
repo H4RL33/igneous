@@ -1,0 +1,56 @@
+[
+  {
+    "name": "A single space is left between the list marker and the text of the list item",
+    "before": "1.   Item 1\n2.  Item 2\n\n-   [ ] Item 1\n- [x]    Item 2\n\t-  [ ] Item 3",
+    "after": "1. Item 1\n2. Item 2\n\n- [ ] Item 1\n- [x] Item 2\n\t- [ ] Item 3",
+    "source": "example"
+  },
+  {
+    "name": "Orders marker and checkbox edits together without duplicating empty items",
+    "before": "- [ ] \n- ",
+    "after": "- [ ] \n- ",
+    "source": "test"
+  },
+  {
+    "name": "Leaves marker and checkbox spacing inside fenced code alone",
+    "before": "```\n-  [ ]  inside\n1.  inside\n```\n-  [ ]  outside\n1.  outside",
+    "after": "```\n-  [ ]  inside\n1.  inside\n```\n- [ ] outside\n1. outside",
+    "source": "test"
+  },
+  {
+    "name": "Leaves marker and checkbox spacing inside disabled sections alone",
+    "before": "<!-- linter-disable -->\n-  [ ]  inside\n1.  inside\n<!-- linter-enable -->\n-  [ ]  outside",
+    "after": "<!-- linter-disable -->\n-  [ ]  inside\n1.  inside\n<!-- linter-enable -->\n- [ ] outside",
+    "source": "test"
+  },
+  {
+    "name": "Normalizes only horizontal whitespace after markers and checkboxes",
+    "before": "1.\t  one\n2.  two\n-  [ ]\t three\n+\t[x]  four\n*  [X]\t five",
+    "after": "1. one\n2. two\n- [ ] three\n+ [x] four\n* [X] five",
+    "source": "test"
+  },
+  {
+    "name": "Normalizes spacing before protected content without changing it",
+    "before": "-  [link](url)\n-  [[wiki]]\n-  #tag\n-  [ ]  [link](url)",
+    "after": "- [link](url)\n- [[wiki]]\n- #tag\n- [ ] [link](url)",
+    "source": "test"
+  },
+  {
+    "name": "Does not normalize whitespace after an ordered checkbox",
+    "before": "1.  [ ]  item\n2.  [x]\t item",
+    "after": "1. [ ]  item\n2. [x]\t item",
+    "source": "test"
+  },
+  {
+    "name": "Collects checkbox edits on a later line without rewriting line breaks",
+    "before": "-  \n [ ]  item",
+    "after": "- \n [ ] item",
+    "source": "test"
+  },
+  {
+    "name": "Handles empty bullets",
+    "before": "Line\n- 1\n- \nLine",
+    "after": "Line\n- 1\n- \nLine",
+    "source": "test"
+  }
+]

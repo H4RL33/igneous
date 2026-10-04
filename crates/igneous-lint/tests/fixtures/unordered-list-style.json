@@ -1,0 +1,35 @@
+[
+  {
+    "name": "Unordered lists have their marker updated to `*` when `List item style = 'consistent'` and `*` is the first unordered list marker",
+    "before": "1. ordered item 1\n2. ordered item 2\n\nChecklists should be ignored\n- [ ] Checklist item 1\n- [x] completed item\n\n* Item 1\n  - Sublist 1 item 1\n  - Sublist 1 item 2\n- Item 2\n  + Sublist 2 item 1\n  + Sublist 2 item 2\n+ Item 3\n  * Sublist 3 item 1\n  * Sublist 3 item 2\n",
+    "after": "1. ordered item 1\n2. ordered item 2\n\nChecklists should be ignored\n- [ ] Checklist item 1\n- [x] completed item\n\n* Item 1\n  * Sublist 1 item 1\n  * Sublist 1 item 2\n* Item 2\n  * Sublist 2 item 1\n  * Sublist 2 item 2\n* Item 3\n  * Sublist 3 item 1\n  * Sublist 3 item 2\n",
+    "source": "example"
+  },
+  {
+    "name": "Unordered lists have their marker updated to `-` when `List item style = '-'`",
+    "before": "- Item 1\n  * Sublist 1 item 1\n  * Sublist 1 item 2\n* Item 2\n  + Sublist 2 item 1\n  + Sublist 2 item 2\n+ Item 3\n  - Sublist 3 item 1\n  - Sublist 3 item 2\n\nSee that the ordered list is ignored, but its sublist is not\n\n1. Item 1\n  - Sub item 1\n1. Item 2\n  * Sub item 2\n1. Item 3\n  + Sub item 3",
+    "after": "- Item 1\n  - Sublist 1 item 1\n  - Sublist 1 item 2\n- Item 2\n  - Sublist 2 item 1\n  - Sublist 2 item 2\n- Item 3\n  - Sublist 3 item 1\n  - Sublist 3 item 2\n\nSee that the ordered list is ignored, but its sublist is not\n\n1. Item 1\n  - Sub item 1\n1. Item 2\n  - Sub item 2\n1. Item 3\n  - Sub item 3",
+    "options": {
+      "listStyle": "-"
+    },
+    "source": "example"
+  },
+  {
+    "name": "Unordered lists have their marker updated to `*` when `List item style = '*'`",
+    "before": "- Item 1\n  * Sublist 1 item 1\n  * Sublist 1 item 2\n* Item 2\n  + Sublist 2 item 1\n  + Sublist 2 item 2\n+ Item 3\n  - Sublist 3 item 1\n  - Sublist 3 item 2\n",
+    "after": "* Item 1\n  * Sublist 1 item 1\n  * Sublist 1 item 2\n* Item 2\n  * Sublist 2 item 1\n  * Sublist 2 item 2\n* Item 3\n  * Sublist 3 item 1\n  * Sublist 3 item 2\n",
+    "options": {
+      "listStyle": "*"
+    },
+    "source": "example"
+  },
+  {
+    "name": "Unordered list in blockquote has list item markers set to `+` when `List item style = '-'`",
+    "before": "> - Item 1\n> + Item 2\n> > * Subitem 1\n> > + Subitem 2\n> >   - Sub sub item 1\n> > - Subitem 3",
+    "after": "> + Item 1\n> + Item 2\n> > + Subitem 1\n> > + Subitem 2\n> >   + Sub sub item 1\n> > + Subitem 3",
+    "options": {
+      "listStyle": "+"
+    },
+    "source": "example"
+  }
+]

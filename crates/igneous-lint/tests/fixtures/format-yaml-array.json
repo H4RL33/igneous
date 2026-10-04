@@ -1,0 +1,640 @@
+[
+  {
+    "name": "Format tags as a single-line array delimited by spaces and aliases as a multi-line array and format the key `test` to be a single-line array",
+    "before": "---\ntags:\n  - computer\n  - research\naliases: Title 1, Title2\ntest: this is a value\n---\n\n# Notes:\n\nNesting YAML arrays may result in unexpected results.\n\nMulti-line arrays will have empty values removed only leaving one if it is completely empty. The same is not true for single-line arrays as that is invalid YAML unless it comes as the last entry in the array.",
+    "after": "---\ntags: [computer, research]\naliases:\n  - Title 1\n  - Title2\ntest: [this is a value]\n---\n\n# Notes:\n\nNesting YAML arrays may result in unexpected results.\n\nMulti-line arrays will have empty values removed only leaving one if it is completely empty. The same is not true for single-line arrays as that is invalid YAML unless it comes as the last entry in the array.",
+    "options": {
+      "aliasArrayStyle": "multi-line",
+      "forceSingleLineArrayStyle": [
+        "test"
+      ]
+    },
+    "source": "example"
+  },
+  {
+    "name": "Format tags as a single string with space delimiters, ignore aliases, and format regular YAML arrays as single-line arrays",
+    "before": "---\naliases: Typescript\ntypes:\n  - thought provoking\n  - peer reviewed\ntags: [computer, science, trajectory]\n---",
+    "after": "---\naliases: Typescript\ntypes: [thought provoking, peer reviewed]\ntags: computer science trajectory\n---",
+    "options": {
+      "formatAliasKey": false,
+      "tagArrayStyle": "single string space delimited"
+    },
+    "source": "example"
+  },
+  {
+    "name": "Arrays with dictionaries in them are ignored",
+    "before": "---\ngists:\n  - id: test123\n    url: 'some_url'\n    filename: file.md\n    isPublic: true\n---",
+    "after": "---\ngists:\n  - id: test123\n    url: 'some_url'\n    filename: file.md\n    isPublic: true\n---",
+    "options": {
+      "formatArrayKeys": true,
+      "defaultArrayStyle": "single-line"
+    },
+    "source": "example"
+  },
+  {
+    "name": "Convert tags from single-line with spaces to multi-line array",
+    "before": "---\ntags: tag1 tag2 tag3 tag4\n---",
+    "after": "---\ntags:\n  - tag1\n  - tag2\n  - tag3\n  - tag4\n---",
+    "options": {
+      "tagArrayStyle": "multi-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert tags from single-line with spaces to single-line array",
+    "before": "---\ntags: tag1 tag2 tag3 tag4\n---",
+    "after": "---\ntags: [tag1, tag2, tag3, tag4]\n---",
+    "options": {
+      "tagArrayStyle": "single-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert tags from single-line with spaces to single-line with commas",
+    "before": "---\ntags: tag1 tag2 tag3 tag4\n---",
+    "after": "---\ntags: tag1, tag2, tag3, tag4\n---",
+    "options": {
+      "tagArrayStyle": "single string comma delimited"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert tags from single-line with spaces to single-line array which is space delimited",
+    "before": "---\ntags: tag1 tag2 tag3 tag4\n---",
+    "after": "---\ntags: [tag1 tag2 tag3 tag4]\n---",
+    "options": {
+      "tagArrayStyle": "single-line space delimited"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert tags from single-line with spaces to single-line with spaces",
+    "before": "---\ntags: tag1 tag2 tag3 tag4\n---",
+    "after": "---\ntags: tag1 tag2 tag3 tag4\n---",
+    "options": {
+      "tagArrayStyle": "single string space delimited"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert tags from single-line array with spaces to single-line with spaces",
+    "before": "---\ntags: [tag1 tag2 tag3 tag4]\n---",
+    "after": "---\ntags: tag1 tag2 tag3 tag4\n---",
+    "options": {
+      "tagArrayStyle": "single string space delimited"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert tags from multi-line array with spaces to single string when 1 element is present",
+    "before": "---\ntags:\n  - tag1\n---",
+    "after": "---\ntags: tag1\n---",
+    "options": {
+      "tagArrayStyle": "single string to single-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert tags from single-line with commas to single-line array when multiple elements present and option is single string to single-line",
+    "before": "---\ntags: tag1, tag2, tag3, tag4\n---",
+    "after": "---\ntags: [tag1, tag2, tag3, tag4]\n---",
+    "options": {
+      "tagArrayStyle": "single string to single-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert tags from single-line array with spaces to multi-line array when multiple elements present and option is single string to multi-line",
+    "before": "---\ntags: tag1 tag2 tag3 tag4\n---",
+    "after": "---\ntags:\n  - tag1\n  - tag2\n  - tag3\n  - tag4\n---",
+    "options": {
+      "tagArrayStyle": "single string to multi-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert tags from single-line string to single-line string when there is only 1 element and the style is single string to multi-line",
+    "before": "---\ntags: tag1, tag2, tag3, tag4\n---",
+    "after": "---\ntags:\n  - tag1\n  - tag2\n  - tag3\n  - tag4\n---",
+    "options": {
+      "tagArrayStyle": "single string to multi-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Formatting YAML tags does nothing when disabled",
+    "before": "---\ntags: tag1, tag2, tag3, tag4\n---",
+    "after": "---\ntags: tag1, tag2, tag3, tag4\n---",
+    "options": {
+      "tagArrayStyle": "single string to multi-line",
+      "formatTagKey": false
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert tags from single-line string to single-line string when there is only 1 element and the style is single string to multi-line and existing key is `tag`",
+    "before": "---\ntag: tag1, tag2, tag3, tag4\n---",
+    "after": "---\ntag:\n  - tag1\n  - tag2\n  - tag3\n  - tag4\n---",
+    "options": {
+      "tagArrayStyle": "single string to multi-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert tags from single-line array to multi-line array when there is no space after one of the commas and the key for tags is `tag`",
+    "before": "---\ntag: [tag1,tag2, tag3, tag4]\n---",
+    "after": "---\ntag:\n  - tag1\n  - tag2\n  - tag3\n  - tag4\n---",
+    "options": {
+      "tagArrayStyle": "multi-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert tags from single-line array to multi-line array with no changes removes unnecessary escape values when `removeUnnecessaryEscapeCharsForMultiLineArrays = true`",
+    "before": "---\ntag: [\"tag1\", tag2, tag3, tag4]\n---",
+    "after": "---\ntag:\n  - tag1\n  - tag2\n  - tag3\n  - tag4\n---",
+    "options": {
+      "tagArrayStyle": "multi-line",
+      "removeUnnecessaryEscapeCharsForMultiLineArrays": true
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert tags from single-line array to multi-line array with no changes doesn't remove unnecessary escape values when `removeUnnecessaryEscapeCharsForMultiLineArrays = false`",
+    "before": "---\ntag: [\"tag1\", tag2, tag3, tag4]\n---",
+    "after": "---\ntag:\n  - \"tag1\"\n  - tag2\n  - tag3\n  - tag4\n---",
+    "options": {
+      "tagArrayStyle": "multi-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert aliases from single-line to multi-line array",
+    "before": "---\naliases: [title1, title2, title3]\n---",
+    "after": "---\naliases:\n  - title1\n  - title2\n  - title3\n---",
+    "options": {
+      "aliasArrayStyle": "multi-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert aliases from single-line to multi-line array when exisiting key is `alias`",
+    "before": "---\nalias: [title1, title2, title3]\n---",
+    "after": "---\nalias:\n  - title1\n  - title2\n  - title3\n---",
+    "options": {
+      "aliasArrayStyle": "multi-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert aliases from multi-line to single string which is comma delimited",
+    "before": "---\naliases:\n  - title1\n  - title2\n  - title3\n---",
+    "after": "---\naliases: title1, title2, title3\n---",
+    "options": {
+      "aliasArrayStyle": "single string comma delimited"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert multi-line to single string when there is 1 element and the style is single string to single-line",
+    "before": "---\naliases:\n  - title\n---",
+    "after": "---\naliases: title\n---",
+    "options": {
+      "aliasArrayStyle": "single string to single-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert multi-line to single string when there is 1 element and the style is single string to multi-line",
+    "before": "---\naliases:\n  - title\n---",
+    "after": "---\naliases: title\n---",
+    "options": {
+      "aliasArrayStyle": "single string to multi-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert single-line to multi-line string when there is more than 1 element and the style is single string to multi-line",
+    "before": "---\naliases: [title, other title]\n---",
+    "after": "---\naliases:\n  - title\n  - other title\n---",
+    "options": {
+      "aliasArrayStyle": "single string to multi-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert multi-line to single-line when there is more than 1 element and the style is single string to single-line",
+    "before": "---\naliases:\n  - title\n  - other title\n---",
+    "after": "---\naliases: [title, other title]\n---",
+    "options": {
+      "aliasArrayStyle": "single string to single-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Formatting aliases does nothing when disabled",
+    "before": "---\naliases:\n  - title\n  - other title\n---",
+    "after": "---\naliases:\n  - title\n  - other title\n---",
+    "options": {
+      "aliasArrayStyle": "single string to single-line",
+      "formatAliasKey": false
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert aliases from single-line array to multi-line array with no changes removes unnecessary escape values when `removeUnnecessaryEscapeCharsForMultiLineArrays = true`",
+    "before": "---\naliases: [\"alias1\", alias2, alias3, alias4]\n---",
+    "after": "---\naliases:\n  - alias1\n  - alias2\n  - alias3\n  - alias4\n---",
+    "options": {
+      "aliasArrayStyle": "multi-line",
+      "removeUnnecessaryEscapeCharsForMultiLineArrays": true
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert aliases from single-line array to multi-line array with no changes doesn't remove unnecessary escape values when `removeUnnecessaryEscapeCharsForMultiLineArrays = false`",
+    "before": "---\naliases: [\"alias1\", alias2, alias3, alias4]\n---",
+    "after": "---\naliases:\n  - \"alias1\"\n  - alias2\n  - alias3\n  - alias4\n---",
+    "options": {
+      "aliasArrayStyle": "multi-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert multi-line to single-line for regular YAML arrays",
+    "before": "---\nkey:\n  - val1\n  - other val\n---",
+    "after": "---\nkey: [val1, other val]\n---",
+    "options": {
+      "defaultArrayStyle": "single-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert single-line to multi-line for regular YAML arrays",
+    "before": "---\nkey: [val1, other val]\n---",
+    "after": "---\nkey:\n  - val1\n  - other val\n---",
+    "options": {
+      "defaultArrayStyle": "multi-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Regular YAML array formatting does nothing when disabled",
+    "before": "---\nkey: [val1, other val]\n---",
+    "after": "---\nkey: [val1, other val]\n---",
+    "options": {
+      "defaultArrayStyle": "multi-line",
+      "formatArrayKeys": false
+    },
+    "source": "test"
+  },
+  {
+    "name": "Regular YAML array formatting does nothing when key is present in list for forcing to be single-line",
+    "before": "---\nkey: [val1, other val]\n---",
+    "after": "---\nkey: [val1, other val]\n---",
+    "options": {
+      "defaultArrayStyle": "multi-line",
+      "forceSingleLineArrayStyle": [
+        "key"
+      ]
+    },
+    "source": "test"
+  },
+  {
+    "name": "Regular YAML array formatting does nothing when key is present in list for forcing to be multi-line",
+    "before": "---\nkey:\n  - val1\n  - other val\n---",
+    "after": "---\nkey:\n  - val1\n  - other val\n---",
+    "options": {
+      "defaultArrayStyle": "single-line",
+      "forceMultiLineArrayStyle": [
+        "key"
+      ]
+    },
+    "source": "test"
+  },
+  {
+    "name": "Regular YAML array formatting does nothing to tags and aliases",
+    "before": "---\naliases: [title1, other title]\ntags: [tag1, tag2, tag3]\n---",
+    "after": "---\naliases: [title1, other title]\ntags: [tag1, tag2, tag3]\n---",
+    "options": {
+      "defaultArrayStyle": "multi-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert single-line to multi-line for regular YAML arrays doesn't remove unnecessary escape values when `removeUnnecessaryEscapeCharsForMultiLineArrays = false`",
+    "before": "---\nkey: [val1, \"other val\"]\n---",
+    "after": "---\nkey:\n  - val1\n  - \"other val\"\n---",
+    "options": {
+      "defaultArrayStyle": "multi-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Convert single-line to multi-line for regular YAML arrays removes unnecessary escape values when `removeUnnecessaryEscapeCharsForMultiLineArrays = true`",
+    "before": "---\nkey: [val1, \"other val\"]\n---",
+    "after": "---\nkey:\n  - val1\n  - other val\n---",
+    "options": {
+      "defaultArrayStyle": "multi-line",
+      "removeUnnecessaryEscapeCharsForMultiLineArrays": true
+    },
+    "source": "test"
+  },
+  {
+    "name": "Forcing single-line on a multi-line array results in a single-line array",
+    "before": "---\nkey:\n  - val1\n  - other val\n---",
+    "after": "---\nkey: [val1, other val]\n---",
+    "options": {
+      "defaultArrayStyle": "multi-line",
+      "forceSingleLineArrayStyle": [
+        "key"
+      ]
+    },
+    "source": "test"
+  },
+  {
+    "name": "Forcing single-line on a key that is not present just ignores the value",
+    "before": "---\nkey:\n  - val1\n  - other val\n---",
+    "after": "---\nkey:\n  - val1\n  - other val\n---",
+    "options": {
+      "defaultArrayStyle": "multi-line",
+      "forceSingleLineArrayStyle": [
+        "key1"
+      ]
+    },
+    "source": "test"
+  },
+  {
+    "name": "Forcing single-line on a value that is a single string will result in a single-line",
+    "before": "---\nkey: text here\n---",
+    "after": "---\nkey: [text here]\n---",
+    "options": {
+      "defaultArrayStyle": "multi-line",
+      "forceSingleLineArrayStyle": [
+        "key"
+      ]
+    },
+    "source": "test"
+  },
+  {
+    "name": "Forcing multi-line on a single-line array results in a multi-line array",
+    "before": "---\nkey: [val1, other val]\n---",
+    "after": "---\nkey:\n  - val1\n  - other val\n---",
+    "options": {
+      "defaultArrayStyle": "single-line",
+      "forceMultiLineArrayStyle": [
+        "key"
+      ]
+    },
+    "source": "test"
+  },
+  {
+    "name": "Forcing multi-line on a key that does not exist results in it being ignored",
+    "before": "---\nkey: [val1, other val]\n---",
+    "after": "---\nkey: [val1, other val]\n---",
+    "options": {
+      "defaultArrayStyle": "single-line",
+      "forceMultiLineArrayStyle": [
+        "key1"
+      ]
+    },
+    "source": "test"
+  },
+  {
+    "name": "Forcing multi-line on a key that does not exist results in it being ignored",
+    "before": "---\nkey: [val1, other val]\n---",
+    "after": "---\nkey: [val1, other val]\n---",
+    "options": {
+      "defaultArrayStyle": "single-line",
+      "forceMultiLineArrayStyle": [
+        "key1"
+      ]
+    },
+    "source": "test"
+  },
+  {
+    "name": "Forcing multi-line on a key that has a single string will result in a multi-line",
+    "before": "---\nkey: here is some text\n---",
+    "after": "---\nkey:\n  - here is some text\n---",
+    "options": {
+      "defaultArrayStyle": "single-line",
+      "forceMultiLineArrayStyle": [
+        "key"
+      ]
+    },
+    "source": "test"
+  },
+  {
+    "name": "Forcing multi-line on a single-line array results in a multi-line array with existing unnecessary escape values when `removeUnnecessaryEscapeCharsForMultiLineArrays = false`",
+    "before": "---\nkey: [val1, \"other val\"]\n---",
+    "after": "---\nkey:\n  - val1\n  - \"other val\"\n---",
+    "options": {
+      "defaultArrayStyle": "single-line",
+      "forceMultiLineArrayStyle": [
+        "key"
+      ]
+    },
+    "source": "test"
+  },
+  {
+    "name": "Forcing multi-line on a single-line array results in a multi-line array without existing unnecessary escape values when `removeUnnecessaryEscapeCharsForMultiLineArrays = true`",
+    "before": "---\nkey: [val1, \"other val\"]\n---",
+    "after": "---\nkey:\n  - val1\n  - other val\n---",
+    "options": {
+      "defaultArrayStyle": "single-line",
+      "forceMultiLineArrayStyle": [
+        "key"
+      ],
+      "removeUnnecessaryEscapeCharsForMultiLineArrays": true
+    },
+    "source": "test"
+  },
+  {
+    "name": "Forcing multi-line on a key that has no value will result in an empty multi-line array",
+    "before": "---\nkey: \n---",
+    "after": "---\nkey: []\n---",
+    "options": {
+      "forceMultiLineArrayStyle": [
+        "key"
+      ]
+    },
+    "source": "test"
+  },
+  {
+    "name": "Forcing single-line on a key that has no value will result in an empty single-line array",
+    "before": "---\nkey: \n---",
+    "after": "---\nkey: []\n---",
+    "options": {
+      "forceSingleLineArrayStyle": [
+        "key"
+      ]
+    },
+    "source": "test"
+  },
+  {
+    "name": "Trying to format tags to a single string when it is has an empty single-line will result in an empty single string",
+    "before": "---\ntags: []\n---",
+    "after": "---\ntags: \n---",
+    "options": {
+      "tagArrayStyle": "single string to single-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Trying to format tags to a multi-line when it is has an empty single-line will leave it as is",
+    "before": "---\ntags: []\n---",
+    "after": "---\ntags: []\n---",
+    "options": {
+      "tagArrayStyle": "multi-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Trying to format tags to a single string separated by commas when it is has an empty single-line will result in an empty string",
+    "before": "---\ntags: []\n---",
+    "after": "---\ntags: \n---",
+    "options": {
+      "tagArrayStyle": "single string comma delimited"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Trying to format tags to a single string separated by spaces when it is has an empty single-line will result in an empty string",
+    "before": "---\ntags: []\n---",
+    "after": "---\ntags: \n---",
+    "options": {
+      "tagArrayStyle": "single string space delimited"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Trying to format tags to a single-line separated by spaces when it is has an empty single-line will result in an empty single-line",
+    "before": "---\ntags: []\n---",
+    "after": "---\ntags: []\n---",
+    "options": {
+      "tagArrayStyle": "single-line space delimited"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Trying to format aliases to a single-line when it is has an empty string will result in an empty single-line",
+    "before": "---\naliases: \n---",
+    "after": "---\naliases: []\n---",
+    "options": {
+      "aliasArrayStyle": "single-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Un-indented array items are associated with array",
+    "before": "---\naliases:\n- title 1\n- title 2\n---",
+    "after": "---\naliases: [title 1, title 2]\n---",
+    "source": "test"
+  },
+  {
+    "name": "An empty multi-line array does not get modified when linted and it is supposed to be a multi-line array",
+    "before": "---\nspeakers: []\n---",
+    "after": "---\nspeakers: []\n---",
+    "options": {
+      "forceMultiLineArrayStyle": [
+        "speakers"
+      ]
+    },
+    "source": "test"
+  },
+  {
+    "name": "A multi-line array with mixed empty and non-empty values should have empty values removed",
+    "before": "---\nspeakers:\n  - \n  - speaker1\n  - \n---",
+    "after": "---\nspeakers:\n  - speaker1\n---",
+    "options": {
+      "forceMultiLineArrayStyle": [
+        "speakers"
+      ]
+    },
+    "source": "test"
+  },
+  {
+    "name": "A single-line array with an empty value at the end should have the empty value removed",
+    "before": "---\nspeakers: [speaker1, ]\n---",
+    "after": "---\nspeakers: [speaker1]\n---",
+    "source": "test"
+  },
+  {
+    "name": "Date stays the same",
+    "before": "---\ndate: 2022-08-14\ntags: []\n---",
+    "after": "---\ndate: 2022-08-14\ntags: []\n---",
+    "source": "test"
+  },
+  {
+    "name": "Nested objects are preserved",
+    "before": "---\nkey1:\n  key2: value2\n  key3:\n    - item1\n    - item2\n---",
+    "after": "---\nkey1:\n  key2: value2\n  key3:\n    - item1\n    - item2\n---",
+    "options": {
+      "defaultArrayStyle": "multi-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Converting a single string comma separated array to a multi-line array should respect escaped entries",
+    "before": "---\naliases: Scott, \"Scott, Jr.\"\n---",
+    "after": "---\naliases:\n  - Scott\n  - \"Scott, Jr.\"\n---",
+    "options": {
+      "aliasArrayStyle": "multi-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Numeric aliases are escaped when aliases are converted from one type to another",
+    "before": "---\naliases: 1234, alias1\n---",
+    "after": "---\naliases:\n  - \"1234\"\n  - alias1\n---",
+    "options": {
+      "aliasArrayStyle": "multi-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Numeric aliases are escaped when aliases are otherwise unchanged",
+    "before": "---\naliases: 1234, alias1\n---",
+    "after": "---\naliases: \"1234\", alias1\n---",
+    "options": {
+      "aliasArrayStyle": "single string comma delimited"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Converting from a multi-line array to a single comma delimited string should result in strings with commas in them being escaped",
+    "before": "---\naliases:\n  - Denver, Co\n---",
+    "after": "---\naliases: \"Denver, Co\"\n---",
+    "options": {
+      "aliasArrayStyle": "single string comma delimited"
+    },
+    "source": "test"
+  },
+  {
+    "name": "Converting from a multi-line array to a single line array should result in strings with commas in them being escaped",
+    "before": "---\naliases:\n  - Denver, Co\n---",
+    "after": "---\naliases: [\"Denver, Co\"]\n---",
+    "options": {
+      "aliasArrayStyle": "single-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "A double quoted YAML key needing no change should not have its value duplicated at the end of the YAML content ",
+    "before": "---\n\"key1\": \n  - value\n---",
+    "after": "---\n\"key1\":\n  - value\n---",
+    "options": {
+      "defaultArrayStyle": "multi-line"
+    },
+    "source": "test"
+  },
+  {
+    "name": "A single quoted YAML key needing no change should not have its value duplicated at the end of the YAML content ",
+    "before": "---\n'key1': \n  - value\n---",
+    "after": "---\n'key1':\n  - value\n---",
+    "options": {
+      "defaultArrayStyle": "multi-line"
+    },
+    "source": "test"
+  }
+]
