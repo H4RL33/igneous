@@ -100,6 +100,8 @@ pub enum Replacement {
     CalloutHeader { kind: String, has_title: bool },
     /// Show the table as a grid while the cursor is outside it.
     Table,
+    /// Show display math rendered while the cursor is outside it.
+    Math,
     /// A ` ```base ` block: show the base's results while the cursor is
     /// outside it (if the editor can).
     Base,
@@ -285,13 +287,20 @@ pub fn spans(doc: &Document, text: &str) -> Vec<StyledSpan> {
             NodeKind::Strikethrough => push(range, Style::Strikethrough, markers, within, None),
             NodeKind::Highlight => push(range, Style::Highlight, markers, within, None),
             NodeKind::InlineCode => push(range, Style::InlineCode, markers, within, None),
-            NodeKind::Math { display } => push(
-                range,
-                Style::Math { display: *display },
-                markers,
-                within,
-                None,
-            ),
+            NodeKind::Math { display: true } => {
+                // Display math is replaced by the rendered formula.
+                let lines = line_span(text, &range);
+                push(
+                    range.clone(),
+                    Style::Math { display: true },
+                    smallvec![range],
+                    Reveal::Within(lines),
+                    Some(Replacement::Math),
+                );
+            }
+            NodeKind::Math { display: false } => {
+                push(range, Style::Math { display: false }, markers, within, None)
+            }
             NodeKind::Link(index) => {
                 let style = match doc.links[*index].kind {
                     LinkKind::Wiki => Style::WikiLink,

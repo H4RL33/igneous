@@ -39,6 +39,8 @@ pub(crate) enum OverlayKind {
     Image(String),
     NoteEmbed(LinkRef),
     Table,
+    /// Display math, rendered.
+    Math,
     /// A ` ```base ` block, shown as the base's results.
     Base,
     CalloutIcon {
@@ -343,7 +345,8 @@ impl NoteView {
                     Some(
                         Replacement::Image { .. }
                         | Replacement::NoteEmbed { .. }
-                        | Replacement::Table,
+                        | Replacement::Table
+                        | Replacement::Math,
                     ) => conceal.push(span.range.clone()),
                     // A callout without a title keeps its `[!type]` line's
                     // height (the type is drawn as the title instead).
@@ -451,6 +454,7 @@ impl NoteView {
                         s.replace,
                         Some(
                             Replacement::Table
+                                | Replacement::Math
                                 | Replacement::Base
                                 | Replacement::CalloutHeader { .. }
                         )
@@ -551,6 +555,7 @@ impl NoteView {
                             OverlayKind::NoteEmbed(link.reference.clone())
                         }
                         Some(Replacement::Table) if !revealed => OverlayKind::Table,
+                        Some(Replacement::Math) if !revealed => OverlayKind::Math,
                         Some(Replacement::Base) if !revealed && bases => OverlayKind::Base,
                         Some(Replacement::CalloutHeader { kind, has_title }) if !revealed => {
                             OverlayKind::CalloutIcon {
@@ -682,7 +687,7 @@ impl NoteView {
                         .or_default()
                         .push(line_of(anchor));
                 }
-                OverlayKind::Table | OverlayKind::Base => {
+                OverlayKind::Table | OverlayKind::Math | OverlayKind::Base => {
                     let last = overlay.end.saturating_sub(1).max(anchor);
                     spacing
                         .entry(format!("space:below-{}", height + 8))
@@ -736,6 +741,21 @@ impl NoteView {
                 | OverlayKind::Image(_)
                 | OverlayKind::FoldToggle { .. }
         )
+    }
+
+    /// A rendered formula, cached by its TeX and colour.
+    fn math_widget(&self, tex: &str) -> gtk::Widget {
+        let color = self.palette().map_or(gdk::RGBA::BLACK, |p| p.role("text"));
+        let scale = self.scale_factor().max(1);
+        let key = (tex.to_owned(), crate::tags::rgba_hex(&color), scale);
+        let texture = self
+            .imp()
+            .formulas
+            .borrow_mut()
+            .entry(key)
+            .or_insert_with(|| crate::math::render(tex, &color, 22.0 * f64::from(scale)))
+            .clone();
+        crate::math::widget(texture, scale, tex)
     }
 
     fn fold_toggle_widget(&self, start: usize, folded: bool) -> gtk::Widget {
@@ -841,6 +861,11 @@ impl NoteView {
             OverlayKind::Table => {
                 let anchor = byte_of(&st.lines, &self.buffer().iter_at_mark(&overlay.mark));
                 self.table_widget(&st.text[anchor..overlay.end.min(st.text.len())])
+            }
+            OverlayKind::Math => {
+                let anchor = byte_of(&st.lines, &self.buffer().iter_at_mark(&overlay.mark));
+                let tex = crate::math::source(&st.text[anchor..overlay.end.min(st.text.len())]);
+                self.math_widget(tex)
             }
             OverlayKind::Base => {
                 let anchor = byte_of(&st.lines, &self.buffer().iter_at_mark(&overlay.mark));
@@ -1196,7 +1221,7 @@ impl NoteView {
             let anchor = byte_of(&st.lines, &iter);
             let near = match overlay.kind {
                 OverlayKind::Properties => visible.start <= fm_end.unwrap_or(0),
-                OverlayKind::Table | OverlayKind::Base => {
+                OverlayKind::Table | OverlayKind::Math | OverlayKind::Base => {
                     anchor <= visible.end && overlay.end >= visible.start
                 }
                 _ => visible.contains(&anchor),
@@ -1264,7 +1289,7 @@ impl NoteView {
                     let (y, h) = self.line_yrange(&iter);
                     (left, y + h - overlay.height.get() - 4)
                 }
-                OverlayKind::Table | OverlayKind::Base => {
+                OverlayKind::Table | OverlayKind::Math | OverlayKind::Base => {
                     let (y, _) = self.line_yrange(&iter);
                     (left, y + 2)
                 }
@@ -1546,6 +1571,7 @@ impl NoteView {
                 OverlayKind::Image(t) => format!("image:{t}"),
                 OverlayKind::NoteEmbed(l) => format!("embed:{}", l.target),
                 OverlayKind::Table => "table".to_owned(),
+                OverlayKind::Math => "math".to_owned(),
                 OverlayKind::Base => "base".to_owned(),
                 OverlayKind::CalloutIcon { kind, .. } => format!("callout:{kind}"),
                 OverlayKind::Properties => "properties".to_owned(),
@@ -1945,6 +1971,18 @@ mod tests {
             picked.type_().name()
         );
         window.close();
+    }
+
+    #[gtk::test]
+    fn display_math_is_rendered_until_the_cursor_enters() {
+        let text = "Euler:\n\n$$\ne^{i\\pi} + 1 = 0\n$$\n\nafter\n";
+        let view = view(text);
+        place(&view, text.len());
+        assert!(view.overlay_kinds().contains(&"math".to_owned()));
+        assert!(concealed_text(&view).iter().any(|c| c.contains("e^{i")));
+        place(&view, text.find("e^").unwrap());
+        assert!(!view.overlay_kinds().contains(&"math".to_owned()));
+        view.check_invariants().unwrap();
     }
 
     #[test]

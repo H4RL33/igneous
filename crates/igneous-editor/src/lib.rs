@@ -11,6 +11,7 @@ mod hover;
 mod input;
 mod live;
 pub mod markup;
+mod math;
 mod properties;
 mod rangeset;
 pub(crate) mod scheme;

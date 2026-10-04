@@ -73,6 +73,10 @@ htmd = "0.5"
 jiff = "0.2"
 libspelling = "0.5"
 nucleo-matcher = "0.3"
+ratex-layout = "0.1.14"
+ratex-parser = "0.1.14"
+ratex-svg = { version = "0.1.14", features = ["standalone", "embed-fonts"] }
+ratex-types = "0.1.14"
 notify-debouncer-full = "0.7"
 pulldown-cmark = { version = "0.13", default-features = false }
 rayon = "1"

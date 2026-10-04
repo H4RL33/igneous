@@ -67,6 +67,9 @@ pub(crate) struct State {
     pub fold_kept: bool,
 }
 
+/// A rendered formula, or why it couldn't be.
+pub(crate) type Formula = Result<gdk::Texture, String>;
+
 mod imp {
     use super::*;
 
@@ -98,6 +101,8 @@ mod imp {
         pub(crate) fold_headings: Cell<bool>,
         /// Laid-out widths of leading whitespace (see `live.rs`).
         pub(crate) indents: RefCell<HashMap<String, i32>>,
+        /// Rendered formulas by TeX, colour and scale.
+        pub(crate) formulas: RefCell<HashMap<(String, String, i32), Formula>>,
     }
 
     #[glib::object_subclass]
