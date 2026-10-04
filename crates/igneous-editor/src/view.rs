@@ -59,6 +59,12 @@ pub(crate) struct State {
     pub unresolved: Vec<std::ops::Range<usize>>,
     /// Problems underlined in the text (see `diagnostics.rs`).
     pub diagnostics: Vec<crate::Diagnostic>,
+    /// Headings and callouts that can fold, and the starts of folded ones.
+    pub foldables: Vec<crate::fold::Foldable>,
+    pub folded: std::collections::BTreeSet<usize>,
+    /// Set to keep folds through the next wholesale change (a mode switch
+    /// or a restyle, rather than new text).
+    pub fold_kept: bool,
 }
 
 mod imp {
@@ -79,7 +85,7 @@ mod imp {
         /// How deeply this view is nested in note embeds (0 for a tab).
         pub(crate) depth: Cell<u8>,
         /// Overlay slots not showing anything (see `live.rs`).
-        pub(crate) free_slots: RefCell<Vec<adw::Bin>>,
+        pub(crate) free_slots: RefCell<Vec<crate::slot::Slot>>,
         pub(crate) input: RefCell<crate::input::InputOptions>,
         /// The theme in use and whether the desktop is dark.
         pub(crate) theme: RefCell<Option<(Theme, bool)>>,
@@ -88,6 +94,10 @@ mod imp {
         pub(crate) spelling: RefCell<Option<libspelling::TextBufferAdapter>>,
         /// Whether wide windows keep the text column narrow.
         pub(crate) wide: Cell<bool>,
+        /// Whether headings fold (callouts with a fold sign always do).
+        pub(crate) fold_headings: Cell<bool>,
+        /// Laid-out widths of leading whitespace (see `live.rs`).
+        pub(crate) indents: RefCell<HashMap<String, i32>>,
     }
 
     #[glib::object_subclass]
@@ -201,6 +211,7 @@ impl NoteView {
 
     /// Colours the view with `theme`'s light or dark variant.
     pub fn set_theme(&self, theme: &Theme, dark: bool) {
+        self.imp().indents.borrow_mut().clear();
         self.imp().theme.replace(Some((theme.clone(), dark)));
         self.apply_scheme();
         let palette = Palette::new(theme.variant(dark), crate::system_accent());
@@ -223,6 +234,13 @@ impl NoteView {
             crate::scheme::live_style_scheme(&theme, dark)
         };
         self.source_buffer().set_style_scheme(scheme.as_ref());
+    }
+
+    /// Whether headings get fold arrows.
+    pub fn set_fold_headings(&self, fold: bool) {
+        if self.imp().fold_headings.replace(fold) != fold {
+            self.restyle_all();
+        }
     }
 
     /// Whether the text column stays a readable width on wide windows.

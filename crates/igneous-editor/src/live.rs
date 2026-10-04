@@ -46,6 +46,9 @@ pub(crate) enum OverlayKind {
         has_title: bool,
     },
     Properties,
+    FoldToggle {
+        folded: bool,
+    },
 }
 
 /// A widget shown over the text. Widgets exist only while near the screen:
@@ -60,7 +63,7 @@ pub(crate) struct Overlay {
     checked: Cell<bool>,
     widget: RefCell<Option<gtk::Widget>>,
     /// The slot showing the widget, while it's near the visible area.
-    slot: RefCell<Option<adw::Bin>>,
+    slot: RefCell<Option<crate::slot::Slot>>,
     /// Built with old colours or an old host; replaced on the next frame.
     stale: Cell<bool>,
     height: Cell<i32>,
@@ -160,9 +163,10 @@ impl NoteView {
     pub(crate) fn restyle_all(&self) {
         {
             let mut st = self.imp().state.borrow_mut();
-            // Force the full path: forget what's applied.
+            // Force the full path: forget what's applied (but not folds).
             st.pending.push((0, 0, 0));
             st.pending.push((0, 0, 0));
+            st.fold_kept = true;
         }
         self.restyle();
     }
@@ -182,9 +186,17 @@ impl NoteView {
                 // Replaced wholesale (a reload): old problems no longer apply.
                 st.diagnostics.clear();
             }
+            // A load replaces the whole text (into an empty buffer that's a
+            // single insert).
+            let wholesale = match edits[..] {
+                [(0, deleted, inserted)] => deleted == st.text.len() || inserted == text.len(),
+                [_] => false,
+                _ => true,
+            };
             st.text = text;
             st.lines = line_starts(&st.text);
             if let [(pos, deleted, inserted)] = edits[..] {
+                crate::fold::shift(&mut st.folded, pos, deleted, inserted);
                 for set in st.applied.values_mut() {
                     set.apply_edit(pos, deleted, inserted);
                 }
@@ -209,6 +221,12 @@ impl NoteView {
             }
             st.doc = parse(&st.text);
             st.spans = present::spans(&st.doc, &st.text);
+            st.foldables =
+                crate::fold::foldables(&st.doc, &st.text, self.imp().fold_headings.get());
+            if wholesale && !st.fold_kept {
+                st.folded = crate::fold::folded_by_default(&st.doc);
+            }
+            st.fold_kept = false;
             st.unresolved = st
                 .doc
                 .links
@@ -348,6 +366,11 @@ impl NoteView {
                 conceal.push(span.range.clone());
             }
         }
+        for fold in &st.foldables {
+            if st.folded.contains(&fold.start) {
+                conceal.push(fold.hidden.clone());
+            }
+        }
         map.entry(kind_key(TagKind::Conceal))
             .or_default()
             .extend(conceal);
@@ -406,6 +429,20 @@ impl NoteView {
                 return;
             }
             let old = std::mem::replace(&mut st.selection, selection);
+            // The cursor went into folded text: unfold it.
+            let entered: Vec<usize> = st
+                .foldables
+                .iter()
+                .filter(|f| {
+                    st.folded.contains(&f.start)
+                        && st.selection.start < f.hidden.end
+                        && st.selection.end > f.hidden.start
+                })
+                .map(|f| f.start)
+                .collect();
+            for start in &entered {
+                st.folded.remove(start);
+            }
             // Tables, base blocks and callout icons are widgets only while
             // their source is hidden.
             let widgets_change = st.mode == Mode::Live
@@ -418,7 +455,8 @@ impl NoteView {
                                 | Replacement::CalloutHeader { .. }
                         )
                     ) && s.reveal.is_revealed_by(&old) != s.reveal.is_revealed_by(&st.selection)
-                });
+                })
+                || !entered.is_empty();
             let mut desired = HashMap::new();
             self.add_concealment(st, &mut desired);
             let keys = Self::REVEAL_KEYS.map(kind_key);
@@ -465,13 +503,13 @@ impl NoteView {
     }
 
     /// Shows `widget` over the text, in a free slot or a new one.
-    fn take_slot(&self, widget: &gtk::Widget) -> adw::Bin {
+    fn take_slot(&self, widget: &gtk::Widget) -> crate::slot::Slot {
         let slot = self.imp().free_slots.borrow_mut().pop().unwrap_or_else(|| {
-            let slot = adw::Bin::new();
+            let slot = crate::slot::Slot::new();
             self.add_overlay(&slot, 0, 0);
             slot
         });
-        adw::prelude::BinExt::set_child(&slot, Some(widget));
+        slot.set_child(Some(widget));
         slot.set_visible(true);
         slot
     }
@@ -479,7 +517,8 @@ impl NoteView {
     /// Takes an overlay's widget off the view, keeping its slot for reuse.
     fn release_slot(&self, overlay: &Overlay) {
         if let Some(slot) = overlay.slot.take() {
-            adw::prelude::BinExt::set_child(&slot, None::<&gtk::Widget>);
+            slot.set_child(None::<&gtk::Widget>);
+            slot.set_natural_width(0);
             slot.set_visible(false);
             self.imp().free_slots.borrow_mut().push(slot);
         }
@@ -523,6 +562,15 @@ impl NoteView {
                         _ => continue,
                     };
                     desired.push((kind, start, span.range.end, false));
+                }
+                for fold in &st.foldables {
+                    let folded = st.folded.contains(&fold.start);
+                    desired.push((
+                        OverlayKind::FoldToggle { folded },
+                        fold.start,
+                        fold.hidden.end,
+                        folded,
+                    ));
                 }
             }
             desired
@@ -593,7 +641,9 @@ impl NoteView {
             // reserved for them.
             if !matches!(
                 overlay.kind,
-                OverlayKind::Checkbox | OverlayKind::CalloutIcon { .. }
+                OverlayKind::Checkbox
+                    | OverlayKind::CalloutIcon { .. }
+                    | OverlayKind::FoldToggle { .. }
             ) {
                 let widget = self.make_widget(&overlay, st);
                 overlay
@@ -648,7 +698,9 @@ impl NoteView {
                             .push(line_of(body));
                     }
                 }
-                OverlayKind::Checkbox | OverlayKind::CalloutIcon { .. } => {}
+                OverlayKind::Checkbox
+                | OverlayKind::CalloutIcon { .. }
+                | OverlayKind::FoldToggle { .. } => {}
             }
         }
         let mut keys: Vec<String> = st
@@ -670,15 +722,83 @@ impl NoteView {
             return widget.measure(gtk::Orientation::Vertical, -1).1;
         }
         let width = self.text_width();
-        widget.set_size_request(width, -1);
-        widget.measure(gtk::Orientation::Vertical, width).1
+        let (min_w, _, _, _) = widget.measure(gtk::Orientation::Horizontal, -1);
+        widget
+            .measure(gtk::Orientation::Vertical, width.max(min_w))
+            .1
     }
 
     fn spans_text_column(kind: &OverlayKind) -> bool {
         !matches!(
             kind,
-            OverlayKind::Checkbox | OverlayKind::CalloutIcon { .. } | OverlayKind::Image(_)
+            OverlayKind::Checkbox
+                | OverlayKind::CalloutIcon { .. }
+                | OverlayKind::Image(_)
+                | OverlayKind::FoldToggle { .. }
         )
+    }
+
+    fn fold_toggle_widget(&self, start: usize, folded: bool) -> gtk::Widget {
+        let button = gtk::Button::builder()
+            .icon_name(if folded {
+                "pan-end-symbolic"
+            } else {
+                "pan-down-symbolic"
+            })
+            .tooltip_text(if folded { "Unfold" } else { "Fold" })
+            .css_classes(["flat", "circular", "fold-toggle"])
+            .focus_on_click(false)
+            .can_focus(false)
+            .build();
+        if folded {
+            button.add_css_class("folded");
+        }
+        button.connect_clicked(glib::clone!(
+            #[weak(rename_to = view)]
+            self,
+            move |_| view.toggle_fold(start)
+        ));
+        button.upcast()
+    }
+
+    /// Folds or unfolds the heading or callout starting at `start`.
+    pub fn toggle_fold(&self, start: usize) {
+        let move_cursor = {
+            let mut guard = self.imp().state.borrow_mut();
+            let st = &mut *guard;
+            if st.folded.remove(&start) {
+                None
+            } else {
+                st.folded.insert(start);
+                // Don't fold the cursor away: move it to the heading.
+                st.foldables
+                    .iter()
+                    .find(|f| f.start == start)
+                    .filter(|f| {
+                        st.selection.start >= f.hidden.start && st.selection.start <= f.hidden.end
+                    })
+                    .map(|_| self.iter_at(&st.lines, start))
+            }
+        };
+        if let Some(iter) = move_cursor {
+            self.buffer().place_cursor(&iter);
+        }
+        {
+            let mut guard = self.imp().state.borrow_mut();
+            let st = &mut *guard;
+            let mut desired = HashMap::new();
+            self.add_concealment(st, &mut desired);
+            let keys = Self::REVEAL_KEYS.map(kind_key);
+            self.apply(st, desired, &keys);
+        }
+        self.sync_overlays();
+        self.queue_draw();
+    }
+
+    /// The starts of folded headings and callouts. For tests.
+    #[doc(hidden)]
+    pub fn folded(&self) -> Vec<usize> {
+        self.imp().state.borrow().folded.iter().copied().collect()
     }
 
     fn text_width(&self) -> i32 {
@@ -731,6 +851,10 @@ impl NoteView {
                 self.callout_icon_widget(kind, *has_title)
             }
             OverlayKind::Properties => self.properties_widget(st),
+            OverlayKind::FoldToggle { folded } => {
+                let anchor = byte_of(&st.lines, &self.buffer().iter_at_mark(&overlay.mark));
+                self.fold_toggle_widget(anchor, *folded)
+            }
         }
     }
 
@@ -1097,7 +1221,9 @@ impl NoteView {
                 // Small widgets are cheap to make again; keep the rest.
                 if matches!(
                     overlay.kind,
-                    OverlayKind::Checkbox | OverlayKind::CalloutIcon { .. }
+                    OverlayKind::Checkbox
+                        | OverlayKind::CalloutIcon { .. }
+                        | OverlayKind::FoldToggle { .. }
                 ) {
                     overlay.widget.replace(None);
                 }
@@ -1107,12 +1233,15 @@ impl NoteView {
             }
             if !matches!(
                 overlay.kind,
-                OverlayKind::Checkbox | OverlayKind::CalloutIcon { .. }
+                OverlayKind::Checkbox
+                    | OverlayKind::CalloutIcon { .. }
+                    | OverlayKind::FoldToggle { .. }
             ) && let Some(widget) = overlay.widget.borrow().as_ref()
             {
                 let height = if Self::spans_text_column(&overlay.kind) {
+                    let (min_w, _, _, _) = widget.measure(gtk::Orientation::Horizontal, -1);
                     widget
-                        .measure(gtk::Orientation::Vertical, self.text_width())
+                        .measure(gtk::Orientation::Vertical, self.text_width().max(min_w))
                         .1
                 } else {
                     widget.measure(gtk::Orientation::Vertical, -1).1
@@ -1128,7 +1257,7 @@ impl NoteView {
             let pos = match &overlay.kind {
                 OverlayKind::Checkbox => {
                     let (y, h) = self.line_yrange(&iter);
-                    let indent = indent_px(&st.text, anchor);
+                    let indent = self.indent_px(&st.text, anchor);
                     (left + indent - 2, y + (h - overlay.height.get()) / 2)
                 }
                 OverlayKind::Image(_) | OverlayKind::NoteEmbed(_) => {
@@ -1143,6 +1272,14 @@ impl NoteView {
                     let (y, h) = self.line_yrange(&iter);
                     (left + 14, y + (h - 16) / 2 - 1)
                 }
+                OverlayKind::FoldToggle { .. } => {
+                    // In the margin, level with the line's text (below any
+                    // space reserved above it).
+                    let (y, h) = self.line_yrange(&iter);
+                    let below = self.pixels_below_lines();
+                    let text = (h - below).min(40);
+                    (left - 28, y + h - below - text + (text - 24) / 2)
+                }
                 OverlayKind::Properties => {
                     let body = self.iter_at(&st.lines, fm_end.unwrap_or(0));
                     let (y, _) = self.line_yrange(&body);
@@ -1150,13 +1287,10 @@ impl NoteView {
                 }
             };
             if overlay.last_pos.get() != pos
-                && let (Some(widget), Some(slot)) = (
-                    overlay.widget.borrow().as_ref(),
-                    overlay.slot.borrow().as_ref(),
-                )
+                && let Some(slot) = overlay.slot.borrow().as_ref()
             {
                 if Self::spans_text_column(&overlay.kind) {
-                    widget.set_size_request(self.text_width(), -1);
+                    slot.set_natural_width(self.text_width());
                 }
                 self.move_overlay(slot, pos.0, pos.1);
                 overlay.last_pos.set(pos);
@@ -1226,7 +1360,7 @@ impl NoteView {
                 }
                 Style::ListBullet if !revealed(span) => {
                     let (y, h) = self.line_yrange(&self.iter_at(&st.lines, span.range.start));
-                    let indent = indent_px(&st.text, span.range.start) as f32;
+                    let indent = self.indent_px(&st.text, span.range.start) as f32;
                     let (cx, cy) = (left + indent + 4.0, y as f32 + h as f32 / 2.0 - 1.0);
                     let dot = graphene::Rect::new(cx - 2.5, cy - 2.5, 5.0, 5.0);
                     rounded(snapshot, &dot, 2.5, &palette.list_marker);
@@ -1312,6 +1446,29 @@ impl NoteView {
         Some(card)
     }
 
+    /// The width of the whitespace before `pos` on its line, as laid out
+    /// (with the view's tab stops), so bullets and checkboxes sit exactly
+    /// where their markers are. Cached per indent.
+    fn indent_px(&self, text: &str, pos: usize) -> i32 {
+        let start = igneous_markdown::text::line_start(text, pos);
+        let indent = &text[start..pos];
+        let indent = &indent[..indent.len() - indent.trim_start_matches([' ', '\t']).len()];
+        if indent.is_empty() {
+            return 0;
+        }
+        if let Some(px) = self.imp().indents.borrow().get(indent) {
+            return *px;
+        }
+        let layout = self.create_pango_layout(Some(indent));
+        layout.set_tabs(self.tabs().as_ref());
+        let px = layout.pixel_size().0;
+        self.imp()
+            .indents
+            .borrow_mut()
+            .insert(indent.to_owned(), px);
+        px
+    }
+
     /// The link under widget coordinates `(x, y)`.
     fn link_at(&self, x: f64, y: f64) -> Option<LinkRef> {
         let (bx, by) =
@@ -1368,13 +1525,6 @@ fn split_row(line: &str) -> Vec<String> {
     cells
 }
 
-/// Approximate pixel indent of the list item at `pos`.
-fn indent_px(text: &str, pos: usize) -> i32 {
-    let line = &text[igneous_markdown::text::line_start(text, pos)..pos];
-    let columns: usize = line.chars().map(|c| if c == '\t' { 4 } else { 1 }).sum();
-    (columns / 2) as i32 * 14
-}
-
 fn rounded(snapshot: &gtk::Snapshot, rect: &graphene::Rect, radius: f32, color: &gdk::RGBA) {
     let clip = gsk::RoundedRect::from_rect(*rect, radius);
     snapshot.push_rounded_clip(&clip);
@@ -1399,6 +1549,7 @@ impl NoteView {
                 OverlayKind::Base => "base".to_owned(),
                 OverlayKind::CalloutIcon { kind, .. } => format!("callout:{kind}"),
                 OverlayKind::Properties => "properties".to_owned(),
+                OverlayKind::FoldToggle { folded } => format!("fold:{folded}"),
             })
             .collect()
     }
@@ -1721,6 +1872,79 @@ mod tests {
         assert_eq!(fence_body("```base\n```"), "");
         assert_eq!(fence_body("```base\nunclosed"), "unclosed");
         assert_eq!(fence_body("~~~base\nx\n~~~"), "x\n");
+    }
+
+    #[gtk::test]
+    fn folding() {
+        let text = "# A\none\n## B\ntwo\n\n> [!tip]- Folded\n> inside\n";
+        let view = view(text);
+        view.set_fold_headings(true);
+        place(&view, text.len());
+        // The `-` callout starts folded.
+        let callout = text.find("> [!tip]").unwrap();
+        assert_eq!(view.folded(), [callout]);
+        assert!(concealed_text(&view).iter().any(|c| c.contains("inside")));
+        let kinds = view.overlay_kinds();
+        assert_eq!(kinds.iter().filter(|k| k.starts_with("fold:")).count(), 3);
+        // Fold the first heading: its section disappears.
+        view.toggle_fold(0);
+        assert!(concealed_text(&view).iter().any(|c| c.contains("one")));
+        // Mode switches keep folds.
+        view.set_mode(Mode::Reading);
+        view.set_mode(Mode::Live);
+        assert_eq!(view.folded().len(), 2);
+        // The cursor going in unfolds.
+        place(&view, text.find("one").unwrap());
+        assert_eq!(view.folded(), [callout]);
+        view.check_invariants().unwrap();
+    }
+
+    /// Block widgets span the text column without making the view's
+    /// minimum width any larger, and still get clicks.
+    #[gtk::test]
+    async fn block_widgets_dont_set_a_minimum_width() {
+        let text = "---\ntitle: Something long enough\n---\n# Heading\n";
+        let view = view(text);
+        let scrolled = gtk::ScrolledWindow::builder()
+            .hscrollbar_policy(gtk::PolicyType::Never)
+            .child(&view)
+            .build();
+        let window = gtk::Window::builder()
+            .default_width(900)
+            .default_height(500)
+            .child(&scrolled)
+            .build();
+        window.present();
+        for _ in 0..20 {
+            glib::timeout_future(std::time::Duration::from_millis(50)).await;
+        }
+        let (min, _, _, _) = view.measure(gtk::Orientation::Horizontal, -1);
+        assert!(min < 200, "the view needs {min}px");
+        // The properties list spans most of the width and can be picked.
+        let st = view.imp().state.borrow();
+        let properties = st
+            .overlays
+            .iter()
+            .find(|o| o.kind == OverlayKind::Properties)
+            .and_then(|o| o.widget.borrow().clone())
+            .unwrap();
+        drop(st);
+        assert!(
+            properties.width() > 600,
+            "only {}px wide",
+            properties.width()
+        );
+        let bounds = properties.compute_bounds(&view).unwrap();
+        let (x, y) = (bounds.x() + bounds.width() - 40.0, bounds.y() + 20.0);
+        let picked = view
+            .pick(f64::from(x), f64::from(y), gtk::PickFlags::DEFAULT)
+            .unwrap();
+        assert!(
+            picked.is_ancestor(&properties) || picked == properties,
+            "picked {}",
+            picked.type_().name()
+        );
+        window.close();
     }
 
     #[test]

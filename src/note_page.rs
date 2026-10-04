@@ -184,6 +184,7 @@ impl NotePage {
         view.set_tab_width(editor.tab_size);
         view.set_insert_spaces_instead_of_tabs(!editor.indent_with_tabs);
         view.set_spellcheck(editor.spellcheck);
+        view.set_fold_headings(editor.fold_headings);
         imp.show_line_numbers.set(editor.show_line_numbers);
         view.set_show_line_numbers(editor.show_line_numbers && self.mode() == Mode::Source);
         let had_vim = view.vim_context().is_some();

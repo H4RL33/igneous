@@ -5,6 +5,7 @@
 mod buffer;
 pub mod completion;
 mod diagnostics;
+mod fold;
 mod host;
 mod hover;
 mod input;
@@ -13,6 +14,7 @@ pub mod markup;
 mod properties;
 mod rangeset;
 pub(crate) mod scheme;
+mod slot;
 mod tags;
 pub mod theme;
 mod view;
