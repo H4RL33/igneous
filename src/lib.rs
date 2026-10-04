@@ -29,6 +29,15 @@ pub fn init() {
         if let Some(display) = gtk::gdk::Display::default() {
             gtk::IconTheme::for_display(&display)
                 .add_resource_path(&format!("{}/icons", config::RESOURCE_BASE));
+            // Loaded here rather than as libadwaita's automatic style.css, so
+            // windows get it even without a running application (tests).
+            let css = gtk::CssProvider::new();
+            css.load_from_resource(&format!("{}/igneous.css", config::RESOURCE_BASE));
+            gtk::style_context_add_provider_for_display(
+                &display,
+                &css,
+                gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+            );
         }
     });
 }

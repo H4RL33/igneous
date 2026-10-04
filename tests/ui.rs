@@ -234,13 +234,36 @@ async fn screenshot() {
     let Ok(out) = std::env::var("IGNEOUS_SCREENSHOT") else {
         return;
     };
+    let tabs = std::env::var("IGNEOUS_SCREENSHOT_TABS").unwrap_or_else(|_| {
+        r#"[{"kind":"note","path":"Home.md"},
+            {"kind":"note","path":"Projects/Igneous/Roadmap.md"},
+            {"kind":"note","path":"Projects/Ideas.md"}]"#
+            .into()
+    });
+    let width: i32 = std::env::var("IGNEOUS_SCREENSHOT_WIDTH")
+        .ok()
+        .and_then(|w| w.parse().ok())
+        .unwrap_or(1100);
     let dir = vault(None);
+    // Expanded folders and three tabs, as if restored from a previous session.
+    std::fs::create_dir_all(dir.path().join(".igneous")).unwrap();
+    std::fs::write(
+        dir.path().join(".igneous/workspace.json"),
+        format!(
+            r#"{{"version":1,"tabs":{tabs},"activeTab":0,
+                "sidebar":{{"expanded":["Attachments","Projects","Projects/Igneous"]}}}}"#
+        ),
+    )
+    .unwrap();
+    if let Ok(theme) = std::env::var("IGNEOUS_SCREENSHOT_THEME") {
+        std::fs::write(
+            dir.path().join(".igneous/appearance.json"),
+            format!(r#"{{"version":1,"editorTheme":"{theme}"}}"#),
+        )
+        .unwrap();
+    }
     let window = open(&dir);
-    window.set_default_size(1100, 720);
-    window.open_path(&p("Home.md"), true);
-    window.open_path(&p("Projects/Igneous/Roadmap.md"), true);
-    window.open_path(&p("Home.md"), false);
-    window.present();
+    window.set_default_size(width, 720);
     wait(1500).await;
     save_png(
         window.upcast_ref(),

@@ -6,7 +6,7 @@
     <file preprocess="xml-stripblanks">vault-picker.ui</file>
     <file preprocess="xml-stripblanks">quick-switcher.ui</file>
     <file preprocess="xml-stripblanks">shortcuts-dialog.ui</file>
-    <file>style.css</file>
+    <file>igneous.css</file>
     <file alias="icons/scalable/apps/dev.h4rl3y.igneous.svg">icons/hicolor/scalable/apps/dev.h4rl3y.igneous.svg</file>
     <file alias="icons/scalable/apps/dev.h4rl3y.igneous.Devel.svg">icons/hicolor/scalable/apps/dev.h4rl3y.igneous.svg</file>
     <file alias="icons/symbolic/apps/dev.h4rl3y.igneous-symbolic.svg">icons/hicolor/symbolic/apps/dev.h4rl3y.igneous-symbolic.svg</file>

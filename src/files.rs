@@ -280,7 +280,8 @@ impl FileTree {
                 .hexpand(true)
                 .build();
             let extension = gtk::Label::builder()
-                .css_classes(["extension", "dim-label"])
+                .css_classes(["file-badge"])
+                .valign(gtk::Align::Center)
                 .visible(false)
                 .build();
             let row = gtk::Box::builder()
@@ -312,10 +313,10 @@ impl FileTree {
             let label = icon.next_sibling().and_downcast::<gtk::Label>().unwrap();
             let extension = label.next_sibling().and_downcast::<gtk::Label>().unwrap();
             let (name, ext) = display_name(&path, item.is_folder());
-            icon.set_icon_name(Some(icon_for(&path, item.is_folder())));
+            icon.set_icon_name(Some(icon_for(item.is_folder())));
             label.set_label(&name);
             extension.set_visible(ext.is_some());
-            extension.set_label(ext.as_deref().unwrap_or(""));
+            extension.set_label(&ext.as_deref().unwrap_or("").to_uppercase());
             content.set_tooltip_text(Some(path.as_str()));
         });
         factory.connect_unbind(|_, obj| {
@@ -328,18 +329,13 @@ impl FileTree {
     }
 }
 
-fn icon_for(path: &VaultPath, folder: bool) -> &'static str {
+/// Folders get a folder icon; every file gets the same file icon, with its
+/// type shown as a pill when it isn't a note.
+fn icon_for(folder: bool) -> &'static str {
     if folder {
-        return "folder-symbolic";
-    }
-    match path.extension().map(str::to_lowercase).as_deref() {
-        Some("md") => "text-x-generic-symbolic",
-        Some("png" | "jpg" | "jpeg" | "gif" | "bmp" | "svg" | "webp" | "avif") => {
-            "image-x-generic-symbolic"
-        }
-        Some("pdf") => "x-office-document-symbolic",
-        Some("base") => "view-grid-symbolic",
-        _ => "text-x-generic-symbolic",
+        "folder-symbolic"
+    } else {
+        "text-x-generic-symbolic"
     }
 }
 

@@ -1,0 +1,17 @@
+/* Igneous's own styling. Colours come only from libadwaita's variables. */
+
+textview.igneous-note {
+  font-size: 1.05em;
+}
+
+/* The file type of anything that isn't a note: a small pill, centred in the row. */
+.file-row .file-badge {
+  font-size: 0.7em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  margin: 4px 0;
+  border-radius: 999px;
+  background-color: alpha(currentColor, 0.12);
+  opacity: 0.8;
+}
