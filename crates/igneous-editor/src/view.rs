@@ -190,6 +190,8 @@ impl NoteView {
     pub fn set_host(&self, host: Rc<dyn Host>) {
         self.imp().host.replace(Some(host));
         self.imp().textures.borrow_mut().clear();
+        // Embeds and images were built by the old host.
+        self.rebuild_overlays();
         self.restyle_all();
     }
 

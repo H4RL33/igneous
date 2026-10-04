@@ -25,6 +25,14 @@ pub struct NoteName {
     pub alias: Option<String>,
 }
 
+/// A base shown in a note.
+pub enum BaseEmbed<'a> {
+    /// `![[File.base]]` or `![[File.base#View]]`.
+    File(&'a LinkRef),
+    /// The body of a ` ```base ` block.
+    Block(&'a str),
+}
+
 pub trait Host {
     /// Whether a link points at something that exists. Unresolved links are
     /// styled differently. Called for every link after every change, so it
@@ -95,6 +103,17 @@ pub trait Host {
 
     /// Fixes the problems `rule` found (the Fix button on an underline).
     fn fix(&self, _rule: &str) {}
+
+    /// Whether [`Host::base_widget`] can show bases. Without it, ` ```base `
+    /// blocks stay code and `![[File.base]]` embeds show their source.
+    fn embeds_bases(&self) -> bool {
+        false
+    }
+
+    /// A widget showing a base's results, for embeds and ` ```base ` blocks.
+    fn base_widget(&self, _base: BaseEmbed<'_>) -> Option<gtk::Widget> {
+        None
+    }
 }
 
 /// A host that knows nothing: every link exists, nothing opens.

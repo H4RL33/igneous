@@ -21,6 +21,7 @@ use igneous_git::{Commit, SyncKind};
 use igneous_markdown::LinkRef;
 
 use crate::application::Application;
+use crate::base_page::{self, BasePage};
 use crate::changes::ChangesPane;
 use crate::files::FileTree;
 use crate::image_page::{self, ImagePage};
@@ -480,6 +481,9 @@ impl Window {
                 if let Some(search) = imp.search.get() {
                     search.refresh();
                 }
+                for base in window.bases() {
+                    base.refresh();
+                }
             }
         });
         let search = SearchPane::new(self);
@@ -577,9 +581,24 @@ impl Window {
             note.path()
         } else if let Some(image) = child.downcast_ref::<ImagePage>() {
             image.path()
+        } else if let Some(base) = child.downcast_ref::<BasePage>() {
+            base.path()
         } else {
             None
         }
+    }
+
+    fn bases(&self) -> Vec<BasePage> {
+        self.pages()
+            .iter()
+            .filter_map(|p| p.child().downcast::<BasePage>().ok())
+            .collect()
+    }
+
+    /// Colours a note that isn't a tab of its own (a base's source) like the
+    /// tabs.
+    pub fn style_note(&self, note: &NotePage) {
+        note.set_theme(&self.editor_theme(), adw::StyleManager::default().is_dark());
     }
 
     pub(crate) fn notes(&self) -> Vec<NotePage> {
@@ -594,6 +613,13 @@ impl Window {
             .tab_view
             .selected_page()
             .and_then(|p| p.child().downcast::<NotePage>().ok())
+    }
+
+    pub fn selected_base(&self) -> Option<BasePage> {
+        self.imp()
+            .tab_view
+            .selected_page()
+            .and_then(|p| p.child().downcast::<BasePage>().ok())
     }
 
     pub fn selected_path(&self) -> Option<VaultPath> {
@@ -630,6 +656,10 @@ impl Window {
             return;
         }
         self.remember_recent(path);
+        if base_page::is_base(path) {
+            self.open_base(path, new_tab);
+            return;
+        }
         let is_note = is_text(path);
         if !is_note && !image_page::is_image(path) {
             gtk::FileLauncher::new(Some(&gio::File::for_path(&abs))).launch(
@@ -688,6 +718,27 @@ impl Window {
         if let Ok(note) = child.downcast::<NotePage>() {
             note.focus_editor();
         }
+    }
+
+    /// Opens a `.base` file in a Bases tab.
+    fn open_base(&self, path: &VaultPath, new_tab: bool) {
+        let imp = self.imp();
+        let page = BasePage::new(self.ctx(), self.index());
+        if let Err(e) = page.load(path) {
+            self.toast(&format!("Couldn't open “{path}”: {e}"));
+            return;
+        }
+        let current = imp.tab_view.selected_page();
+        // Like notes, a base replaces an unpinned note tab unless asked not to.
+        let replace = current
+            .as_ref()
+            .filter(|p| !new_tab && !p.is_pinned() && p.child().is::<NotePage>());
+        let tab = imp.tab_view.add_page(&page, current.as_ref());
+        if let Some(old) = replace {
+            imp.tab_view.close_page(old);
+        }
+        Self::update_tab(&tab, path);
+        imp.tab_view.set_selected_page(&tab);
     }
 
     fn on_selected_page(&self) {
@@ -800,6 +851,8 @@ impl Window {
             (TabKind::Note, note.cursor_byte())
         } else if child.is::<ImagePage>() {
             (TabKind::Image, 0)
+        } else if child.is::<BasePage>() {
+            (TabKind::Base, 0)
         } else {
             return None;
         };
@@ -816,6 +869,9 @@ impl Window {
     fn remember_closed(&self, page: &adw::TabPage) {
         if let Ok(note) = page.child().downcast::<NotePage>() {
             note.flush();
+        }
+        if let Ok(base) = page.child().downcast::<BasePage>() {
+            base.flush();
         }
         if page.is_pinned() {
             return;
@@ -858,6 +914,12 @@ impl Window {
         for note in self.notes() {
             note.flush();
         }
+        for base in self.bases() {
+            base.flush();
+            if let Some(note) = base.source_note() {
+                note.flush();
+            }
+        }
     }
 
     // --- changes on disk -------------------------------------------------------
@@ -877,11 +939,13 @@ impl Window {
         for event in &events {
             match event {
                 VaultEvent::Modified(path) | VaultEvent::Created(path) => {
-                    if let Some(note) = self
-                        .find_page(path)
-                        .and_then(|p| p.child().downcast::<NotePage>().ok())
-                    {
+                    let child = self.find_page(path).map(|p| p.child());
+                    if let Some(note) = child.as_ref().and_then(|c| c.downcast_ref::<NotePage>()) {
                         note.on_disk_changed();
+                    } else if let Some(base) =
+                        child.as_ref().and_then(|c| c.downcast_ref::<BasePage>())
+                    {
+                        base.on_disk_changed();
                     }
                 }
                 VaultEvent::Removed(path) => {
@@ -919,6 +983,8 @@ impl Window {
                 note.set_path(new.clone());
             } else if let Some(image) = child.downcast_ref::<ImagePage>() {
                 image.set_path(new.clone());
+            } else if let Some(base) = child.downcast_ref::<BasePage>() {
+                base.set_path(new.clone());
             }
             Self::update_tab(&page, &new);
         }
@@ -1461,6 +1527,11 @@ impl Window {
                 note.set_theme(&theme, dark);
             } else if let Some(text) = child.downcast_ref::<TextPage>() {
                 text.set_style_scheme(scheme.as_ref());
+            } else if let Some(note) = child
+                .downcast_ref::<BasePage>()
+                .and_then(BasePage::source_note)
+            {
+                note.set_theme(&theme, dark);
             }
         }
     }
@@ -2144,7 +2215,7 @@ impl Window {
 fn is_text(path: &VaultPath) -> bool {
     matches!(
         path.extension().map(str::to_lowercase).as_deref(),
-        Some("md" | "markdown" | "txt" | "base" | "canvas" | "css" | "json" | "yaml" | "yml")
+        Some("md" | "markdown" | "txt" | "canvas" | "css" | "json" | "yaml" | "yml")
     )
 }
 
