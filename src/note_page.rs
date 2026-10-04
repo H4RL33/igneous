@@ -22,6 +22,9 @@ use sourceview::prelude::*;
 
 use crate::vault::VaultContext;
 
+/// How many notes Back remembers per tab.
+const MAX_HISTORY: usize = 50;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum State {
     #[default]
@@ -66,6 +69,9 @@ mod imp {
         /// A rebase is in progress, so the upper side of a conflict is the
         /// remote's version rather than ours.
         pub rebasing: Cell<bool>,
+        /// Notes visited in this tab before and after the current one.
+        pub back: RefCell<Vec<VaultPath>>,
+        pub forward: RefCell<Vec<VaultPath>>,
     }
 
     #[glib::object_subclass]
@@ -200,6 +206,65 @@ impl NotePage {
         let start = self.buffer().start_iter();
         self.buffer().place_cursor(&start);
         Ok(())
+    }
+
+    /// Loads `path` in this tab, remembering the current note for Back.
+    pub fn navigate(&self, path: &VaultPath) -> Result<(), String> {
+        let current = self.path();
+        self.load(path)?;
+        if let Some(current) = current
+            && &current != path
+        {
+            let mut back = self.imp().back.borrow_mut();
+            back.push(current);
+            if back.len() > MAX_HISTORY {
+                back.remove(0);
+            }
+            self.imp().forward.borrow_mut().clear();
+        }
+        Ok(())
+    }
+
+    /// Goes back (or forward) a note, skipping notes that no longer exist.
+    /// Returns the note now shown.
+    pub fn go(&self, forward: bool) -> Option<VaultPath> {
+        let imp = self.imp();
+        let (from, to) = if forward {
+            (&imp.forward, &imp.back)
+        } else {
+            (&imp.back, &imp.forward)
+        };
+        loop {
+            let path = from.borrow_mut().pop()?;
+            if !self.ctx().abs(&path).is_file() {
+                continue;
+            }
+            let current = self.path();
+            if self.load(&path).is_ok() {
+                if let Some(current) = current {
+                    to.borrow_mut().push(current);
+                }
+                return Some(path);
+            }
+        }
+    }
+
+    pub fn can_go(&self, forward: bool) -> bool {
+        let imp = self.imp();
+        let stack = if forward { &imp.forward } else { &imp.back };
+        !stack.borrow().is_empty()
+    }
+
+    /// The Back and Forward lists, oldest first, as saved in the workspace.
+    pub fn history(&self) -> (Vec<VaultPath>, Vec<VaultPath>) {
+        let imp = self.imp();
+        (imp.back.borrow().clone(), imp.forward.borrow().clone())
+    }
+
+    pub fn set_history(&self, back: Vec<VaultPath>, forward: Vec<VaultPath>) {
+        let imp = self.imp();
+        imp.back.replace(back);
+        imp.forward.replace(forward);
     }
 
     fn set_contents(&self, file: TextFile, stamp: Option<FileStamp>, state: State) {

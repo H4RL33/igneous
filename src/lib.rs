@@ -2,6 +2,7 @@
 
 mod application;
 mod changes;
+mod command_palette;
 mod config;
 mod files;
 mod gsettings;

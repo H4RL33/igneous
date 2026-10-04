@@ -250,6 +250,34 @@ async fn vault_themes_are_found() {
     window.close();
 }
 
+#[gtk::test]
+async fn back_and_forward_follow_the_tab() {
+    let dir = vault(None);
+    let window = open(&dir);
+    window.open_path(&p("Home.md"), false);
+    window.open_path(&p("Projects/Ideas.md"), false);
+    window.open_path(&p("Daily/2026-10-04.md"), false);
+    assert_eq!(window.tab_paths().len(), 1);
+    WidgetExt::activate_action(&window, "win.go-back", None).unwrap();
+    assert_eq!(window.selected_path(), Some(p("Projects/Ideas.md")));
+    WidgetExt::activate_action(&window, "win.go-back", None).unwrap();
+    assert_eq!(window.selected_path(), Some(p("Home.md")));
+    WidgetExt::activate_action(&window, "win.go-forward", None).unwrap();
+    assert_eq!(window.selected_path(), Some(p("Projects/Ideas.md")));
+    // History is saved with the tab.
+    window.save_workspace();
+    let saved = std::fs::read_to_string(dir.path().join(".igneous/workspace.json")).unwrap();
+    assert!(
+        saved.contains(
+            r#""back": [
+        "Home.md"
+      ]"#
+        ),
+        "{saved}"
+    );
+    window.close();
+}
+
 // --- Git sync ------------------------------------------------------------------
 //
 // These rely on the sealed session's own Git configuration (identity, no

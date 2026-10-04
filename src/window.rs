@@ -192,6 +192,11 @@ fn install_actions(klass: &mut <imp::Window as ObjectSubclass>::Class) {
         }
     });
     klass.install_action("win.reopen-tab", None, |w, _, _| w.reopen_tab());
+    klass.install_action("win.go-back", None, |w, _, _| w.go(false));
+    klass.install_action("win.go-forward", None, |w, _, _| w.go(true));
+    klass.install_action("win.command-palette", None, |w, _, _| {
+        crate::command_palette::show(w)
+    });
     klass.install_action("win.toggle-sidebar", None, |w, _, _| {
         let split = &w.imp().split_view;
         split.set_show_sidebar(!split.shows_sidebar());
@@ -551,7 +556,7 @@ impl Window {
             && !page.is_pinned()
             && let Ok(note) = page.child().downcast::<NotePage>()
         {
-            match note.load(path) {
+            match note.navigate(path) {
                 Ok(()) => {
                     Self::update_tab(page, path);
                     self.on_selected_page();
@@ -633,6 +638,9 @@ impl Window {
         let mut state = TabState::new(kind, Some(Self::page_path(page)?));
         state.cursor = cursor;
         state.pinned = page.is_pinned();
+        if let Some(note) = child.downcast_ref::<NotePage>() {
+            (state.back, state.forward) = note.history();
+        }
         Some(state)
     }
 
@@ -649,6 +657,19 @@ impl Window {
             if closed.len() > MAX_CLOSED_TABS {
                 closed.remove(0);
             }
+        }
+    }
+
+    /// Back or forward in the selected tab's history.
+    fn go(&self, forward: bool) {
+        let imp = self.imp();
+        let (Some(page), Some(note)) = (imp.tab_view.selected_page(), self.selected_note()) else {
+            return;
+        };
+        if let Some(path) = note.go(forward) {
+            Self::update_tab(&page, &path);
+            self.on_selected_page();
+            note.focus_editor();
         }
     }
 
@@ -1214,6 +1235,7 @@ impl Window {
             imp.tab_view.set_page_pinned(&page, tab.pinned);
             if let Ok(note) = page.child().downcast::<NotePage>() {
                 note.set_cursor_byte(tab.cursor);
+                note.set_history(tab.back.clone(), tab.forward.clone());
             }
             if workspace.active_tab == Some(i) {
                 active = Some(page);

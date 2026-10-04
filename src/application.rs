@@ -108,6 +108,9 @@ impl Application {
             ("win.rename-note", &["F2"]),
             ("win.preferences", &["<Control>comma"]),
             ("win.sync-now", &["<Control><Alt>s"]),
+            ("win.command-palette", &["<Control>p"]),
+            ("win.go-back", &["<Alt>Left"]),
+            ("win.go-forward", &["<Alt>Right"]),
         ] {
             self.set_accels_for_action(action, accels);
         }

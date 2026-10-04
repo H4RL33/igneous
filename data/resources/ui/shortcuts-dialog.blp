@@ -11,6 +11,11 @@ Adw.ShortcutsDialog shortcuts_dialog {
     }
 
     Adw.ShortcutsItem {
+      title: _("Command palette");
+      action-name: "win.command-palette";
+    }
+
+    Adw.ShortcutsItem {
       title: _("Open another vault");
       action-name: "app.new-window";
     }
@@ -52,6 +57,16 @@ Adw.ShortcutsDialog shortcuts_dialog {
     Adw.ShortcutsItem {
       title: _("Save now");
       action-name: "win.save";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Go back");
+      action-name: "win.go-back";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Go forward");
+      action-name: "win.go-forward";
     }
   }
 
