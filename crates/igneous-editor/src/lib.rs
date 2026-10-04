@@ -4,6 +4,7 @@
 
 mod buffer;
 pub mod completion;
+mod diagnostics;
 mod host;
 mod hover;
 mod live;
@@ -15,6 +16,7 @@ pub mod theme;
 mod view;
 
 pub use buffer::LANGUAGE_ID;
+pub use diagnostics::Diagnostic;
 pub use host::{Embed, Host, NoHost, NoteName};
 pub use scheme::{style_scheme, system_accent};
 pub use view::{Mode, NoteView};

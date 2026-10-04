@@ -63,6 +63,9 @@ pub trait Host {
     fn tags(&self) -> Vec<(String, usize)> {
         Vec::new()
     }
+
+    /// Fixes the problems `rule` found (the Fix button on an underline).
+    fn fix(&self, _rule: &str) {}
 }
 
 /// A host that knows nothing: every link exists, nothing opens.

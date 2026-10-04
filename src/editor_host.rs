@@ -118,6 +118,12 @@ impl Host for NoteHost {
             .collect()
     }
 
+    fn fix(&self, rule: &str) {
+        if let (Some(window), Some(page)) = (self.window(), self.page.upgrade()) {
+            window.fix_rule(&page, rule);
+        }
+    }
+
     fn tags(&self) -> Vec<(String, usize)> {
         self.window()
             .map(|w| w.index().tags().as_ref().clone())

@@ -174,12 +174,17 @@ impl NoteView {
             let mut guard = self.imp().state.borrow_mut();
             let st = &mut *guard;
             let edits = std::mem::take(&mut st.pending);
+            if edits.len() != 1 && st.text != text {
+                // Replaced wholesale (a reload): old problems no longer apply.
+                st.diagnostics.clear();
+            }
             st.text = text;
             st.lines = line_starts(&st.text);
             if let [(pos, deleted, inserted)] = edits[..] {
                 for set in st.applied.values_mut() {
                     set.apply_edit(pos, deleted, inserted);
                 }
+                crate::diagnostics::shift(&mut st.diagnostics, pos, deleted, inserted);
                 if inserted > 0 {
                     // GTK gives inserted text the tags around it; strip ours so
                     // the buffer matches what's recorded.
@@ -231,6 +236,9 @@ impl NoteView {
     }
 
     fn tag_for(&self, key: &str) -> gtk::TextTag {
+        if key == crate::diagnostics::KEY {
+            return self.tags().diagnostic.clone();
+        }
         if let Some(role) = key.strip_prefix("title:") {
             return self
                 .tags()
@@ -253,6 +261,10 @@ impl NoteView {
         for kind in TagKind::ALL {
             map.entry(kind_key(kind)).or_default();
         }
+        map.insert(
+            crate::diagnostics::KEY.to_owned(),
+            crate::diagnostics::coverage(&st.diagnostics, st.mode),
+        );
         if st.mode == Mode::Source {
             return map;
         }
@@ -339,7 +351,7 @@ impl NoteView {
             .extend(headings);
     }
 
-    fn apply(
+    pub(crate) fn apply(
         &self,
         st: &mut State,
         mut desired: HashMap<String, Vec<Range<usize>>>,

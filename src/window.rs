@@ -100,6 +100,7 @@ mod imp {
         pub index: OnceCell<Rc<IndexService>>,
         pub inspector: OnceCell<Rc<Inspector>>,
         pub inspector_timer: RefCell<Option<glib::SourceId>>,
+        pub lint: OnceCell<Rc<crate::lint::LintConfig>>,
     }
 
     #[glib::object_subclass]
@@ -224,10 +225,11 @@ fn install_actions(klass: &mut <imp::Window as ObjectSubclass>::Class) {
         let split = &w.imp().split_view;
         split.set_show_sidebar(!split.shows_sidebar());
     });
-    klass.install_action("win.save", None, |w, _, _| {
-        if let Some(note) = w.selected_note() {
-            note.flush();
-        }
+    klass.install_action("win.save", None, |w, _, _| w.save_selected_note());
+    klass.install_action("win.lint-note", None, |w, _, _| w.lint_selected_note());
+    klass.install_action("win.lint-vault", None, |w, _, _| w.lint_folder_dialog(None));
+    klass.install_action("win.lint-folder", string, |w, _, p| {
+        w.lint_folder_dialog(path_param(p))
     });
     klass.install_action("win.rename-note", None, |w, _, _| {
         if let Some(path) = w.selected_path() {
@@ -306,7 +308,7 @@ impl Window {
         Ok(window)
     }
 
-    fn ctx(&self) -> &Rc<VaultContext> {
+    pub(crate) fn ctx(&self) -> &Rc<VaultContext> {
         self.imp().ctx.get().unwrap()
     }
 
@@ -462,6 +464,10 @@ impl Window {
             }
         });
         imp.index.set(index).ok().unwrap();
+        imp.lint
+            .set(crate::lint::LintConfig::load(&ctx.vault.igneous_dir()))
+            .ok()
+            .unwrap();
         let inspector = Inspector::new(self);
         imp.inspector_bin.set_child(Some(&inspector.widget));
         imp.inspector.set(inspector).ok().unwrap();
@@ -550,7 +556,7 @@ impl Window {
         }
     }
 
-    fn notes(&self) -> Vec<NotePage> {
+    pub(crate) fn notes(&self) -> Vec<NotePage> {
         self.pages()
             .iter()
             .filter_map(|p| p.child().downcast::<NotePage>().ok())
@@ -630,6 +636,13 @@ impl Window {
                 #[weak(rename_to = window)]
                 self,
                 move |_| window.schedule_inspector_update()
+            ));
+            note.buffer().connect_changed(glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                #[weak]
+                note,
+                move |_| window.schedule_problems(&note)
             ));
             note.set_theme(&self.editor_theme(), adw::StyleManager::default().is_dark());
             note.set_mode(mode_from(self.ctx().settings.editor.default_mode));
@@ -1583,6 +1596,10 @@ impl Window {
 
     pub fn index(&self) -> &Rc<IndexService> {
         self.imp().index.get().unwrap()
+    }
+
+    pub fn lint(&self) -> &Rc<crate::lint::LintConfig> {
+        self.imp().lint.get().unwrap()
     }
 
     fn schedule_inspector_update(&self) {

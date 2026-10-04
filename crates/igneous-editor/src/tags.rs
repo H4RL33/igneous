@@ -226,6 +226,8 @@ pub struct Tags {
     spacing: RefCell<HashMap<String, gtk::TextTag>>,
     callout_titles: RefCell<HashMap<&'static str, gtk::TextTag>>,
     palette: RefCell<Option<Palette>>,
+    /// The wavy underline under problems the linter found.
+    pub diagnostic: gtk::TextTag,
 }
 
 impl Tags {
@@ -262,9 +264,15 @@ impl Tags {
             table.add(&tag);
             tags.insert(kind, tag);
         }
+        let diagnostic = gtk::TextTag::builder()
+            .name("lp-diagnostic")
+            .underline(pango::Underline::Error)
+            .build();
+        table.add(&diagnostic);
         Self {
             table,
             tags,
+            diagnostic,
             spacing: RefCell::default(),
             callout_titles: RefCell::default(),
             palette: RefCell::default(),
@@ -277,6 +285,8 @@ impl Tags {
 
     /// Colours every tag from `palette`.
     pub fn set_palette(&self, palette: &Palette) {
+        self.diagnostic
+            .set_underline_rgba(Some(&palette.role("warning")));
         let fg = |kind: TagKind, role: &str| {
             self.get(kind)
                 .set_foreground_rgba(Some(&palette.role(role)));
