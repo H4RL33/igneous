@@ -759,6 +759,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "igneous-query"
+version = "0.1.0"
+dependencies = [
+ "igneous-core",
+ "igneous-markdown",
+ "jiff",
+ "proptest",
+ "regex",
+ "saphyr",
+ "thiserror",
+]
+
+[[package]]
 name = "indexmap"
 version = "2.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

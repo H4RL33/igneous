@@ -1,0 +1,62 @@
+# A base exercising most of the format. Synthetic.
+filters:
+  and:
+    - file.ext == "md"
+    - not:
+        - file.inFolder("Archive")
+formulas:
+  pages_left: "pages - read"
+  progress: "if(pages, (read / pages * 100).round()) "
+  label: 'formula.progress + "% of " + file.basename'
+  loop_a: formula.loop_b + 1
+  loop_b: formula.loop_a + 1
+properties:
+  formula.progress:
+    displayName: Progress
+  file.basename:
+    displayName: Title
+summaries:
+  total: values.sum()
+views:
+  - type: table
+    name: Reading
+    filters:
+      or:
+        - status == "reading"
+        - status == "queued"
+    groupBy:
+      property: status
+      direction: ASC
+    order:
+      - file.basename
+      - pages
+      - formula.progress
+      - formula.pages_left
+    sort:
+      - property: formula.progress
+        direction: DESC
+    summaries:
+      pages: Sum
+      formula.progress: Average
+      formula.pages_left: total
+  - type: cards
+    name: Top two
+    limit: 2
+    order:
+      - file.basename
+      - rating
+    sort:
+      - property: rating
+        direction: DESC
+    image: note.cover
+  - type: list
+    name: Broken
+    filters:
+      and:
+        - file.hasTag(
+    order:
+      - formula.loop_a
+      - formula.missing
+      - formula.label
+  - type: kanban
+    name: Board

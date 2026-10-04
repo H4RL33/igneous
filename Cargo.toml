@@ -28,7 +28,13 @@ tempfile.workspace = true
 
 [workspace]
 resolver = "3"
-members = ["crates/igneous-core", "crates/igneous-editor", "crates/igneous-markdown", "spikes/live-preview"]
+members = [
+    "crates/igneous-core",
+    "crates/igneous-editor",
+    "crates/igneous-markdown",
+    "crates/igneous-query",
+    "spikes/live-preview",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -41,6 +47,7 @@ authors = ["Harley Welsh <git@harleywelsh.com>"]
 igneous-core = { path = "crates/igneous-core" }
 igneous-editor = { path = "crates/igneous-editor" }
 igneous-markdown = { path = "crates/igneous-markdown" }
+igneous-query = { path = "crates/igneous-query" }
 
 anyhow = "1"
 async-channel = "2"
