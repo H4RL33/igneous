@@ -1,0 +1,24 @@
+[package]
+name = "igneous-core"
+description = "Vault, file and settings handling for Igneous"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+blake3.workspace = true
+globset.workspace = true
+jiff.workspace = true
+notify-debouncer-full.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+unicode-normalization.workspace = true
+walkdir.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true

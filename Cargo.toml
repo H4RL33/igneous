@@ -1,0 +1,42 @@
+[workspace]
+resolver = "3"
+members = ["crates/igneous-core"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "BSD-3-Clause"
+authors = ["Harley Welsh <git@harleywelsh.com>"]
+
+[workspace.dependencies]
+igneous-core = { path = "crates/igneous-core" }
+igneous-markdown = { path = "crates/igneous-markdown" }
+
+anyhow = "1"
+blake3 = "1.8"
+globset = "0.4"
+jiff = "0.2"
+notify-debouncer-full = "0.7"
+pulldown-cmark = { version = "0.13", default-features = false }
+regex = "1"
+saphyr = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+smallvec = { version = "1", features = ["union", "const_generics"] }
+tempfile = "3"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+unicode-normalization = "0.1"
+walkdir = "2"
+
+gtk = { package = "gtk4", version = "0.11", features = ["v4_22"] }
+adw = { package = "libadwaita", version = "0.9", features = ["v1_9"] }
+sourceview = { package = "sourceview5", version = "0.11", features = ["v5_18"] }
+
+insta = "1"
+proptest = "1"
+
+[profile.dev.package."*"]
+opt-level = 2
