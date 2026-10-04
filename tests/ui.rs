@@ -1,62 +1,15 @@
 //! UI tests on a copy of the fixture vault. They need a display; run them
 //! with `build-aux/run-ui-tests.sh`, which uses a private headless session.
 
+use igneous_core::VaultPath;
 use std::path::Path;
-use std::time::Duration;
 
 use adw::prelude::*;
-use gtk::glib;
 use igneous::{NoteState, SyncState, Window};
-use igneous_core::VaultPath;
 use sourceview::prelude::*;
 
-const FIXTURE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/vaults/basic");
-
-fn copy_dir(from: &Path, to: &Path) {
-    std::fs::create_dir_all(to).unwrap();
-    for entry in std::fs::read_dir(from).unwrap() {
-        let entry = entry.unwrap();
-        let dest = to.join(entry.file_name());
-        if entry.file_type().unwrap().is_dir() {
-            copy_dir(&entry.path(), &dest);
-        } else {
-            std::fs::copy(entry.path(), dest).unwrap();
-        }
-    }
-}
-
-/// A fresh copy of the fixture vault, optionally with an autosave delay.
-fn vault(autosave_ms: Option<u32>) -> tempfile::TempDir {
-    if let Some(settings) = gtk::Settings::default() {
-        settings.set_gtk_error_bell(false);
-    }
-    let dir = tempfile::tempdir().unwrap();
-    copy_dir(Path::new(FIXTURE), dir.path());
-    if let Some(ms) = autosave_ms {
-        std::fs::create_dir_all(dir.path().join(".igneous")).unwrap();
-        std::fs::write(
-            dir.path().join(".igneous/vault.json"),
-            format!("{{\"version\":1,\"editor\":{{\"autosaveDelayMs\":{ms}}}}}"),
-        )
-        .unwrap();
-    }
-    dir
-}
-
-/// Opens and shows a window: GTK only closes windows that have been shown.
-fn open(dir: &tempfile::TempDir) -> Window {
-    let window = Window::for_vault(dir.path()).unwrap();
-    window.present();
-    window
-}
-
-fn p(s: &str) -> VaultPath {
-    VaultPath::new(s).unwrap()
-}
-
-async fn wait(ms: u64) {
-    glib::timeout_future(Duration::from_millis(ms)).await;
-}
+mod common;
+use common::*;
 
 #[gtk::test]
 async fn edits_autosave_and_keep_line_endings() {
@@ -326,65 +279,6 @@ async fn following_a_missing_link_creates_the_note() {
 // These rely on the sealed session's own Git configuration (identity, no
 // signing), set up by build-aux/headless-session.sh.
 
-fn git(cwd: &Path, args: &[&str]) -> String {
-    let out = std::process::Command::new("git")
-        .current_dir(cwd)
-        .args(args)
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "git {args:?}: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    String::from_utf8_lossy(&out.stdout).into_owned()
-}
-
-/// The fixture vault as a repository whose `main` is pushed to a bare
-/// remote. The second directory holds the remote and any other clones.
-fn synced_vault() -> (tempfile::TempDir, tempfile::TempDir) {
-    let dir = vault(Some(100));
-    let remotes = tempfile::tempdir().unwrap();
-    git(remotes.path(), &["init", "-q", "--bare", "remote.git"]);
-    let remote = remotes.path().join("remote.git");
-    git(dir.path(), &["init", "-q"]);
-    git(dir.path(), &["add", "-A"]);
-    git(dir.path(), &["commit", "-q", "-m", "init"]);
-    git(
-        dir.path(),
-        &["remote", "add", "origin", remote.to_str().unwrap()],
-    );
-    git(dir.path(), &["push", "-q", "-u", "origin", "main"]);
-    (dir, remotes)
-}
-
-/// Another computer: a clone of the remote.
-fn other_clone(remotes: &tempfile::TempDir) -> std::path::PathBuf {
-    let path = remotes.path().join("other");
-    if !path.exists() {
-        git(remotes.path(), &["clone", "-q", "remote.git", "other"]);
-    }
-    path
-}
-
-fn remote_log(remotes: &tempfile::TempDir) -> String {
-    git(
-        &remotes.path().join("remote.git"),
-        &["log", "--format=%s", "main"],
-    )
-}
-
-/// Waits up to `ms` for `f` to hold.
-async fn until(ms: u64, mut f: impl FnMut() -> bool) -> bool {
-    for _ in 0..ms / 50 {
-        if f() {
-            return true;
-        }
-        wait(50).await;
-    }
-    f()
-}
-
 #[gtk::test]
 async fn git_sync_round_trip() {
     let (dir, remotes) = synced_vault();
@@ -577,7 +471,9 @@ async fn screenshot() {
         dir.path().join(".igneous/workspace.json"),
         format!(
             r#"{{"version":1,"tabs":{tabs},"activeTab":0,
-                "sidebar":{{"expanded":["Attachments","Projects","Projects/Igneous"]}}}}"#
+                "inspector":{{"visible":{}}},
+                "sidebar":{{"expanded":["Attachments","Projects","Projects/Igneous"]}}}}"#,
+            std::env::var("IGNEOUS_SCREENSHOT_INSPECTOR").is_ok()
         ),
     )
     .unwrap();
@@ -635,18 +531,6 @@ async fn screenshot() {
     wait(800).await;
     save_png(picker.upcast_ref(), &out.replace(".png", "-picker.png"));
     picker.close();
-}
-
-fn save_png(window: &gtk::Window, out: &str) {
-    // Paint the whole window: header bars are translucent over its background.
-    let paintable = gtk::WidgetPaintable::new(Some(window));
-    let snapshot = gtk::Snapshot::new();
-    paintable.snapshot(&snapshot, window.width() as f64, window.height() as f64);
-    let texture = window
-        .renderer()
-        .unwrap()
-        .render_texture(snapshot.to_node().unwrap(), None);
-    texture.save_to_png(out).unwrap();
 }
 
 /// Opt-in: opens copies of real vaults, loads every note, closes, and checks
