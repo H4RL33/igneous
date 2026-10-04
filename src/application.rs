@@ -110,6 +110,7 @@ impl Application {
             ("win.sync-now", &["<Control><Alt>s"]),
             ("win.lint-note", &["<Control><Alt>l"]),
             ("win.command-palette", &["<Control>p"]),
+            ("win.graph", &["<Control>g"]),
             ("win.go-back", &["<Alt>Left"]),
             ("win.toggle-reading", &["<Control>e"]),
             ("win.search", &["<Control><Shift>f"]),

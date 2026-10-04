@@ -48,6 +48,7 @@ pub const COMMANDS: &[Command] = &[
     command("win.close-tab", "Close tab", Needs::Nothing),
     command("win.reopen-tab", "Reopen closed tab", Needs::Nothing),
     command("win.toggle-sidebar", "Toggle sidebar", Needs::Nothing),
+    command("win.graph", "Open graph view", Needs::Nothing),
     command("win.sync-now", "Git: Sync now", Needs::Git),
     command("win.pull", "Git: Pull", Needs::Git),
     command("win.show-changes", "Git: Show changes", Needs::Git),
