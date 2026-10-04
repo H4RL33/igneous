@@ -1,0 +1,6 @@
+/target
+/_build
+/builddir
+*.swp
+*~
+.flatpak-builder/
