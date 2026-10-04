@@ -1,0 +1,50 @@
+[
+  {
+    "name": "Math blocks that start a document do not get an empty line before them.",
+    "before": "$$\n\\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}\n$$\nsome more text",
+    "after": "$$\n\\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}\n$$\n\nsome more text",
+    "source": "example"
+  },
+  {
+    "name": "Math blocks that are singe-line are updated based on the value of `Number of dollar signs to indicate a math block` (in this case its value is 2)",
+    "before": "$$\\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}$$\nsome more text",
+    "after": "$$\\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}$$\n\nsome more text",
+    "source": "example"
+  },
+  {
+    "name": "Math blocks that end a document do not get an empty line after them.",
+    "before": "Some text\n$$\n\\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}\n$$",
+    "after": "Some text\n\n$$\n\\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}\n$$",
+    "source": "example"
+  },
+  {
+    "name": "Math blocks that are not at the start or the end of the document will have an empty line added before and after them",
+    "before": "Some text\n$$\n\\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}\n$$\nsome more text",
+    "after": "Some text\n\n$$\n\\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}\n$$\n\nsome more text",
+    "source": "example"
+  },
+  {
+    "name": "Math blocks in callouts or blockquotes have the appropriately formatted blank lines added",
+    "before": "> Math block in blockquote\n> $$\n> \\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}\n> $$\n\nMore content here\n\n> Math block doubly nested in blockquote\n> > $$\n> > \\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}\n> > $$",
+    "after": "> Math block in blockquote\n>\n> $$\n> \\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}\n> $$\n\nMore content here\n\n> Math block doubly nested in blockquote\n>\n> > $$\n> > \\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}\n> > $$",
+    "source": "example"
+  },
+  {
+    "name": "When the next line after a math block in a blockquote is a callout, it should retain its current level instead of breaking callouts by adding a blank blocquote line before it",
+    "before": "> [!Example]+\n> Some math equations:\n> \n> $$ a + b = c $$\n>\n> > [!Note]\n> > Text under nested callout.",
+    "after": "> [!Example]+\n> Some math equations:\n>\n> $$ a + b = c $$\n>\n> > [!Note]\n> > Text under nested callout.",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that empty lines around math blocks handles an empty line prior to the math block that is nested one blockquote level more than the math block is",
+    "before": "> AAA\n>\n> > **BBB:**\n> >\n> > - CCC\n> > \n> $$\n> Some math here\n> $$",
+    "after": "> AAA\n>\n> > **BBB:**\n> >\n> > - CCC\n> >\n> $$\n> Some math here\n> $$",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that empty lines around math blocks handles an empty line after the math block that is nested one blockquote level more than the math block is",
+    "before": "> AAA\n>\n> $$\n> Some math here\n> $$\n> > **BBB:**\n> >\n> > - CCC",
+    "after": "> AAA\n>\n> $$\n> Some math here\n> $$\n>\n> > **BBB:**\n> >\n> > - CCC",
+    "source": "test"
+  }
+]

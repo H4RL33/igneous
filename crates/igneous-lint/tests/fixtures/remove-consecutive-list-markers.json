@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Removing consecutive list markers.",
+    "before": "- item 1\n- - copypasted item A\n- item 2\n  - indented item\n  - - copypasted item B",
+    "after": "- item 1\n- copypasted item A\n- item 2\n  - indented item\n  - copypasted item B",
+    "source": "example"
+  },
+  {
+    "name": "Leaves consecutive markers inside fenced code alone",
+    "before": "```\n- - item\n```\n- - outside",
+    "after": "```\n- - item\n```\n- outside",
+    "source": "test"
+  },
+  {
+    "name": "Leaves consecutive markers inside disabled sections alone",
+    "before": "<!-- linter-disable -->\n- - item\n<!-- linter-enable -->\n- - outside",
+    "after": "<!-- linter-disable -->\n- - item\n<!-- linter-enable -->\n- outside",
+    "source": "test"
+  },
+  {
+    "name": "Does not treat a protected link as the letter anchor",
+    "before": "- - [letter](url)\n- - [[letter]]",
+    "after": "- - [letter](url)\n- - [[letter]]",
+    "source": "test"
+  },
+  {
+    "name": "Make sure consecutive list markers are removed when dealing with non-latin characters",
+    "before": "- - test content\n- - тест content\n- - 测试 content",
+    "after": "- test content\n- тест content\n- 测试 content",
+    "source": "test"
+  }
+]

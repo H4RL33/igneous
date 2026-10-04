@@ -1,0 +1,74 @@
+[
+  {
+    "name": "Consecutive blank lines are removed",
+    "before": "Some text\n\n\nSome more text",
+    "after": "Some text\n\nSome more text",
+    "source": "example"
+  },
+  {
+    "name": "Leaves consecutive blank lines inside a disabled section unchanged",
+    "before": "<!-- linter-disable -->\nFirst\n\n\nSecond\n<!-- linter-enable -->\n\n\nLast",
+    "after": "<!-- linter-disable -->\nFirst\n\n\nSecond\n<!-- linter-enable -->\n\nLast",
+    "source": "test"
+  },
+  {
+    "name": "Handles ignores code blocks",
+    "before": "Line 1\n\n\n```\n\n\n\n```",
+    "after": "Line 1\n\n```\n\n\n\n```",
+    "source": "test"
+  },
+  {
+    "name": "Removes multiple empty lines when one of the lines just has spaces in it",
+    "before": "Line 1\n\n   \nLine 2",
+    "after": "Line 1\n\nLine 2",
+    "source": "test"
+  },
+  {
+    "name": "Removes multiple empty lines when one of the lines just has a tab in it",
+    "before": "Line 1\n\n\t\nLine 2",
+    "after": "Line 1\n\nLine 2",
+    "source": "test"
+  },
+  {
+    "name": "Removes multiple empty lines when one of the lines just has a carriage return in it",
+    "before": "Line 1\n\n\r\n\u000b\nLine 2",
+    "after": "Line 1\n\nLine 2",
+    "source": "test"
+  },
+  {
+    "name": "Removes multiple empty lines when one of the lines just has a vertical tab in it",
+    "before": "Line 1\n\n\u000b\nLine 2",
+    "after": "Line 1\n\nLine 2",
+    "source": "test"
+  },
+  {
+    "name": "Removes multiple empty lines when one of the lines just has a page break in it",
+    "before": "Line 1\n\n\f\nLine 2",
+    "after": "Line 1\n\nLine 2",
+    "source": "test"
+  },
+  {
+    "name": "Removes multiple empty lines when one of the lines just has a page break in it",
+    "before": "Line 1\n\n\f\nLine 2",
+    "after": "Line 1\n\nLine 2",
+    "source": "test"
+  },
+  {
+    "name": "Removes multiple empty lines when one of the lines just has multiple kinds of whitespace in it in it",
+    "before": "Line 1\n\n\f \r\u000b\t\t\u000b\nLine 2",
+    "after": "Line 1\n\nLine 2",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that lists with a blank line between them are not affected since there are not 2 or more blank lines",
+    "before": "- Item 1\n\n  - Subitem 1\n\n  - Subitem 2\n\n    - Sub sub item 1\n\n    - Sub sub item 2",
+    "after": "- Item 1\n\n  - Subitem 1\n\n  - Subitem 2\n\n    - Sub sub item 1\n\n    - Sub sub item 2",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that nested code blocks with a blank line between them are not affected since there are not 2 or more blank lines",
+    "before": "1. `aaa` bbbb,\n3. xxxxxxxxxxxxxxx\n\n    ```csharp\n    private IProcessor[] GetProcessors()\n    {\n        return returnedProcessors.ToArray();\n    }\n    ```\n\n4. ccccccc,",
+    "after": "1. `aaa` bbbb,\n3. xxxxxxxxxxxxxxx\n\n    ```csharp\n    private IProcessor[] GetProcessors()\n    {\n        return returnedProcessors.ToArray();\n    }\n    ```\n\n4. ccccccc,",
+    "source": "test"
+  }
+]

@@ -1,0 +1,110 @@
+[
+  {
+    "name": "Tables that start a document do not get an empty line before them.",
+    "before": "| Column 1 | Column 2 |\n|----------|----------|\n| foo      | bar      |\n| baz      | qux      |\n| quux     | quuz     |\nMore text.\n# Heading\n\n**Note that text directly following a table is considered part of a table according to github markdown**",
+    "after": "| Column 1 | Column 2 |\n|----------|----------|\n| foo      | bar      |\n| baz      | qux      |\n| quux     | quuz     |\n\nMore text.\n# Heading\n\n**Note that text directly following a table is considered part of a table according to github markdown**",
+    "source": "example"
+  },
+  {
+    "name": "Tables that end a document do not get an empty line after them.",
+    "before": "# Heading 1\n| Column 1 | Column 2 |\n|----------|----------|\n| foo      | bar      |\n| baz      | qux      |\n| quux     | quuz     |",
+    "after": "# Heading 1\n\n| Column 1 | Column 2 |\n|----------|----------|\n| foo      | bar      |\n| baz      | qux      |\n| quux     | quuz     |",
+    "source": "example"
+  },
+  {
+    "name": "Tables that are not at the start or the end of the document will have an empty line added before and after them",
+    "before": "# Table 1\n| Column 1 | Column 2 | Column 3 |\n|----------|----------|----------|\n| foo      | bar      | blob     |\n| baz      | qux      | trust    |\n| quux     | quuz     | glob     |\n# Table 2 without Pipe at Start and End\n| Column 1 | Column 2 |\n:-: | -----------:\nbar | baz\nfoo | bar\n# Header for more content\nNew paragraph.",
+    "after": "# Table 1\n\n| Column 1 | Column 2 | Column 3 |\n|----------|----------|----------|\n| foo      | bar      | blob     |\n| baz      | qux      | trust    |\n| quux     | quuz     | glob     |\n\n# Table 2 without Pipe at Start and End\n\n| Column 1 | Column 2 |\n:-: | -----------:\nbar | baz\nfoo | bar\n\n# Header for more content\nNew paragraph.",
+    "source": "example"
+  },
+  {
+    "name": "Tables in callouts or blockquotes have the appropriately formatted blank lines added",
+    "before": "> Table in blockquote\n> | Column 1 | Column 2 | Column 3 |\n> |----------|----------|----------|\n> | foo      | bar      | blob     |\n> | baz      | qux      | trust    |\n> | quux     | quuz     | glob     |\n\nMore content here\n\n> Table doubly nested in blockquote\n> > | Column 1 | Column 2 | Column 3 |\n> > |----------|----------|----------|\n> > | foo      | bar      | blob     |\n> > | baz      | qux      | trust    |\n> > | quux     | quuz     | glob     |",
+    "after": "> Table in blockquote\n>\n> | Column 1 | Column 2 | Column 3 |\n> |----------|----------|----------|\n> | foo      | bar      | blob     |\n> | baz      | qux      | trust    |\n> | quux     | quuz     | glob     |\n\nMore content here\n\n> Table doubly nested in blockquote\n>\n> > | Column 1 | Column 2 | Column 3 |\n> > |----------|----------|----------|\n> > | foo      | bar      | blob     |\n> > | baz      | qux      | trust    |\n> > | quux     | quuz     | glob     |",
+    "source": "example"
+  },
+  {
+    "name": "Leaves tables inside fenced code unchanged",
+    "before": "```\nBefore\n| a |\n| - |\n| b |\nAfter\n```",
+    "after": "```\nBefore\n| a |\n| - |\n| b |\nAfter\n```",
+    "source": "test"
+  },
+  {
+    "name": "Leaves tables inside a disabled section unchanged",
+    "before": "<!-- linter-disable -->\nBefore\n| a |\n| - |\n| b |\nAfter\n<!-- linter-enable -->",
+    "after": "<!-- linter-disable -->\nBefore\n| a |\n| - |\n| b |\nAfter\n<!-- linter-enable -->",
+    "source": "test"
+  },
+  {
+    "name": "Uses projected lines around a table between protected multiline constructs",
+    "before": "```\ncode\n```\n| a |\n| - |\n| b |\n$$\nx\n$$",
+    "after": "```\ncode\n```\n\n| a |\n| - |\n| b |\n\n$$\nx\n$$",
+    "source": "test"
+  },
+  {
+    "name": "Make sure multiple blank lines at the start and end are removed",
+    "before": "\n\n| Column 1 | Column 2 |\n|----------|----------|\n| foo      | bar      |\n| baz      | qux      |\n| quux     | quuz     |\n\n",
+    "after": "| Column 1 | Column 2 |\n|----------|----------|\n| foo      | bar      |\n| baz      | qux      |\n| quux     | quuz     |",
+    "source": "test"
+  },
+  {
+    "name": "Make sure multiple blank lines at the start and end are removed when dealing with blockquotes or callouts",
+    "before": ">\n> \n> | Column 1 | Column 2 |\n> |----------|----------|\n> | foo      | bar      |\n> | baz      | qux      |\n> | quux     | quuz     |\n> \n>",
+    "after": "> | Column 1 | Column 2 |\n> |----------|----------|\n> | foo      | bar      |\n> | baz      | qux      |\n> | quux     | quuz     |",
+    "source": "test"
+  },
+  {
+    "name": "Don't modify inline math",
+    "before": "\n$|a| + |b|$",
+    "after": "\n$|a| + |b|$",
+    "source": "test"
+  },
+  {
+    "name": "Don't modify math",
+    "before": "\n$$\n|a| + |b|\n$$",
+    "after": "\n$$\n|a| + |b|\n$$",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that consecutive links are not affected",
+    "before": "[[filename with dot . |alt name]] [[filename|alt name]]\n",
+    "after": "[[filename with dot . |alt name]] [[filename|alt name]]\n",
+    "source": "test"
+  },
+  {
+    "name": "More complex link scenario is not affected either",
+    "before": "dolor sit amet [[filename with dot . |alt name]] lorem ipsum [[filename|alt name]] adipisci velit [[filename|alt name]]\n",
+    "after": "dolor sit amet [[filename with dot . |alt name]] lorem ipsum [[filename|alt name]] adipisci velit [[filename|alt name]]\n",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that math blocks followed by a couple of wiki links are not affected",
+    "before": "- $math1$ [[name1 .|alt name1]]  [[name2 |alt name2]]:\n\n- $math2$",
+    "after": "- $math1$ [[name1 .|alt name1]]  [[name2 |alt name2]]:\n\n- $math2$",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that we prevent some erroneous table matches where the value is not at the start of a line",
+    "before": "content\nmagneto - | maɡˈnedō |\ncontent",
+    "after": "content\nmagneto - | maɡˈnedō |\ncontent",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that we do not break a table apart when it rows with just dashes in them",
+    "before": "| test  |\n|:-----:|\n|  ---  |\n|  one  |\n|  two  |\n|  ---  |\n|  ---  |\n| three |\n|  ---  |\n|  ---  |\n|  ---  |\n|  ---  |\n| four  |\n| five  |",
+    "after": "| test  |\n|:-----:|\n|  ---  |\n|  one  |\n|  two  |\n|  ---  |\n|  ---  |\n| three |\n|  ---  |\n|  ---  |\n|  ---  |\n|  ---  |\n| four  |\n| five  |",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that empty lines around table handles an empty line prior to the table that is nested one blockquote level more than the table is",
+    "before": "> AAA\n>\n> > **BBB:**\n> >\n> > - CCC\n> > \n> | D | E |\n> |:---:|:--- |\n> | F | G |",
+    "after": "> AAA\n>\n> > **BBB:**\n> >\n> > - CCC\n> >\n> | D | E |\n> |:---:|:--- |\n> | F | G |",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that empty lines around table handles an empty line after the table that is nested one blockquote level more than the table is",
+    "before": "> AAA\n>\n> | D | E |\n> |:---:|:--- |\n> | F | G |\n> > **BBB:**\n> >\n> > - CCC",
+    "after": "> AAA\n>\n> | D | E |\n> |:---:|:--- |\n> | F | G |\n>\n> > **BBB:**\n> >\n> > - CCC",
+    "source": "test"
+  }
+]

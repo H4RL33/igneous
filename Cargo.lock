@@ -745,6 +745,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "igneous-lint"
+version = "0.1.0"
+dependencies = [
+ "igneous-core",
+ "igneous-markdown",
+ "jiff",
+ "proptest",
+ "regex",
+ "serde",
+ "serde_json",
+ "similar",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "igneous-markdown"
 version = "0.1.0"
 dependencies = [

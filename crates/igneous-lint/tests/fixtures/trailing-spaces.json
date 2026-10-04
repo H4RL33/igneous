@@ -1,0 +1,143 @@
+[
+  {
+    "name": "Removes trailing spaces and tabs.",
+    "before": "# H1\nLine with trailing spaces and tabs.\t        ",
+    "after": "# H1\nLine with trailing spaces and tabs.",
+    "source": "example"
+  },
+  {
+    "name": "With `Two space linebreak = true`",
+    "before": "# H1\nLine with trailing spaces and tabs.  ",
+    "after": "# H1\nLine with trailing spaces and tabs.  ",
+    "options": {
+      "twoSpaceLineBreak": true
+    },
+    "source": "example"
+  },
+  {
+    "name": "Trailing whitespace inside a fenced code block is preserved",
+    "before": "```\ncode \t \n   \n```",
+    "after": "```\ncode \t \n   \n```",
+    "source": "test"
+  },
+  {
+    "name": "Trailing whitespace immediately after a fenced code block is removed",
+    "before": "```\ncode\n```\nafter \t ",
+    "after": "```\ncode\n```\nafter",
+    "source": "test"
+  },
+  {
+    "name": "An empty list item preserves one marker space",
+    "before": "-   ",
+    "after": "- ",
+    "source": "test"
+  },
+  {
+    "name": "Trailing whitespace inside a disabled section is preserved",
+    "before": "<!-- linter-disable -->\nignored \t \n   \n<!-- linter-enable -->\nafter \t ",
+    "after": "<!-- linter-disable -->\nignored \t \n   \n<!-- linter-enable -->\nafter",
+    "source": "test"
+  },
+  {
+    "name": "One trailing space removed",
+    "before": "# H1 \nline with one trailing spaces ",
+    "after": "# H1\nline with one trailing spaces",
+    "source": "test"
+  },
+  {
+    "name": "Three trailing whitespaces removed",
+    "before": "# H1   \nline with three trailing spaces   ",
+    "after": "# H1\nline with three trailing spaces",
+    "source": "test"
+  },
+  {
+    "name": "Tab-Space-Linebreak removed",
+    "before": "# H1\nline with trailing tab and spaces    \n",
+    "after": "# H1\nline with trailing tab and spaces\n",
+    "options": {
+      "twoSpaceLineBreak": true
+    },
+    "source": "test"
+  },
+  {
+    "name": "Two Space Linebreak not removed",
+    "before": "# H1\nline with one trailing spaces  \n",
+    "after": "# H1\nline with one trailing spaces  \n",
+    "options": {
+      "twoSpaceLineBreak": true
+    },
+    "source": "test"
+  },
+  {
+    "name": "Regular link with spaces stays the same",
+    "before": "# Hello world\n\n[This has  spaces in it](File with  spaces.md)",
+    "after": "# Hello world\n\n[This has  spaces in it](File with  spaces.md)",
+    "source": "test"
+  },
+  {
+    "name": "Image link with spaces stays the same",
+    "before": "# Hello world\n\n![This has  spaces in it](File with  spaces.png)",
+    "after": "# Hello world\n\n![This has  spaces in it](File with  spaces.png)",
+    "source": "test"
+  },
+  {
+    "name": "Wiki link with spaces stays the same",
+    "before": "# Hello world\n\n[[File with  spaces]]",
+    "after": "# Hello world\n\n[[File with  spaces]]",
+    "source": "test"
+  },
+  {
+    "name": "A list item with no content should not have the space indicating it is a list item removed",
+    "before": "- List item 1\n- \n-   ",
+    "after": "- List item 1\n- \n- ",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that checklists are properly handled with trailing spaces",
+    "before": "- [ ] List item 1\n- [ ] \n- [ ]    ",
+    "after": "- [ ] List item 1\n- [ ] \n- [ ] ",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that indented lists are properly handled with trailing spaces",
+    "before": "Text here\n- List item 1\n  - \n  -   ",
+    "after": "Text here\n- List item 1\n  - \n  - ",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that ordered lists are properly handled with trailing spaces",
+    "before": "Text here\n1. List item 1\n2. \n3.   ",
+    "after": "Text here\n1. List item 1\n2. \n3. ",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that we properly handle an empty list item when it is empty and has no spaces in it",
+    "before": "Some text\n\n-\n",
+    "after": "Some text\n\n-\n",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that whitespace only lines inside of lists are properly trimmed",
+    "before": "Some text\n \n- List item 1\n \n1. List item 2\n \n> Blockquote\n ",
+    "after": "Some text\n\n- List item 1\n\n1. List item 2\n\n> Blockquote\n",
+    "source": "test"
+  },
+  {
+    "name": "Whitespace only lines are emptied instead of being replaced with a literal \"$1\" when two space line break is enabled",
+    "before": "Some text\n \nMore text\n   \nEven more text\n\t\nThe end",
+    "after": "Some text\n\nMore text\n\nEven more text\n\nThe end",
+    "options": {
+      "twoSpaceLineBreak": true
+    },
+    "source": "test"
+  },
+  {
+    "name": "A whitespace only line of exactly two spaces is still preserved when two space line break is enabled",
+    "before": "Some text\n  \nMore text",
+    "after": "Some text\n  \nMore text",
+    "options": {
+      "twoSpaceLineBreak": true
+    },
+    "source": "test"
+  }
+]

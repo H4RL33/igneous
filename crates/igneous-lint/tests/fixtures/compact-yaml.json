@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Remove blank lines at the start and end of the YAML",
+    "before": "---\n\ndate: today\n\ntitle: unchanged without inner new lines turned on\n\n---",
+    "after": "---\ndate: today\n\ntitle: unchanged without inner new lines turned on\n---",
+    "source": "example"
+  },
+  {
+    "name": "Remove blank lines anywhere in YAML with inner new lines set to true",
+    "before": "---\n\ndate: today\n\n\ntitle: remove inner new lines\n\n---\n\n# Header 1\n\n\nBody content here.",
+    "after": "---\ndate: today\ntitle: remove inner new lines\n---\n\n# Header 1\n\n\nBody content here.",
+    "options": {
+      "innerNewLines": true
+    },
+    "source": "example"
+  },
+  {
+    "name": "Compact YAML should ignore blank lines inside scalar blocks",
+    "before": "---\noverview: |-\n  This is the System area. It holds the system's own infrastructure and governance.\n\n  This vault holds only the System area at present.\nkey:\n  - Value\n  - Value2\n---",
+    "after": "---\noverview: |-\n  This is the System area. It holds the system's own infrastructure and governance.\n\n  This vault holds only the System area at present.\nkey:\n  - Value\n  - Value2\n---",
+    "options": {
+      "innerNewLines": true
+    },
+    "source": "test"
+  }
+]

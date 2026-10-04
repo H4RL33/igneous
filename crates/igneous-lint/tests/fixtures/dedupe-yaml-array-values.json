@@ -1,0 +1,53 @@
+[
+  {
+    "name": "Dedupe YAML tags is case sensitive and will use your default format for tags.",
+    "before": "---\ntags: [computer, research, computer, Computer]\naliases:\n  - Title 1\n  - Title2\n---",
+    "after": "---\ntags: [computer, research, Computer]\naliases:\n  - Title 1\n  - Title2\n---",
+    "options": {
+      "aliasArrayStyle": "multi-line"
+    },
+    "source": "example"
+  },
+  {
+    "name": "Dedupe YAML aliases is case sensitive and will use your default format for aliases.",
+    "before": "---\ntags: [computer, research]\naliases:\n  - Title 1\n  - Title2\n  - Title 1\n  - Title2\n  - Title 3\n---",
+    "after": "---\ntags: [computer, research]\naliases:\n  - Title 1\n  - Title2\n  - Title 3\n---",
+    "options": {
+      "aliasArrayStyle": "multi-line"
+    },
+    "source": "example"
+  },
+  {
+    "name": "Dedupe YAML array keys is case sensitive and will try to preserve the original array format.",
+    "before": "---\ntags: [computer, research]\naliases:\n  - Title 1\n  - Title2\narr1: [val, val1, val, val2, Val]\narr2:\n  - Val\n  - Val\n  - val\n  - val2\n  - Val2\n---",
+    "after": "---\ntags: [computer, research]\naliases:\n  - Title 1\n  - Title2\narr1: [val, val1, val2, Val]\narr2:\n  - Val\n  - val\n  - val2\n  - Val2\n---",
+    "options": {
+      "aliasArrayStyle": "multi-line"
+    },
+    "source": "example"
+  },
+  {
+    "name": "Dedupe YAML respects list of keys to not remove duplicates of for normal arrays (keys to ignore is just `arr2` for this example)",
+    "before": "---\ntags: [computer, research]\naliases:\n  - Title 1\n  - Title2\narr1: [val, val1, val, val2, Val]\narr2:\n  - Val\n  - Val\n  - val\n  - val2\n  - Val2\n---",
+    "after": "---\ntags: [computer, research]\naliases:\n  - Title 1\n  - Title2\narr1: [val, val1, val2, Val]\narr2:\n  - Val\n  - Val\n  - val\n  - val2\n  - Val2\n---",
+    "options": {
+      "aliasArrayStyle": "multi-line",
+      "ignoreDedupeArrayKeys": [
+        "arr2"
+      ]
+    },
+    "source": "example"
+  },
+  {
+    "name": "Deduping escaped YAML array keys should not throw an error",
+    "before": "---\n\"key1\": \n  - value\n'key2': \n  - value\n---",
+    "after": "---\n\"key1\":\n  - value\n'key2':\n  - value\n---",
+    "source": "test"
+  },
+  {
+    "name": "Deduping YAML arrays should properly handle escaped values being the same and prefer the first of all values that are found to be the same",
+    "before": "---\nkey: [a, \"a\", 'a']\nkey2: [\"blob,bob, sally\", 'blob,bob, sally']\n---",
+    "after": "---\nkey: [a]\nkey2: [\"blob,bob, sally\"]\n---",
+    "source": "test"
+  }
+]

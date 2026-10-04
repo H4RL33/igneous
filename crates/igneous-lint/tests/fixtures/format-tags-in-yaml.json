@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Format tags in YAML frontmatter",
+    "before": "---\ntags: #one #two #three #nested/four/five\n---",
+    "after": "---\ntags: one two three nested/four/five\n---",
+    "source": "example"
+  },
+  {
+    "name": "Format tags in array",
+    "before": "---\ntags: [#one #two #three]\n---",
+    "after": "---\ntags: [one two three]\n---",
+    "source": "example"
+  },
+  {
+    "name": "Format tags in array with `tag` as the tags key",
+    "before": "---\ntag: [#one #two #three]\n---",
+    "after": "---\ntag: [one two three]\n---",
+    "source": "example"
+  },
+  {
+    "name": "Format tags in list",
+    "before": "---\ntags:\n- #tag1\n- #tag2\n---",
+    "after": "---\ntags:\n- tag1\n- tag2\n---",
+    "source": "example"
+  },
+  {
+    "name": "Make sure that when a tags array is empty and the next line has a hashtag it is not affected",
+    "before": "---\ncreated: 2024-08-29T19:28:47+02:00\nupdated: 2024-08-29T19:48:06+02:00\ntitle: Share note Test\naliases: \ntags: []\nshare_link: https://share.note.sx/r0w1vdtw#goaVfYU2NExAphdG8oHzVUZ2h8E22JDbJHC5BBEsZPo\nshare_updated: 2024-08-29T19:37:28+02:00\n---",
+    "after": "---\ncreated: 2024-08-29T19:28:47+02:00\nupdated: 2024-08-29T19:48:06+02:00\ntitle: Share note Test\naliases: \ntags: []\nshare_link: https://share.note.sx/r0w1vdtw#goaVfYU2NExAphdG8oHzVUZ2h8E22JDbJHC5BBEsZPo\nshare_updated: 2024-08-29T19:37:28+02:00\n---",
+    "source": "test"
+  }
+]

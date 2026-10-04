@@ -1,0 +1,38 @@
+[
+  {
+    "name": "A file with just YAML in it does not get a blank line after the YAML",
+    "before": "---\nkey: value\n---",
+    "after": "---\nkey: value\n---",
+    "source": "example"
+  },
+  {
+    "name": "A file with YAML followed directly by content has an empty line added",
+    "before": "---\nkey: value\n---\nHere is some text",
+    "after": "---\nkey: value\n---\n\nHere is some text",
+    "source": "example"
+  },
+  {
+    "name": "A file with YAML that already has a blank line after it and before content has no empty line added",
+    "before": "---\nkey: value\n---\n\nHere is some text",
+    "after": "---\nkey: value\n---\n\nHere is some text",
+    "source": "example"
+  },
+  {
+    "name": "Make sure that no YAML means no change to the text",
+    "before": "Here is some text.",
+    "after": "Here is some text.",
+    "source": "test"
+  },
+  {
+    "name": "If there are multiple blank lines after a YAML block, they are left alone",
+    "before": "---\nkey: value\n---\n\n\nContent here.",
+    "after": "---\nkey: value\n---\n\n\nContent here.",
+    "source": "test"
+  },
+  {
+    "name": "If there are multiple blank lines after a YAML block and they end the file content, they should be left alone",
+    "before": "---\nkey: value\n---\n\n",
+    "after": "---\nkey: value\n---\n\n",
+    "source": "test"
+  }
+]

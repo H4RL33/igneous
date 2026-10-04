@@ -1,0 +1,80 @@
+[
+  {
+    "name": "Moving math block indicator to its own line when `Number of dollar signs to indicate a math block` = 2",
+    "before": "This is left alone:\n$$\n\\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}\n$$\nThe following is updated:\n$$L = \\frac{1}{2} \\rho v^2 S C_L$$",
+    "after": "This is left alone:\n$$\n\\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}\n$$\nThe following is updated:\n$$\nL = \\frac{1}{2} \\rho v^2 S C_L\n$$",
+    "source": "example"
+  },
+  {
+    "name": "Moving math block indicator to its own line when `Number of dollar signs to indicate a math block` = 3 and opening indicator is on the same line as the start of the content",
+    "before": "$$$\\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}\n$$$",
+    "after": "$$$\n\\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}\n$$$",
+    "source": "example"
+  },
+  {
+    "name": "Moving math block indicator to its own line when `Number of dollar signs to indicate a math block` = 2 and ending indicator is on the same line as the ending line of the content",
+    "before": "$$\n\\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}$$",
+    "after": "$$\n\\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}\n$$",
+    "source": "example"
+  },
+  {
+    "name": "Moving math block indicator to its own line when `Number of Dollar Signs to Indicate a Math Block` = 2 and ending indicator is on the same line as the ending line of the content and there is content on the next line",
+    "before": "$$\n\\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}$$\ntext here",
+    "after": "$$\n\\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}\n$$\ntext here",
+    "source": "test"
+  },
+  {
+    "name": "Moving math block indicator to its own line when in a blockquote moves the content to lines with a blockquote indicator at their start for inline math",
+    "before": "> $$math$$",
+    "after": "> $$\n> math\n> $$",
+    "source": "test"
+  },
+  {
+    "name": "Moving math block indicator to its own line when in a blockquote moves the content to lines with a blockquote indicator at their start for math block",
+    "before": "> $$\n> \\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}$$\ntext here",
+    "after": "> $$\n> \\boldsymbol{a}=\\begin{bmatrix}a_x \\\\ a_y\\end{bmatrix}\n> $$\ntext here",
+    "source": "test"
+  },
+  {
+    "name": "Math block in blockquote/callout should not get an empty blockquote line added",
+    "before": "> [!note]\n> $$\n> \\frac{1}{2}\n> $$",
+    "after": "> [!note]\n> $$\n> \\frac{1}{2}\n> $$",
+    "source": "test"
+  },
+  {
+    "name": "Math indicators greater than or equal to the the starting indicator lead to a splitting of the math block if the number of qualifying math blocks is greater than 3",
+    "before": "$$a$$\n\n$$\nb$$\n\n$$c\n$$",
+    "after": "$$\na\n$$\n\n$$\nb\n$$\n\n$$\nc\n$$",
+    "source": "test"
+  },
+  {
+    "name": "Math indicators that are malformed with content between them should be properly formatted without messing up the content of the other math blocks",
+    "before": "$$\n\\sqrt{(x_1-x_2)^2+(y_1-y_2)^2+cdots+(n_1-n_2)^2}$$\n- here is some text\n$$\n\\begin{aligned}\n\\frac{n*(n+1)}{2}=\\frac{1000*1001}{2}=500500\n\\end{aligned}\n$$\ntext",
+    "after": "$$\n\\sqrt{(x_1-x_2)^2+(y_1-y_2)^2+cdots+(n_1-n_2)^2}\n$$\n- here is some text\n$$\n\\begin{aligned}\n\\frac{n*(n+1)}{2}=\\frac{1000*1001}{2}=500500\n\\end{aligned}\n$$\ntext",
+    "source": "test"
+  },
+  {
+    "name": "Math indicators with content before them should not have that content duplicated unless it is a blockquote",
+    "before": "a $$b$$",
+    "after": "a\n$$\nb\n$$",
+    "source": "test"
+  },
+  {
+    "name": "Math indicators with content before them should have the opening indicator moved to a new line and have any tabs and spaces that were between the content and the opening indicators removed.",
+    "before": "a \t    $$b$$",
+    "after": "a\n$$\nb\n$$",
+    "source": "test"
+  },
+  {
+    "name": "Math indicators in a blockquote/callout with content before them should have the opening indicator moved to a new line and have any tabs and spaces that were between the content and the opening indicators removed.",
+    "before": "> a \t    $$b$$",
+    "after": "> a\n> $$\n> b\n> $$",
+    "source": "test"
+  },
+  {
+    "name": "Math indicators in indented blockquotes should not have unnecessary blank lines added",
+    "before": " > [!important]\n >\n > $$\n > f(x)\n > $$\n\n  > $$f(x)$$",
+    "after": " > [!important]\n >\n > $$\n > f(x)\n > $$\n\n  > $$\n  > f(x)\n  > $$",
+    "source": "test"
+  }
+]

@@ -28,7 +28,13 @@ tempfile.workspace = true
 
 [workspace]
 resolver = "3"
-members = ["crates/igneous-core", "crates/igneous-editor", "crates/igneous-markdown", "spikes/live-preview"]
+members = [
+    "crates/igneous-core",
+    "crates/igneous-editor",
+    "crates/igneous-lint",
+    "crates/igneous-markdown",
+    "spikes/live-preview",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -40,6 +46,7 @@ authors = ["Harley Welsh <git@harleywelsh.com>"]
 [workspace.dependencies]
 igneous-core = { path = "crates/igneous-core" }
 igneous-editor = { path = "crates/igneous-editor" }
+igneous-lint = { path = "crates/igneous-lint" }
 igneous-markdown = { path = "crates/igneous-markdown" }
 
 anyhow = "1"
@@ -55,6 +62,7 @@ regex = "1"
 saphyr = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+similar = "2.7"
 smallvec = { version = "1", features = ["union", "const_generics"] }
 tempfile = "3"
 thiserror = "2"

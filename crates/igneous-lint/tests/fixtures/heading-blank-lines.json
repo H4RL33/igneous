@@ -1,0 +1,140 @@
+[
+  {
+    "name": "Headings should be surrounded by blank lines",
+    "before": "# H1\n## H2\n\n\n# H1\nline\n## H2\n",
+    "after": "# H1\n\n## H2\n\n# H1\n\nline\n\n## H2",
+    "source": "example"
+  },
+  {
+    "name": "With `Bottom=false`",
+    "before": "# H1\nline\n## H2\n# H1\nline",
+    "after": "# H1\nline\n\n## H2\n# H1\nline",
+    "options": {
+      "bottom": false,
+      "emptyLineAfterYaml": true
+    },
+    "source": "example"
+  },
+  {
+    "name": "Empty line before header and after YAML is removed with `Empty line between YAML and header=false`",
+    "before": "---\nkey: value\n---\n\n# Header\nParagraph here...",
+    "after": "---\nkey: value\n---\n# Header\n\nParagraph here...",
+    "options": {
+      "bottom": true,
+      "emptyLineAfterYaml": false
+    },
+    "source": "example"
+  },
+  {
+    "name": "Leaves heading spacing inside fenced code alone",
+    "before": "```\n# inside\ntext\n```",
+    "after": "```\n# inside\ntext\n```",
+    "source": "test"
+  },
+  {
+    "name": "Leaves heading spacing inside disabled sections alone",
+    "before": "<!-- linter-disable -->\n# inside\ntext\n<!-- linter-enable -->",
+    "after": "<!-- linter-disable -->\n# inside\ntext\n<!-- linter-enable -->",
+    "source": "test"
+  },
+  {
+    "name": "Preserves heading adjacency across a multiline disabled section",
+    "before": "# <!-- linter-disable -->\n<!-- linter-enable -->\n# h",
+    "after": "# <!-- linter-disable -->\n<!-- linter-enable -->\n# h",
+    "options": {
+      "bottom": false,
+      "emptyLineAfterYaml": true
+    },
+    "source": "test"
+  },
+  {
+    "name": "Maps blank lines around a heading containing a multiline disabled section",
+    "before": "text\n# <!-- linter-disable -->\n<!-- linter-enable -->\n# h\ntext",
+    "after": "text\n\n# <!-- linter-disable -->\n<!-- linter-enable -->\n\n# h\n\ntext",
+    "source": "test"
+  },
+  {
+    "name": "Maps YAML spacing and adjacent heading edits without overlapping",
+    "before": "---\nkey: value\n---\n\n\n# first\n# second\n```\n# inside\n```\n# last\n\n",
+    "after": "---\nkey: value\n---\n# first\n\n# second\n\n```\n# inside\n```\n\n# last",
+    "options": {
+      "bottom": true,
+      "emptyLineAfterYaml": false
+    },
+    "source": "test"
+  },
+  {
+    "name": "Ignores codeblocks",
+    "before": "---\nfront matter\n---\n\n# H1\n```\n# comment not header\n$$\na = b\n$$\n```",
+    "after": "---\nfront matter\n---\n\n# H1\n\n```\n# comment not header\n$$\na = b\n$$\n```",
+    "source": "test"
+  },
+  {
+    "name": "Ignores # not in headings",
+    "before": "Not a header # .\nLine\n```\n# comment not header\na = b\n```\n~~~\n# comment not header\n~~~\n  # tabbed not header\n    # space not header",
+    "after": "Not a header # .\nLine\n```\n# comment not header\na = b\n```\n~~~\n# comment not header\n~~~\n  # tabbed not header\n    # space not header",
+    "source": "test"
+  },
+  {
+    "name": "Works normally",
+    "before": "# H1\n## H2\nLine\n### H3",
+    "after": "# H1\n\n## H2\n\nLine\n\n### H3",
+    "source": "test"
+  },
+  {
+    "name": "Make sure a tag after a header still only has 1 blank line when bottom is set to true",
+    "before": "## diary\n\n#study\nblah blah blah\n\n#life\nblah blah blah",
+    "after": "## diary\n\n#study\nblah blah blah\n\n#life\nblah blah blah",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that blank lines after a heading are left alone when `bottom = false`",
+    "before": "## diary\n\n\nContent here\n## entry 2\nblah blah blah",
+    "after": "## diary\n\n\nContent here\n\n## entry 2\nblah blah blah",
+    "options": {
+      "bottom": false,
+      "emptyLineAfterYaml": false
+    },
+    "source": "test"
+  },
+  {
+    "name": "Make sure that blank lines are not added when there is no content between 2 headings when `bottom = false`",
+    "before": "# Heading 1\n## Heading 2",
+    "after": "# Heading 1\n## Heading 2",
+    "options": {
+      "bottom": false,
+      "emptyLineAfterYaml": false
+    },
+    "source": "test"
+  },
+  {
+    "name": "Make sure that blank lines are not changed when there is no content between 2 headings when `bottom = false`",
+    "before": "# Heading 1\n\n\n## Heading 2",
+    "after": "# Heading 1\n\n\n## Heading 2",
+    "options": {
+      "bottom": false,
+      "emptyLineAfterYaml": false
+    },
+    "source": "test"
+  },
+  {
+    "name": "Make sure that blank lines are not added when there is already a blank line between headings `bottom = false`",
+    "before": "## foobar\n### Hello World\n\n### Hello two",
+    "after": "## foobar\n### Hello World\n\n### Hello two",
+    "options": {
+      "bottom": false,
+      "emptyLineAfterYaml": false
+    },
+    "source": "test"
+  },
+  {
+    "name": "Make sure that headings proceeded by a line with a hashtag get a blank line added when `Bottom=false`.",
+    "before": "# Heading 1\nLorem ipsum.\n\n## Heading 2\nWoah, cool text here. #reallycool\n## Heading 3",
+    "after": "# Heading 1\nLorem ipsum.\n\n## Heading 2\nWoah, cool text here. #reallycool\n\n## Heading 3",
+    "options": {
+      "bottom": false,
+      "emptyLineAfterYaml": false
+    },
+    "source": "test"
+  }
+]

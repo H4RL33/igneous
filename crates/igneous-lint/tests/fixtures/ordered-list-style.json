@@ -1,0 +1,135 @@
+[
+  {
+    "name": "Ordered lists have list items set to ascending numerical order when Number style is `ascending`.",
+    "before": "1. Item 1\n2. Item 2\n4. Item 3\n\nSome text here\n\n1. Item 1\n1. Item 2\n1. Item 3",
+    "after": "1. Item 1\n2. Item 2\n3. Item 3\n\nSome text here\n\n1. Item 1\n2. Item 2\n3. Item 3",
+    "source": "example"
+  },
+  {
+    "name": "Nested ordered lists have list items set to ascending numerical order when Number style is `ascending`.",
+    "before": "1. Item 1\n2. Item 2\n  1. Subitem 1\n  5. Subitem 2\n  2. Subitem 3\n4. Item 3",
+    "after": "1. Item 1\n2. Item 2\n  1. Subitem 1\n  2. Subitem 2\n  3. Subitem 3\n3. Item 3",
+    "source": "example"
+  },
+  {
+    "name": "Ordered list in blockquote has list items set to '1.' when Number style is `lazy`.",
+    "before": "> 1. Item 1\n> 4. Item 2\n> > 1. Subitem 1\n> > 5. Subitem 2\n> > 2. Subitem 3",
+    "after": "> 1. Item 1\n> 1. Item 2\n> > 1. Subitem 1\n> > 1. Subitem 2\n> > 1. Subitem 3",
+    "options": {
+      "numberStyle": "lazy"
+    },
+    "source": "example"
+  },
+  {
+    "name": "Ordered list in blockquote has list items set to ascending numerical order when Number style is `ascending`.",
+    "before": "> 1. Item 1\n> 4. Item 2\n> > 1. Subitem 1\n> > 5. Subitem 2\n> > 2. Subitem 3",
+    "after": "> 1. Item 1\n> 2. Item 2\n> > 1. Subitem 1\n> > 2. Subitem 2\n> > 3. Subitem 3",
+    "source": "example"
+  },
+  {
+    "name": "Nested ordered list has list items set to '1)' when Number style is `lazy` and Ordered list indicator end style is `)`.",
+    "before": "1. Item 1\n2. Item 2\n  1. Subitem 1\n  5. Subitem 2\n  2. Subitem 3\n4. Item 3",
+    "after": "1) Item 1\n1) Item 2\n  1) Subitem 1\n  1) Subitem 2\n  1) Subitem 3\n1) Item 3",
+    "options": {
+      "listEndStyle": ")",
+      "numberStyle": "lazy"
+    },
+    "source": "example"
+  },
+  {
+    "name": "Ordered lists have list items set to ascending numerical order using initial indicator number when Number style is `ascending` and `preserveStart` is enabled",
+    "before": "1. Item 1\n2. Item 2\n4. Item 3\n\nSome text here\n\n4. Item 4\n5. Item 5\n7. Item 6",
+    "after": "1. Item 1\n2. Item 2\n3. Item 3\n\nSome text here\n\n4. Item 4\n5. Item 5\n6. Item 6",
+    "options": {
+      "numberStyle": "ascending",
+      "preserveStart": true
+    },
+    "source": "example"
+  },
+  {
+    "name": "Nested ordered lists have list items set to ascending numerical order using initial indicator number when Number style is `ascending` and `preserveStart` is enabled",
+    "before": "4. Item 4\n2. Item 5\n  2. Subitem 2\n  5. Subitem 3\n  2. Subitem 4\n4. Item 6",
+    "after": "4. Item 4\n5. Item 5\n  2. Subitem 2\n  3. Subitem 3\n  4. Subitem 4\n6. Item 6",
+    "options": {
+      "preserveStart": true
+    },
+    "source": "example"
+  },
+  {
+    "name": "Ordered lists have list items set to initial indicator number when Number style is `lazy` and `preserveStart` is enabled",
+    "before": "2. Item 2\n5. Item 3\n4. Item 4",
+    "after": "2. Item 2\n2. Item 3\n2. Item 4",
+    "options": {
+      "numberStyle": "lazy",
+      "preserveStart": true
+    },
+    "source": "example"
+  },
+  {
+    "name": "Nested ordered lists have list items set to initial indicator number when Number style is `lazy` and `preserveStart` is enabled",
+    "before": "4. Item 4\n2. Item 5\n  2. Subitem 2\n  5. Subitem 3\n  2. Subitem 4\n4. Item 6",
+    "after": "4. Item 4\n4. Item 5\n  2. Subitem 2\n  2. Subitem 3\n  2. Subitem 4\n4. Item 6",
+    "options": {
+      "numberStyle": "lazy",
+      "preserveStart": true
+    },
+    "source": "example"
+  },
+  {
+    "name": "Ordered lists items are not modified when Number style is `preserve`",
+    "before": "4. Item 4\n2. Item 5\n  2. Subitem 2\n  5. Subitem 3\n  2. Subitem 4\n4. Item 6",
+    "after": "4. Item 4\n2. Item 5\n  2. Subitem 2\n  5. Subitem 3\n  2. Subitem 4\n4. Item 6",
+    "options": {
+      "numberStyle": "preserve"
+    },
+    "source": "example"
+  },
+  {
+    "name": "Make sure more advanced nesting correctly updates ordered list items",
+    "before": "1. Element 1\n  1. Sub element 1\n  2. Sub element 2\n    1. [ ] Other element 1\n      1. [ ] Yet another element 1\n    3. [ ] XXX\n2. Element 2\n  1. Another sub list\n  2. other text\n    1. XXX\n      1. XXX\n    1. XXX\n    1. XXX\n    1. more text\n  1. yet\n  2. again\n    1. maybe\n      1. yesterday\n    1. today\n    1. tomorrow\n3. What about now?\n  1. Do you see me?\n  2. No?\n    1. Maybe\n      1. What if I do?\n    1. XXX\n    1. XXX\n    2. I believe I can fly",
+    "after": "1. Element 1\n  1. Sub element 1\n  2. Sub element 2\n    1. [ ] Other element 1\n      1. [ ] Yet another element 1\n    2. [ ] XXX\n2. Element 2\n  1. Another sub list\n  2. other text\n    1. XXX\n      1. XXX\n    2. XXX\n    3. XXX\n    4. more text\n  3. yet\n  4. again\n    1. maybe\n      1. yesterday\n    2. today\n    3. tomorrow\n3. What about now?\n  1. Do you see me?\n  2. No?\n    1. Maybe\n      1. What if I do?\n    2. XXX\n    3. XXX\n    4. I believe I can fly",
+    "source": "test"
+  },
+  {
+    "name": "Make sure more advanced nesting correctly updates ordered list items with Chinese characters",
+    "before": "1. 项目 A\n  1. 类别一\n  2. 类别二\n    1. [ ] XXX\n      1. [ ] XXX\n    3. [ ] XXX\n2. 项目 B\n    1. 类别一\n    2. 类别二\n      1. XXX\n        1. XXX\n      1. XXX\n      1. XXX\n  1. 发几封积分积分\n    1. 类别一\n    2. 类别二\n      1. XXX\n        1. XXX\n      1. XXX\n      1. XXX\n3. 发几封积分积分3. 项目 B\n    1. 类别一\n    2. 类别二\n      1. XXX\n        1. XXX\n      1. XXX\n      1. XXX\n  2. 发几封积分积分",
+    "after": "1. 项目 A\n  1. 类别一\n  2. 类别二\n    1. [ ] XXX\n      1. [ ] XXX\n    2. [ ] XXX\n2. 项目 B\n    1. 类别一\n    2. 类别二\n      1. XXX\n        1. XXX\n      2. XXX\n      3. XXX\n  1. 发几封积分积分\n    1. 类别一\n    2. 类别二\n      1. XXX\n        1. XXX\n      2. XXX\n      3. XXX\n3. 发几封积分积分3. 项目 B\n    1. 类别一\n    2. 类别二\n      1. XXX\n        1. XXX\n      2. XXX\n      3. XXX\n  1. 发几封积分积分",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that tabs in lists with sublists still works correctly",
+    "before": "1. Entry 1\n\t1. Sub 1\n\t\t\t1. Sub2 1\n\t1. Sub 2\n1. Entry 2\n  1. Sub3 1\n\t1. Sub3 2\n1. Entry 3",
+    "after": "1. Entry 1\n\t1. Sub 1\n\t\t\t1. Sub2 1\n\t2. Sub 2\n2. Entry 2\n  1. Sub3 1\n\t2. Sub3 2\n3. Entry 3",
+    "source": "test"
+  },
+  {
+    "name": "Make sure indentation levels are calculated correctly for blockquotes",
+    "before": "> 1. Entry 1\n>  1. Entry 2\n>   1. Sub1 1",
+    "after": "> 1. Entry 1\n>  2. Entry 2\n>   1. Sub1 1",
+    "source": "test"
+  },
+  {
+    "name": "Ordered list item levels should be reset when a non-ordered item is encountered",
+    "before": "- a\n  1. b\n  1. b\n- c\n- c\n  1. d\n  1. d",
+    "after": "- a\n  1. b\n  2. b\n- c\n- c\n  1. d\n  2. d",
+    "source": "test"
+  },
+  {
+    "name": "Parenthesis-terminated indicators keep their numbers when preserve start is enabled",
+    "before": "1) Item 1\n1) Item 2\n1) Item 3",
+    "after": "1. Item 1\n2. Item 2\n3. Item 3",
+    "options": {
+      "preserveStart": true
+    },
+    "source": "test"
+  },
+  {
+    "name": "Parenthesis-terminated indicators keep their numbers when number style is preserve",
+    "before": "3) Item 3\n4) Item 4",
+    "after": "3. Item 3\n4. Item 4",
+    "options": {
+      "numberStyle": "preserve"
+    },
+    "source": "test"
+  }
+]

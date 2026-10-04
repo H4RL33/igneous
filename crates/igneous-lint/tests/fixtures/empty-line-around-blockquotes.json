@@ -1,0 +1,104 @@
+[
+  {
+    "name": "Blockquotes that start a document do not get an empty line before them.",
+    "before": "> Quote content here\n> quote content continued\n# Title here",
+    "after": "> Quote content here\n> quote content continued\n\n# Title here",
+    "source": "example"
+  },
+  {
+    "name": "Blockquotes that end a document do not get an empty line after them.",
+    "before": "# Heading 1\n> Quote content here\n> quote content continued",
+    "after": "# Heading 1\n\n> Quote content here\n> quote content continued",
+    "source": "example"
+  },
+  {
+    "name": "Blockquotes that are nested have the proper empty line added",
+    "before": "# Make sure that nested blockquotes are accounted for correctly\n> Quote content here\n> quote content continued\n> > Nested Blockquote\n> > content continued\n\n**Note that the empty line is either one less blockquote indicator if followed/proceeded by more blockquote content or it is an empty line**\n\n# Doubly nested code block\n\n> > Quote content here\n> > quote content continued",
+    "after": "# Make sure that nested blockquotes are accounted for correctly\n\n> Quote content here\n> quote content continued\n>\n> > Nested Blockquote\n> > content continued\n\n**Note that the empty line is either one less blockquote indicator if followed/proceeded by more blockquote content or it is an empty line**\n\n# Doubly nested code block\n\n> > Quote content here\n> > quote content continued",
+    "source": "example"
+  },
+  {
+    "name": "Make sure that consecutive blockquotes are not merged when a blank line is between them",
+    "before": "> [!quote] Title 1\n> The quote 1\n\n> [!quote] Title 2\n> The quote 2",
+    "after": "> [!quote] Title 1\n> The quote 1\n\n> [!quote] Title 2\n> The quote 2",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that consecutive blockquotes are not merged when multiple blank lines are between them",
+    "before": "> [!quote] title 1\n> the quote 1\n\n\n> [!quote] title 2\n> the quote 2",
+    "after": "> [!quote] title 1\n> the quote 1\n\n> [!quote] title 2\n> the quote 2",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that consecutive blockquotes are not merged when a blank line is between them",
+    "before": "> [!quote] Title 1\n> The quote 1\n\n> [!quote] Title 2\n> The quote 2\n\n> [!quote] Title 3\n> The quote 3",
+    "after": "> [!quote] Title 1\n> The quote 1\n\n> [!quote] Title 2\n> The quote 2\n\n> [!quote] Title 3\n> The quote 3",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that consecutive blockquotes are not merged when multiple blank lines are between them",
+    "before": "> [!quote] Title 1\n> The quote 1\n\n\n> [!quote] Title 2\n> The quote 2\n\n\n\n\n> [!quote] Title 3\n> The quote 3",
+    "after": "> [!quote] Title 1\n> The quote 1\n\n> [!quote] Title 2\n> The quote 2\n\n> [!quote] Title 3\n> The quote 3",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that consecutive blockquotes do not get merged when the first one ends with an empty blockquote line",
+    "before": "> [!FAQ] Title\n>\n\n> [!NOTES] Title\n> Content",
+    "after": "> [!FAQ] Title\n>\n\n> [!NOTES] Title\n> Content",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that consecutive blockquotes do not get merged when the second one starts with an empty blockquote line",
+    "before": "> [!FAQ] Title\n> Content here\n\n>\n> [!NOTES] Title\n> Content",
+    "after": "> [!FAQ] Title\n> Content here\n\n> [!NOTES] Title\n> Content",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that a nested set of callouts are not merged when only a blank lines is between them with no content",
+    "before": "> [!multi-column]\n>\n>> [!note]+ Use Case\n>> Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n>> ##### User Case Background\n>> Vitae nunc sed velit dignissim sodales. In cursus turpis massa tincidunt dui ut ornare lectus.\n>\n>> [!warning]+ Resources\n>> #### Requirement\n>> - Lorem ipsum dolor sit amet\n>> - Vitae nunc sed velit dignissim sodales.\n>> - In cursus turpis massa tincidunt dui ut ornare lectus.\n>\n>> [!todo]+\n>> - [x] Define Use Case\n>> - [ ] Craft User Story\n>> - [ ] Develop draft sketches",
+    "after": "> [!multi-column]\n>\n>> [!note]+ Use Case\n>> Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n>> ##### User Case Background\n>> Vitae nunc sed velit dignissim sodales. In cursus turpis massa tincidunt dui ut ornare lectus.\n>\n>> [!warning]+ Resources\n>> #### Requirement\n>> - Lorem ipsum dolor sit amet\n>> - Vitae nunc sed velit dignissim sodales.\n>> - In cursus turpis massa tincidunt dui ut ornare lectus.\n>\n>> [!todo]+\n>> - [x] Define Use Case\n>> - [ ] Craft User Story\n>> - [ ] Develop draft sketches",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that the end of a blockqoute is properly identified when there is a blank line right after a blockqoute",
+    "before": "---\ndate created: 29-10-2023 04:16 PM\ndate modified: 12-11-2023 04:11 PM\n---\n\n> 1\n>\n> > 2\n> >\n> > > 3\n\n> 4\n",
+    "after": "---\ndate created: 29-10-2023 04:16 PM\ndate modified: 12-11-2023 04:11 PM\n---\n\n> 1\n>\n> > 2\n> >\n> > > 3\n\n> 4\n",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that a blockquote 1 level lower than the next one ends in an empty line that it is on its level",
+    "before": "> 1\n>> 2\n>\n>>> 3\n\n> 4",
+    "after": "> 1\n>\n>> 2\n>>\n>>> 3\n\n> 4",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that a blockquote that starts with an empty blockquote line gets the proper blockquote empty line set",
+    "before": "> 1\n>> 2\n>>>\n>>> 3\n\n> 4",
+    "after": "> 1\n>\n>> 2\n>>\n>>> 3\n\n> 4",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that a blockquote that ends in a blank blockquote line gets the proper blockquote empty line set",
+    "before": "> 1\n>> 2\n>>\n>>> 3\n>>>\n>> 2\n\n> 4",
+    "after": "> 1\n>\n>> 2\n>>\n>>> 3\n>>>\n>> 2\n\n> 4",
+    "source": "test"
+  },
+  {
+    "name": "Make sure a nested callout is properly handled with a blank line being added before and after it",
+    "before": "> [!quote]\n> Text\n> > [!quote]\n> > Text\n> Text",
+    "after": "> [!quote]\n> Text\n>\n> > [!quote]\n> > Text\n> Text",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that empty lines around blockquotes handles an empty line prior to the blockqoute that is nested one blockquote level more than the blockquote is",
+    "before": "> AAA\n>\n> > **BBB:**\n> >\n> > - CCC\n> > \n> | D | E |\n> |:---:|:--- |\n> | F | G |",
+    "after": "> AAA\n>\n> > **BBB:**\n> >\n> > - CCC\n> >\n> | D | E |\n> |:---:|:--- |\n> | F | G |",
+    "source": "test"
+  },
+  {
+    "name": "Make sure that empty lines around blockqoutes handles an empty line after the table that is nested one blockquote level more than the blockquote is",
+    "before": "> AAA\n>\n> | D | E |\n> |:---:|:--- |\n> | F | G |\n> > **BBB:**\n> >\n> > - CCC",
+    "after": "> AAA\n>\n> | D | E |\n> |:---:|:--- |\n> | F | G |\n>\n> > **BBB:**\n> >\n> > - CCC",
+    "source": "test"
+  }
+]
