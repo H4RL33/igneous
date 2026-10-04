@@ -9,7 +9,7 @@ use std::sync::Once;
 
 use gtk::glib;
 
-use crate::theme::{Color, Theme, scheme_xml};
+use crate::theme::{Color, Theme, chrome_scheme_xml, scheme_xml};
 
 fn schemes_dir() -> PathBuf {
     glib::user_cache_dir().join("igneous").join("style-schemes")
@@ -29,6 +29,15 @@ pub fn system_accent() -> Color {
 /// The style scheme for `theme` on a light or dark desktop. Returns `None`
 /// (after logging why) if the scheme can't be written or loaded.
 pub fn style_scheme(theme: &Theme, dark: bool) -> Option<sourceview::StyleScheme> {
+    load(theme, scheme_xml(theme, dark, system_accent()))
+}
+
+/// The scheme Live Preview uses: the editor's colours without syntax styles.
+pub fn live_style_scheme(theme: &Theme, dark: bool) -> Option<sourceview::StyleScheme> {
+    load(theme, chrome_scheme_xml(theme, dark, system_accent()))
+}
+
+fn load(theme: &Theme, (id, xml): (String, String)) -> Option<sourceview::StyleScheme> {
     crate::init();
     static PREPARE: Once = Once::new();
     let dir = schemes_dir();
@@ -41,7 +50,6 @@ pub fn style_scheme(theme: &Theme, dark: bool) -> Option<sourceview::StyleScheme
     });
 
     let manager = sourceview::StyleSchemeManager::default();
-    let (id, xml) = scheme_xml(theme, dark, system_accent());
     if let Some(scheme) = manager.scheme(&id) {
         return Some(scheme);
     }

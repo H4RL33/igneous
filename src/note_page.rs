@@ -18,6 +18,7 @@ use igneous_core::fs::{self, Expect, FileStamp, ReadError, WriteError};
 use igneous_core::{TextFile, VaultPath};
 use igneous_editor::{Mode, NoteView};
 use igneous_git::conflicts::{self, Keep};
+use sourceview::prelude::ViewExt;
 
 use crate::vault::VaultContext;
 
@@ -55,6 +56,10 @@ mod imp {
         #[template_child]
         pub scrolled: TemplateChild<gtk::ScrolledWindow>,
         #[template_child]
+        pub vim_bar: TemplateChild<gtk::Revealer>,
+        #[template_child]
+        pub vim_label: TemplateChild<gtk::Label>,
+        #[template_child]
         pub view: TemplateChild<NoteView>,
         pub buffer: OnceCell<sourceview::Buffer>,
         pub ctx: OnceCell<Rc<VaultContext>>,
@@ -73,6 +78,7 @@ mod imp {
         pub forward: RefCell<Vec<VaultPath>>,
         /// The editing mode to return to when leaving Reading mode.
         pub last_edit_mode: Cell<Mode>,
+        pub show_line_numbers: Cell<bool>,
     }
 
     #[glib::object_subclass]
@@ -154,16 +160,7 @@ impl NotePage {
     pub fn new(ctx: &Rc<VaultContext>) -> Self {
         let page: Self = glib::Object::new();
         page.imp().ctx.set(ctx.clone()).ok().unwrap();
-        let editor = &ctx.settings.editor;
-        page.imp()
-            .view
-            .set_input_options(igneous_editor::InputOptions {
-                smart_lists: editor.smart_lists,
-                indent_with_tabs: editor.indent_with_tabs,
-                tab_size: editor.tab_size,
-                auto_pair_brackets: editor.auto_pair_brackets,
-                auto_pair_markdown: editor.auto_pair_markdown,
-            });
+        page.apply_editor_settings(&ctx.settings.borrow().editor);
         page.imp()
             .view
             .set_host(Rc::new(crate::editor_host::NoteHost {
@@ -171,6 +168,37 @@ impl NotePage {
                 page: page.downgrade(),
             }));
         page
+    }
+
+    /// Applies the vault's editor settings (Preferences → Editor).
+    pub fn apply_editor_settings(&self, editor: &igneous_core::settings::EditorSettings) {
+        let imp = self.imp();
+        let view = imp.view.get();
+        view.set_input_options(igneous_editor::InputOptions {
+            smart_lists: editor.smart_lists,
+            indent_with_tabs: editor.indent_with_tabs,
+            tab_size: editor.tab_size,
+            auto_pair_brackets: editor.auto_pair_brackets,
+            auto_pair_markdown: editor.auto_pair_markdown,
+        });
+        view.set_tab_width(editor.tab_size);
+        view.set_insert_spaces_instead_of_tabs(!editor.indent_with_tabs);
+        view.set_spellcheck(editor.spellcheck);
+        imp.show_line_numbers.set(editor.show_line_numbers);
+        view.set_show_line_numbers(editor.show_line_numbers && self.mode() == Mode::Source);
+        let had_vim = view.vim_context().is_some();
+        view.set_vim_mode(editor.vim_mode);
+        imp.vim_bar.set_reveal_child(editor.vim_mode);
+        if !had_vim && let Some(vim) = view.vim_context() {
+            vim.bind_property("command-bar-text", &*imp.vim_label, "label")
+                .sync_create()
+                .build();
+            vim.connect_write(glib::clone!(
+                #[weak(rename_to = page)]
+                self,
+                move |_, _, _| page.flush()
+            ));
+        }
     }
 
     pub fn view(&self) -> NoteView {
@@ -185,7 +213,9 @@ impl NotePage {
         if mode != Mode::Reading {
             self.imp().last_edit_mode.set(mode);
         }
-        self.imp().view.set_mode(mode);
+        let view = self.imp().view.get();
+        view.set_mode(mode);
+        view.set_show_line_numbers(self.imp().show_line_numbers.get() && mode == Mode::Source);
     }
 
     /// Ctrl+E: between Reading and the last editing mode.
@@ -428,7 +458,9 @@ impl NotePage {
         if let Some(id) = imp.autosave.take() {
             id.remove();
         }
-        let delay = Duration::from_millis(u64::from(self.ctx().settings.editor.autosave_delay_ms));
+        let delay = Duration::from_millis(u64::from(
+            self.ctx().settings.borrow().editor.autosave_delay_ms,
+        ));
         let page = self.downgrade();
         let id = glib::timeout_add_local_once(delay, move || {
             if let Some(page) = page.upgrade() {

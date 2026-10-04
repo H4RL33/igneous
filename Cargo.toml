@@ -70,6 +70,7 @@ glib-build-tools = "0.22"
 globset = "0.4"
 htmd = "0.5"
 jiff = "0.2"
+libspelling = "0.5"
 nucleo-matcher = "0.3"
 notify-debouncer-full = "0.7"
 pulldown-cmark = { version = "0.13", default-features = false }

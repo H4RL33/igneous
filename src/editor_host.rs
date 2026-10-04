@@ -229,7 +229,7 @@ impl NoteHost {
     fn attachment_path(&self, stem: &str, ext: &str) -> Option<VaultPath> {
         use igneous_core::settings::Location;
         let note_folder = self.from().and_then(|p| p.parent());
-        let folder = match &self.ctx.settings.files.attachment_location {
+        let folder = match &self.ctx.settings.borrow().files.attachment_location {
             Location::VaultRoot => None,
             Location::SameFolder => note_folder,
             Location::Folder(f) => VaultPath::new(f).ok(),

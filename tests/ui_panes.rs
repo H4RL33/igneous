@@ -63,3 +63,22 @@ async fn dropped_files_become_attachments() {
     assert_eq!(link.as_deref(), Some("![[Scan 1.pdf]]"));
     window.close();
 }
+
+#[gtk::test]
+async fn editor_settings_apply_to_open_notes() {
+    let dir = vault(None);
+    let window = open(&dir);
+    window.open_path(&p("Home.md"), false);
+    let note = window.selected_note().unwrap();
+    assert!(note.view().vim_context().is_none());
+    {
+        let ctx = window.ctx_for_test();
+        let mut settings = ctx.settings.borrow_mut();
+        settings.editor.vim_mode = true;
+        settings.editor.spellcheck = true;
+    }
+    window.apply_editor_settings();
+    assert!(note.view().vim_context().is_some());
+    wait(200).await;
+    window.close();
+}

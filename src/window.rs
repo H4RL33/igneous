@@ -107,6 +107,8 @@ mod imp {
         pub inspector: OnceCell<Rc<Inspector>>,
         pub inspector_timer: RefCell<Option<glib::SourceId>>,
         pub search: OnceCell<Rc<SearchPane>>,
+        /// appearance.json's readable line length.
+        pub readable: Cell<bool>,
         pub tags: OnceCell<Rc<TagsPane>>,
         pub lint: OnceCell<Rc<crate::lint::LintConfig>>,
     }
@@ -466,7 +468,7 @@ impl Window {
 
         // The index, and the inspector that shows what it knows.
         let index = IndexService::new(&ctx.vault);
-        index.set_overrides(ctx.settings.properties.types.clone());
+        index.set_overrides(ctx.settings.borrow().properties.types.clone());
         let weak = self.downgrade();
         index.connect_changed(move || {
             if let Some(window) = weak.upgrade() {
@@ -669,7 +671,9 @@ impl Window {
                 move |_| window.schedule_problems(&note)
             ));
             note.set_theme(&self.editor_theme(), adw::StyleManager::default().is_dark());
-            note.set_mode(mode_from(self.ctx().settings.editor.default_mode));
+            note.set_mode(mode_from(self.ctx().settings.borrow().editor.default_mode));
+            note.view()
+                .set_readable_line_length(self.readable_line_length());
             if let Err(e) = note.load(path) {
                 self.toast(&format!("Couldn't open “{path}”: {e}"));
                 return;
@@ -934,7 +938,7 @@ impl Window {
         if let Some(folder) = folder {
             return folder;
         }
-        match &self.ctx().settings.files.new_note_location {
+        match &self.ctx().settings.borrow().files.new_note_location {
             Location::VaultRoot => None,
             Location::SameFolder => self.selected_path().and_then(|p| p.parent()),
             Location::Folder(f) => VaultPath::new(f).ok(),
@@ -1085,11 +1089,12 @@ impl Window {
             note.flush();
         }
         // Plan link updates against the index as it is before the move.
-        let plan = (ctx.settings.links.update_on_rename && self.index().is_ready()).then(|| {
-            let (from, to) = (from.clone(), to.clone());
-            self.index()
-                .submit(move |index| igneous_index::refactor::plan_rename(index, &from, &to))
-        });
+        let plan =
+            (ctx.settings.borrow().links.update_on_rename && self.index().is_ready()).then(|| {
+                let (from, to) = (from.clone(), to.clone());
+                self.index()
+                    .submit(move |index| igneous_index::refactor::plan_rename(index, &from, &to))
+            });
         // Renaming that only changes case needs a hop on case-insensitive disks.
         let result = if from.eq_loose(to) && from != to {
             let hop = ctx
@@ -1213,7 +1218,7 @@ impl Window {
     }
 
     pub fn trash(&self, path: VaultPath) {
-        if !self.ctx().settings.files.confirm_delete {
+        if !self.ctx().settings.borrow().files.confirm_delete {
             self.trash_now(&path);
             return;
         }
@@ -1249,7 +1254,7 @@ impl Window {
             }
         }
         let (name, _) = crate::files::display_name(path, abs.is_dir());
-        match ctx.settings.files.trash {
+        match ctx.settings.borrow().files.trash {
             TrashMode::System => match gio::File::for_path(&abs).trash(gio::Cancellable::NONE) {
                 Ok(()) => {
                     self.on_vault_events(vec![VaultEvent::Removed(path.clone())]);
@@ -1383,13 +1388,41 @@ impl Window {
         for (path, error) in &catalog.errors {
             tracing::warn!(path = %path.display(), %error, "skipping a theme");
         }
-        let id = vault_settings::load::<Appearance>(&ctx.vault.igneous_dir())
-            .ok()
+        let appearance = vault_settings::load::<Appearance>(&ctx.vault.igneous_dir()).ok();
+        self.imp()
+            .readable
+            .set(appearance.as_ref().is_none_or(|a| a.readable_line_length));
+        let id = appearance
             .and_then(|a| a.editor_theme)
             .unwrap_or_else(|| gsettings::settings().string("editor-theme").to_string());
         let imp = self.imp();
         imp.themes.replace(catalog);
         imp.theme_id.replace(id);
+    }
+
+    /// The vault context. For tests.
+    #[doc(hidden)]
+    pub fn ctx_for_test(&self) -> Rc<VaultContext> {
+        self.ctx().clone()
+    }
+
+    pub fn readable_line_length(&self) -> bool {
+        self.imp().readable.get()
+    }
+
+    pub fn set_readable_line_length(&self, readable: bool) {
+        self.imp().readable.set(readable);
+        for note in self.notes() {
+            note.view().set_readable_line_length(readable);
+        }
+    }
+
+    /// Applies changed editor settings to every open note.
+    pub fn apply_editor_settings(&self) {
+        let editor = self.ctx().settings.borrow().editor.clone();
+        for note in self.notes() {
+            note.apply_editor_settings(&editor);
+        }
     }
 
     /// Re-reads theme files, e.g. after the user added one.

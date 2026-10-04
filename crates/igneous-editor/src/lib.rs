@@ -12,7 +12,7 @@ mod live;
 pub mod markup;
 mod properties;
 mod rangeset;
-mod scheme;
+pub(crate) mod scheme;
 mod tags;
 pub mod theme;
 mod view;

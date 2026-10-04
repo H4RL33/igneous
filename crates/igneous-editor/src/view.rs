@@ -81,6 +81,13 @@ mod imp {
         /// Overlay slots not showing anything (see `live.rs`).
         pub(crate) free_slots: RefCell<Vec<adw::Bin>>,
         pub(crate) input: RefCell<crate::input::InputOptions>,
+        /// The theme in use and whether the desktop is dark.
+        pub(crate) theme: RefCell<Option<(Theme, bool)>>,
+        pub(crate) vim: RefCell<Option<gtk::EventControllerKey>>,
+        pub(crate) vim_context: RefCell<Option<sourceview::VimIMContext>>,
+        pub(crate) spelling: RefCell<Option<libspelling::TextBufferAdapter>>,
+        /// Whether wide windows keep the text column narrow.
+        pub(crate) wide: Cell<bool>,
     }
 
     #[glib::object_subclass]
@@ -103,7 +110,9 @@ mod imp {
                     .as_ref(),
             );
             buffer.set_highlight_matching_brackets(false);
-            buffer.set_highlight_syntax(false);
+            // Always on: spellcheck needs the syntax engine's context classes
+            // even in Live Preview, whose scheme has no syntax colours.
+            buffer.set_highlight_syntax(true);
             view.set_buffer(Some(&buffer));
             self.tags.set(tags).ok().unwrap();
             self.state.borrow_mut().lines = vec![0];
@@ -190,14 +199,82 @@ impl NoteView {
 
     /// Colours the view with `theme`'s light or dark variant.
     pub fn set_theme(&self, theme: &Theme, dark: bool) {
-        let buffer = self.source_buffer();
-        buffer.set_style_scheme(crate::style_scheme(theme, dark).as_ref());
+        self.imp().theme.replace(Some((theme.clone(), dark)));
+        self.apply_scheme();
         let palette = Palette::new(theme.variant(dark), crate::system_accent());
         self.tags().set_palette(&palette);
         self.imp().palette.replace(Some(palette));
         // Widgets built with the old colours (tables, embeds) are rebuilt.
         self.rebuild_overlays();
         self.queue_draw();
+    }
+
+    /// Source mode shows the theme's syntax colours; Live Preview and Reading
+    /// use the same theme without them (their tags do the styling).
+    pub(crate) fn apply_scheme(&self) {
+        let Some((theme, dark)) = self.imp().theme.borrow().clone() else {
+            return;
+        };
+        let scheme = if self.mode() == Mode::Source {
+            crate::style_scheme(&theme, dark)
+        } else {
+            crate::scheme::live_style_scheme(&theme, dark)
+        };
+        self.source_buffer().set_style_scheme(scheme.as_ref());
+    }
+
+    /// Whether the text column stays a readable width on wide windows.
+    pub fn set_readable_line_length(&self, readable: bool) {
+        self.imp().wide.set(!readable);
+        self.imp().last_width.set(-1);
+        self.update_margins();
+    }
+
+    /// Vim keybindings (GtkSourceView's emulation).
+    pub fn set_vim_mode(&self, enabled: bool) {
+        let imp = self.imp();
+        if enabled == imp.vim.borrow().is_some() {
+            return;
+        }
+        if let Some(keys) = imp.vim.take() {
+            self.remove_controller(&keys);
+            imp.vim_context.take();
+            return;
+        }
+        let context = sourceview::VimIMContext::new();
+        let keys = gtk::EventControllerKey::new();
+        keys.set_im_context(Some(&context));
+        keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+        self.add_controller(keys.clone());
+        context.set_client_widget(Some(self));
+        imp.vim.replace(Some(keys));
+        imp.vim_context.replace(Some(context));
+    }
+
+    /// The Vim emulation, while it's on (for its command bar and `:w`).
+    pub fn vim_context(&self) -> Option<sourceview::VimIMContext> {
+        self.imp().vim_context.borrow().clone()
+    }
+
+    /// Underlines misspelt words (libspelling, in the desktop's language);
+    /// corrections are in the context menu.
+    pub fn set_spellcheck(&self, enabled: bool) {
+        let imp = self.imp();
+        if imp.spelling.borrow().is_none() {
+            if !enabled {
+                return;
+            }
+            let adapter = libspelling::TextBufferAdapter::new(
+                &self.source_buffer(),
+                &libspelling::Checker::default(),
+            );
+            self.set_extra_menu(Some(&adapter.menu_model()));
+            self.insert_action_group("spelling", Some(&adapter));
+            imp.spelling.replace(Some(adapter));
+        }
+        if let Some(adapter) = imp.spelling.borrow().as_ref() {
+            adapter.set_enabled(enabled);
+        }
     }
 
     /// Checks link targets again, e.g. after files were added or removed,
@@ -259,7 +336,11 @@ impl NoteView {
             return;
         }
         self.imp().last_width.set(width);
-        let margin = ((width - READABLE_WIDTH) / 2).max(MIN_MARGIN);
+        let margin = if self.imp().wide.get() {
+            MIN_MARGIN
+        } else {
+            ((width - READABLE_WIDTH) / 2).max(MIN_MARGIN)
+        };
         if self.left_margin() != margin {
             self.set_left_margin(margin);
             self.set_right_margin(margin);

@@ -144,11 +144,10 @@ impl NoteView {
     // --- modes -----------------------------------------------------------------
 
     pub fn set_mode(&self, mode: Mode) {
-        let buffer = self.source_buffer();
-        buffer.set_highlight_syntax(mode == Mode::Source);
         self.set_editable(mode != Mode::Reading);
         self.set_cursor_visible(mode != Mode::Reading);
         self.imp().state.borrow_mut().mode = mode;
+        self.apply_scheme();
         self.restyle_all();
     }
 

@@ -12,6 +12,7 @@ adw.workspace = true
 gtk.workspace = true
 htmd.workspace = true
 igneous-markdown.workspace = true
+libspelling.workspace = true
 nucleo-matcher.workspace = true
 sourceview.workspace = true
 thiserror.workspace = true

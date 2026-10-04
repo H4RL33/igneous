@@ -15,7 +15,9 @@ use igneous_markdown::LinkRef;
 
 pub struct VaultContext {
     pub vault: Vault,
-    pub settings: VaultSettings,
+    /// `.igneous/vault.json`; Preferences can change it while the vault is
+    /// open.
+    pub settings: RefCell<VaultSettings>,
     /// Set when `.igneous/vault.json` couldn't be read; defaults are in use and
     /// the file is never overwritten.
     pub settings_error: Option<String>,
@@ -39,7 +41,7 @@ impl VaultContext {
         }
         Ok(Self {
             vault,
-            settings,
+            settings: RefCell::new(settings),
             settings_error,
             watcher: RefCell::default(),
             files: RefCell::new(FileSet::new([])),

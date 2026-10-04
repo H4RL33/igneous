@@ -82,5 +82,22 @@ template $IgneousNotePage: Adw.Bin {
 
       child: $IgneousNoteView view {};
     }
+
+    // Vim's command bar, while Vim mode is on.
+    Revealer vim_bar {
+      transition-type: slide_up;
+
+      child: Label vim_label {
+        xalign: 0;
+        margin-start: 12;
+        margin-end: 12;
+        margin-top: 4;
+        margin-bottom: 4;
+
+        styles [
+          "monospace",
+        ]
+      };
+    }
   };
 }
