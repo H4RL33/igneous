@@ -18,6 +18,7 @@ mod text_page;
 mod vault;
 mod vault_picker;
 mod window;
+mod worker;
 
 pub use application::Application;
 pub use note_page::{NotePage, State as NoteState};

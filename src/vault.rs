@@ -1,7 +1,6 @@
 //! Everything a window knows about its vault.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -11,6 +10,7 @@ use igneous_core::settings::{self, VaultSettings};
 use igneous_core::vault::EntryKind;
 use igneous_core::watch::{VaultEvent, VaultWatcher};
 use igneous_core::{Vault, VaultPath};
+use igneous_index::FileSet;
 use igneous_markdown::LinkRef;
 
 pub struct VaultContext {
@@ -20,10 +20,9 @@ pub struct VaultContext {
     /// the file is never overwritten.
     pub settings_error: Option<String>,
     watcher: RefCell<Option<VaultWatcher>>,
-    /// Every file in the vault (not folders), sorted.
-    files: RefCell<Vec<VaultPath>>,
-    /// Files by loose name, and notes also by loose stem, for resolving links.
-    names: RefCell<HashMap<String, Vec<VaultPath>>>,
+    /// Every file in the vault (not folders), for the quick switcher and
+    /// for resolving links as they're typed.
+    files: RefCell<FileSet>,
 }
 
 impl VaultContext {
@@ -43,8 +42,7 @@ impl VaultContext {
             settings,
             settings_error,
             watcher: RefCell::default(),
-            files: RefCell::default(),
-            names: RefCell::default(),
+            files: RefCell::new(FileSet::new([])),
         })
     }
 
@@ -92,90 +90,28 @@ impl VaultContext {
     }
 
     pub fn set_files(&self, files: Vec<VaultPath>) {
-        self.files.replace(files);
-        self.index_names();
+        self.files.replace(FileSet::new(files));
     }
 
-    fn index_names(&self) {
-        let mut names: HashMap<String, Vec<VaultPath>> = HashMap::new();
-        for file in self.files.borrow().iter() {
-            names
-                .entry(igneous_core::path::loose_key(file.file_name()))
-                .or_default()
-                .push(file.clone());
-            if file.extension() == Some("md") {
-                names
-                    .entry(igneous_core::path::loose_key(file.stem()))
-                    .or_default()
-                    .push(file.clone());
-            }
-        }
-        self.names.replace(names);
-    }
-
-    /// The file a link points to, following Obsidian's order: exact path,
-    /// path relative to the linking note, then a unique name; ties go to the
-    /// same folder, then the shortest path.
-    pub fn resolve(&self, link: &LinkRef, from: Option<&VaultPath>) -> Option<VaultPath> {
-        let target = link.target.trim().trim_start_matches('/');
-        if target.is_empty() {
-            return from.cloned();
-        }
-        let files = self.files.borrow();
-        let exists = |candidate: &str| -> Option<VaultPath> {
-            let key = igneous_core::path::loose_key(candidate);
-            files
-                .iter()
-                .find(|f| f.as_str() == candidate)
-                .or_else(|| files.iter().find(|f| f.loose_key() == key))
-                .cloned()
-        };
-        let has_extension = Path::new(target).extension().is_some_and(|e| {
-            let e = e.to_string_lossy();
-            !e.is_empty() && e.len() <= 5 && !e.contains(' ')
-        });
-        let forms: Vec<String> = if has_extension {
-            vec![target.to_owned(), format!("{target}.md")]
-        } else {
-            vec![format!("{target}.md"), target.to_owned()]
-        };
-        for form in &forms {
-            if let Some(found) = exists(form) {
-                return Some(found);
-            }
-        }
-        if let Some(dir) = from.and_then(VaultPath::parent) {
-            for form in &forms {
-                if let Some(joined) = normalise(&format!("{dir}/{form}"))
-                    && let Some(found) = exists(&joined)
-                {
-                    return Some(found);
-                }
-            }
-        }
-        let name = target.rsplit('/').next().unwrap_or(target);
-        let names = self.names.borrow();
-        let mut candidates: Vec<&VaultPath> = names
-            .get(&igneous_core::path::loose_key(name))
-            .map(|v| v.iter().collect())
-            .unwrap_or_default();
-        // `folder/Note` also matches `deeper/folder/Note.md`.
-        if target.contains('/') {
-            let suffix = igneous_core::path::loose_key(&forms[0]);
-            candidates.retain(|c| c.loose_key().ends_with(&suffix));
-        }
-        let folder = from.and_then(VaultPath::parent);
-        candidates.sort_by(|a, b| {
-            (a.parent() != folder)
-                .cmp(&(b.parent() != folder))
-                .then(a.as_str().len().cmp(&b.as_str().len()))
-                .then_with(|| a.as_str().cmp(b.as_str()))
-        });
-        candidates.first().map(|c| (*c).clone())
-    }
-
+    /// Every file, sorted.
     pub fn files(&self) -> Vec<VaultPath> {
-        self.files.borrow().clone()
+        let mut files: Vec<VaultPath> = self.files.borrow().iter().cloned().collect();
+        files.sort();
+        files
+    }
+
+    /// The file a link points to, resolved as Obsidian does (PROJECT.md
+    /// §8.4). `from` is the linking note; without one, paths are taken from
+    /// the vault's root.
+    pub fn resolve(&self, link: &LinkRef, from: Option<&VaultPath>) -> Option<VaultPath> {
+        let root = VaultPath::new("_.md").ok()?;
+        self.files.borrow().resolve(link, from.unwrap_or(&root))
+    }
+
+    /// How a new link to `to` is written: its name if that's unique,
+    /// otherwise its path.
+    pub fn link_text(&self, to: &VaultPath) -> String {
+        self.files.borrow().link_text(to)
     }
 
     /// Lists every file in the vault. Blocking; run it off the main thread.
@@ -194,41 +130,36 @@ impl VaultContext {
         for event in events {
             match event {
                 VaultEvent::Created(path) | VaultEvent::Modified(path) => {
-                    if self.abs(path).is_file() && !files.contains(path) {
-                        files.push(path.clone());
+                    if self.abs(path).is_file() {
+                        files.insert(path.clone());
+                    } else if self.abs(path).is_dir() {
+                        for file in Self::scan(&self.vault).into_iter().filter(|f| f.starts_with(path)) {
+                            files.insert(file);
+                        }
                     }
                 }
-                VaultEvent::Removed(path) => files.retain(|f| !f.starts_with(path)),
+                VaultEvent::Removed(path) => {
+                    let gone: Vec<VaultPath> = files.under(path).cloned().collect();
+                    for file in gone {
+                        files.remove(&file);
+                    }
+                    files.remove(path);
+                }
                 VaultEvent::Renamed { from, to } => {
-                    files.retain(|f| !f.starts_with(from));
+                    let gone: Vec<VaultPath> = files.under(from).cloned().collect();
+                    for file in gone {
+                        files.remove(&file);
+                    }
+                    files.remove(from);
                     if self.abs(to).is_file() {
-                        files.push(to.clone());
+                        files.insert(to.clone());
                     } else {
-                        let vault = &self.vault;
-                        files.extend(Self::scan(vault).into_iter().filter(|f| f.starts_with(to)));
+                        for file in Self::scan(&self.vault).into_iter().filter(|f| f.starts_with(to)) {
+                            files.insert(file);
+                        }
                     }
                 }
             }
         }
-        files.sort();
-        files.dedup();
-        drop(files);
-        self.index_names();
     }
-}
-
-/// Resolves `.` and `..` in a `/`-separated path; `None` if it climbs out of
-/// the vault.
-fn normalise(path: &str) -> Option<String> {
-    let mut parts: Vec<&str> = Vec::new();
-    for part in path.split('/') {
-        match part {
-            "" | "." => {}
-            ".." => {
-                parts.pop()?;
-            }
-            _ => parts.push(part),
-        }
-    }
-    Some(parts.join("/"))
 }

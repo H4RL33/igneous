@@ -8,7 +8,6 @@
 use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use std::sync::mpsc;
 use std::time::Duration;
 
 use gtk::{gio, glib};
@@ -16,41 +15,7 @@ use igneous_core::settings::{self as vault_settings, GitSettings};
 use igneous_git::sync::{self, Phase, SyncKind, SyncOptions, SyncReport};
 use igneous_git::{FailureKind, Git, GitError, RepoStatus};
 
-type Job = Box<dyn FnOnce(&Git) + Send>;
-
-/// Runs jobs against one repository on a thread of its own.
-#[derive(Clone)]
-struct Worker {
-    sender: mpsc::Sender<Job>,
-}
-
-impl Worker {
-    fn new(git: Git) -> Self {
-        let (sender, receiver) = mpsc::channel::<Job>();
-        std::thread::Builder::new()
-            .name("igneous-git".into())
-            .spawn(move || {
-                for job in receiver {
-                    job(&git);
-                }
-            })
-            .expect("can start the Git thread");
-        Self { sender }
-    }
-
-    async fn call<R: Send + 'static>(
-        &self,
-        f: impl FnOnce(&Git) -> R + Send + 'static,
-    ) -> Option<R> {
-        let (sender, receiver) = async_channel::bounded(1);
-        self.sender
-            .send(Box::new(move |git| {
-                let _ = sender.send_blocking(f(git));
-            }))
-            .ok()?;
-        receiver.recv().await.ok()
-    }
-}
+use crate::worker::Worker;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum State {
@@ -70,7 +35,7 @@ pub enum State {
 pub struct SyncService {
     igneous_dir: PathBuf,
     git: RefCell<Option<Git>>,
-    worker: RefCell<Option<Worker>>,
+    worker: RefCell<Option<Worker<Git>>>,
     settings: RefCell<GitSettings>,
     settings_error: RefCell<Option<String>>,
     state: RefCell<State>,
@@ -125,7 +90,9 @@ impl SyncService {
     }
 
     fn attach(self: &Rc<Self>, git: Git) {
-        self.worker.replace(Some(Worker::new(git.clone())));
+        let owned = git.clone();
+        self.worker
+            .replace(Some(Worker::new("igneous-git", move || owned)));
         self.git.replace(Some(git));
         self.state.replace(State::Idle);
         self.notify();
@@ -205,7 +172,7 @@ impl SyncService {
         f: impl FnOnce(&Git) -> R + Send + 'static,
     ) -> Option<R> {
         let worker = self.worker.borrow().clone()?;
-        worker.call(f).await
+        worker.call(|git| f(git)).await
     }
 
     // --- status ----------------------------------------------------------------
