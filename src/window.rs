@@ -146,7 +146,9 @@ mod imp {
                 std::sync::LazyLock::new(|| {
                     vec![
                         glib::ParamSpecBoolean::builder("menu-page-pinned").build(),
-                        glib::ParamSpecString::builder("note-mode").build(),
+                        glib::ParamSpecString::builder("note-mode")
+                            .default_value(Some(""))
+                            .build(),
                     ]
                 });
             PROPERTIES.as_ref()
@@ -165,7 +167,8 @@ mod imp {
         fn property(&self, _id: usize, pspec: &glib::ParamSpec) -> glib::Value {
             match pspec.name() {
                 "menu-page-pinned" => self.obj().menu_page_pinned().to_value(),
-                "note-mode" => self.obj().note_mode().to_value(),
+                // Never NULL: the win.mode action holds it as a GVariant.
+                "note-mode" => self.obj().note_mode().unwrap_or_default().to_value(),
                 _ => unimplemented!(),
             }
         }
@@ -828,6 +831,9 @@ impl Window {
         let Some(note) = self.selected_note() else {
             return;
         };
+        if mode.is_none_or(str::is_empty) {
+            return;
+        }
         note.set_mode(match mode {
             Some("source") => Mode::Source,
             Some("reading") => Mode::Reading,

@@ -1303,7 +1303,7 @@ impl NoteView {
                     let (y, h) = self.line_yrange(&iter);
                     let below = self.pixels_below_lines();
                     let text = (h - below).min(40);
-                    (left - 28, y + h - below - text + (text - 24) / 2)
+                    ((left - 28).max(0), y + h - below - text + (text - 24) / 2)
                 }
                 OverlayKind::Properties => {
                     let body = self.iter_at(&st.lines, fm_end.unwrap_or(0));
