@@ -438,6 +438,8 @@ pub struct Workspace {
     pub sidebar: SidebarState,
     pub inspector: InspectorState,
     pub recently_closed: Vec<TabState>,
+    /// Recently opened files, most recent first.
+    pub recent_files: Vec<VaultPath>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
@@ -452,6 +454,7 @@ impl Default for Workspace {
             sidebar: SidebarState::default(),
             inspector: InspectorState::default(),
             recently_closed: Vec::new(),
+            recent_files: Vec::new(),
             extra: Map::new(),
         }
     }
@@ -476,6 +479,21 @@ pub struct TabState {
     pub back: Vec<VaultPath>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub forward: Vec<VaultPath>,
+}
+
+impl TabState {
+    pub fn new(kind: TabKind, path: Option<VaultPath>) -> Self {
+        Self {
+            kind,
+            path,
+            mode: None,
+            cursor: 0,
+            scroll: 0.0,
+            pinned: false,
+            back: Vec::new(),
+            forward: Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

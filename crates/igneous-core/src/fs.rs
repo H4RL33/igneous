@@ -113,19 +113,46 @@ pub fn write_bytes_atomic(
 
     let dir = target.parent().unwrap_or(Path::new("."));
     std::fs::create_dir_all(dir)?;
-    let mut temp = tempfile::Builder::new()
-        .prefix(".")
-        .suffix(".igneous-tmp")
-        .tempfile_in(dir)?;
-    temp.write_all(bytes)?;
-    temp.as_file().sync_all()?;
-    if let Ok(meta) = std::fs::metadata(&target) {
-        std::fs::set_permissions(temp.path(), meta.permissions())?;
+    let (temp_path, mut temp) = create_temp(dir, &target)?;
+    let written = (|| {
+        temp.write_all(bytes)?;
+        temp.sync_all()?;
+        if let Ok(meta) = std::fs::metadata(&target) {
+            std::fs::set_permissions(&temp_path, meta.permissions())?;
+        }
+        std::fs::rename(&temp_path, &target)
+    })();
+    if let Err(e) = written {
+        let _ = std::fs::remove_file(&temp_path);
+        return Err(e.into());
     }
-    temp.persist(&target).map_err(|e| e.error)?;
 
     let mtime = std::fs::metadata(&target).and_then(|m| m.modified()).ok();
     Ok(FileStamp::of_bytes(bytes, mtime))
+}
+
+/// A new hidden file next to `target`. Created with the default mode, so a
+/// new note gets the same permissions as any other new file.
+fn create_temp(dir: &Path, target: &Path) -> io::Result<(PathBuf, std::fs::File)> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let name = target
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    loop {
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let path = dir.join(format!(".{name}.{}-{n}.igneous-tmp", std::process::id()));
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+        {
+            Ok(file) => return Ok((path, file)),
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e),
+        }
+    }
 }
 
 fn resolve_symlink(path: &Path) -> io::Result<PathBuf> {
@@ -233,6 +260,19 @@ mod tests {
             .map(|e| e.unwrap().file_name())
             .collect();
         assert_eq!(names, vec!["note.md"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn new_files_get_default_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let plain = dir.path().join("plain.md");
+        std::fs::write(&plain, "x").unwrap();
+        let ours = dir.path().join("ours.md");
+        write_atomic(&ours, &TextFile::new("x"), Expect::Absent).unwrap();
+        let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&ours), mode(&plain));
     }
 
     #[cfg(unix)]

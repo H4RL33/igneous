@@ -4,7 +4,7 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 use crate::ignore::IgnoreRules;
-use crate::path::VaultPath;
+use crate::path::{VaultPath, natural_cmp};
 
 #[derive(Debug, thiserror::Error)]
 pub enum VaultError {
@@ -104,6 +104,62 @@ impl Vault {
         VaultPath::from_fs(&self.root, abs).ok()
     }
 
+    /// The non-ignored entries directly inside `folder` (`None` for the vault
+    /// root): folders first, then files, each in natural name order.
+    pub fn list(&self, folder: Option<&VaultPath>) -> std::io::Result<Vec<Entry>> {
+        let dir = folder.map_or_else(|| self.root.clone(), |f| self.abs(f));
+        let mut entries = Vec::new();
+        for entry in std::fs::read_dir(dir)? {
+            let entry = entry?;
+            let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
+                continue;
+            };
+            let path = match folder {
+                Some(f) => f.join(&name),
+                None => VaultPath::new(&name),
+            };
+            let Ok(path) = path else { continue };
+            if self.ignore.is_ignored(&path) {
+                continue;
+            }
+            let kind = if entry.file_type()?.is_dir() {
+                EntryKind::Folder
+            } else {
+                EntryKind::File
+            };
+            entries.push(Entry { path, kind });
+        }
+        entries.sort_by(|a, b| {
+            (a.kind == EntryKind::File)
+                .cmp(&(b.kind == EntryKind::File))
+                .then_with(|| natural_cmp(a.path.file_name(), b.path.file_name()))
+        });
+        Ok(entries)
+    }
+
+    /// `stem.ext` in `folder`, or `stem 1.ext`, `stem 2.ext`… if taken.
+    pub fn unused_name(
+        &self,
+        folder: Option<&VaultPath>,
+        stem: &str,
+        extension: &str,
+    ) -> VaultPath {
+        let name = |n: usize| match (n, extension.is_empty()) {
+            (0, true) => stem.to_owned(),
+            (0, false) => format!("{stem}.{extension}"),
+            (n, true) => format!("{stem} {n}"),
+            (n, false) => format!("{stem} {n}.{extension}"),
+        };
+        (0..)
+            .map(|n| match folder {
+                Some(f) => f.join(&name(n)),
+                None => VaultPath::new(&name(n)),
+            })
+            .filter_map(Result::ok)
+            .find(|p| std::fs::symlink_metadata(self.abs(p)).is_err())
+            .expect("some name is free")
+    }
+
     /// Every non-ignored file and folder, depth-first, sorted by name within
     /// each folder. Ignored folders are not descended into. Symlinks are not
     /// followed.
@@ -166,6 +222,60 @@ mod tests {
             })
             .collect();
         assert_eq!(entries, ["Home.md", "notes/", "notes/a.md"]);
+    }
+
+    #[test]
+    fn list_sorts_folders_first_naturally() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        for path in [
+            "b.md",
+            "Note 10.md",
+            "Note 2.md",
+            "zeta/x.md",
+            "Alpha/y.md",
+            ".obsidian/a",
+        ] {
+            let full = root.join(path);
+            std::fs::create_dir_all(full.parent().unwrap()).unwrap();
+            std::fs::write(full, "").unwrap();
+        }
+        let vault = Vault::open(root).unwrap();
+        let names: Vec<_> = vault
+            .list(None)
+            .unwrap()
+            .into_iter()
+            .map(|e| e.path.to_string())
+            .collect();
+        assert_eq!(names, ["Alpha", "zeta", "b.md", "Note 2.md", "Note 10.md"]);
+        let inner: Vec<_> = vault
+            .list(Some(&VaultPath::new("zeta").unwrap()))
+            .unwrap()
+            .into_iter()
+            .map(|e| e.path.to_string())
+            .collect();
+        assert_eq!(inner, ["zeta/x.md"]);
+    }
+
+    #[test]
+    fn unused_names() {
+        let dir = tempfile::tempdir().unwrap();
+        let vault = Vault::open(dir.path()).unwrap();
+        assert_eq!(
+            vault.unused_name(None, "Untitled", "md").as_str(),
+            "Untitled.md"
+        );
+        std::fs::write(dir.path().join("Untitled.md"), "").unwrap();
+        std::fs::write(dir.path().join("Untitled 1.md"), "").unwrap();
+        assert_eq!(
+            vault.unused_name(None, "Untitled", "md").as_str(),
+            "Untitled 2.md"
+        );
+        std::fs::create_dir(dir.path().join("Untitled")).unwrap();
+        assert_eq!(
+            vault.unused_name(None, "Untitled", "").as_str(),
+            "Untitled 1"
+        );
     }
 
     #[test]

@@ -137,6 +137,43 @@ impl VaultPath {
     }
 }
 
+/// Orders names the way people expect: case-insensitively, with runs of
+/// digits compared by value ("Note 2" before "Note 10").
+pub fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    let (mut x, mut y) = (a.chars().peekable(), b.chars().peekable());
+    loop {
+        match (x.peek().copied(), y.peek().copied()) {
+            (None, None) => return a.cmp(b),
+            (None, Some(_)) => return Ordering::Less,
+            (Some(_), None) => return Ordering::Greater,
+            (Some(c), Some(d)) if c.is_ascii_digit() && d.is_ascii_digit() => {
+                let take = |it: &mut std::iter::Peekable<std::str::Chars<'_>>| {
+                    let mut digits = String::new();
+                    while let Some(c) = it.next_if(char::is_ascii_digit) {
+                        digits.push(c);
+                    }
+                    digits
+                };
+                let (m, n) = (take(&mut x), take(&mut y));
+                let (m, n) = (m.trim_start_matches('0'), n.trim_start_matches('0'));
+                let ord = m.len().cmp(&n.len()).then_with(|| m.cmp(n));
+                if ord != Ordering::Equal {
+                    return ord;
+                }
+            }
+            (Some(c), Some(d)) => {
+                let ord = c.to_lowercase().cmp(d.to_lowercase());
+                if ord != Ordering::Equal {
+                    return ord;
+                }
+                x.next();
+                y.next();
+            }
+        }
+    }
+}
+
 /// Case-folds and NFC-normalises arbitrary text the same way as
 /// [`VaultPath::loose_key`].
 pub fn loose_key(text: &str) -> String {
@@ -225,6 +262,20 @@ mod tests {
         let b = VaultPath::new("cafe\u{301}/note.MD").unwrap();
         assert_ne!(a, b);
         assert!(a.eq_loose(&b));
+    }
+
+    #[test]
+    fn natural_order() {
+        let mut names = vec![
+            "Note 10", "note 2", "Note 1", "apple", "Banana", "Note 02b", "Note 2a",
+        ];
+        names.sort_by(|a, b| natural_cmp(a, b));
+        assert_eq!(
+            names,
+            [
+                "apple", "Banana", "Note 1", "note 2", "Note 2a", "Note 02b", "Note 10"
+            ]
+        );
     }
 
     #[test]
