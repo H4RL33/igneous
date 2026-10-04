@@ -10,6 +10,7 @@
     <file>igneous.css</file>
     <file alias="icons/scalable/apps/dev.h4rl3y.igneous.svg">icons/hicolor/scalable/apps/dev.h4rl3y.igneous.svg</file>
     <file alias="icons/scalable/apps/dev.h4rl3y.igneous.Devel.svg">icons/hicolor/scalable/apps/dev.h4rl3y.igneous.svg</file>
-    <file alias="icons/symbolic/apps/dev.h4rl3y.igneous-symbolic.svg">icons/hicolor/symbolic/apps/dev.h4rl3y.igneous-symbolic.svg</file>
+    <file alias="icons/scalable/actions/tag-symbolic.svg">icons/symbolic/tag-symbolic.svg</file>
+    <file alias="icons/scalable/apps/dev.h4rl3y.igneous-symbolic.svg">icons/hicolor/symbolic/apps/dev.h4rl3y.igneous-symbolic.svg</file>
   </gresource>
 </gresources>

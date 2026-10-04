@@ -111,6 +111,7 @@ impl Application {
             ("win.command-palette", &["<Control>p"]),
             ("win.go-back", &["<Alt>Left"]),
             ("win.toggle-reading", &["<Control>e"]),
+            ("win.search", &["<Control><Shift>f"]),
             ("win.go-forward", &["<Alt>Right"]),
         ] {
             self.set_accels_for_action(action, accels);

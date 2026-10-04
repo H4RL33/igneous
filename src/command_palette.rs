@@ -37,6 +37,8 @@ const fn command(action: &'static str, label: &'static str, needs: Needs) -> Com
 /// Every command the palette offers, in the order shown for an empty query.
 pub const COMMANDS: &[Command] = &[
     command("win.quick-switcher", "Find note", Needs::Nothing),
+    command("win.search", "Search vault", Needs::Nothing),
+    command("win.toggle-reading", "Toggle Reading view", Needs::Note),
     command("win.new-note", "New note", Needs::Nothing),
     command("win.new-folder", "New folder", Needs::Nothing),
     command("win.rename-note", "Rename note", Needs::Note),

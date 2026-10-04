@@ -1,0 +1,47 @@
+//! The sidebar's Search and Tags panes.
+
+use adw::prelude::*;
+
+mod common;
+use common::*;
+
+#[gtk::test]
+async fn search_finds_notes() {
+    let dir = vault(None);
+    let window = open(&dir);
+    assert!(until(5000, || window.index().is_ready()).await);
+    window.search_vault("fixture vault");
+    assert!(until(3000, || window.search_results() == [p("Home.md")]).await);
+    window.search_vault("path:Projects -file:Ideas");
+    assert!(
+        until(3000, || {
+            let found = window.search_results();
+            found.contains(&p("Projects/Igneous/Roadmap.md"))
+                && !found.contains(&p("Projects/Ideas.md"))
+        })
+        .await,
+        "{:?}",
+        window.search_results()
+    );
+    window.search_vault("tag:#home");
+    assert!(until(3000, || window.search_results() == [p("Home.md")]).await);
+    window.close();
+}
+
+#[gtk::test]
+async fn tags_rename_across_the_vault() {
+    let dir = vault(None);
+    let window = open(&dir);
+    assert!(until(5000, || window.index().is_ready()).await);
+    assert!(window.index().tags().iter().any(|(t, _)| t == "home"));
+    window.rename_tag("home", "start");
+    let home = || std::fs::read_to_string(dir.path().join("Home.md")).unwrap();
+    assert!(
+        until(3000, || home().contains("- start")).await,
+        "{}",
+        home()
+    );
+    assert!(!home().contains("- home"));
+    let _ = WidgetExt::activate_action(&window, "win.search", None);
+    window.close();
+}

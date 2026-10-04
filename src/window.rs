@@ -28,8 +28,10 @@ use crate::index::IndexService;
 use crate::inspector::{Inspector, Links};
 use crate::note_page::NotePage;
 use crate::quick_switcher::{Choice, QuickSwitcher};
+use crate::search_pane::SearchPane;
 use crate::sync::{State as SyncState, SyncService};
 use crate::sync_button::SyncButton;
+use crate::tags_pane::TagsPane;
 use crate::text_page::{Contents, TextPage};
 use crate::vault::VaultContext;
 use crate::{config, gsettings};
@@ -60,6 +62,10 @@ mod imp {
         pub changes_page: TemplateChild<adw::ViewStackPage>,
         #[template_child]
         pub changes_bin: TemplateChild<adw::Bin>,
+        #[template_child]
+        pub search_bin: TemplateChild<adw::Bin>,
+        #[template_child]
+        pub tags_bin: TemplateChild<adw::Bin>,
         #[template_child]
         pub sync_slot: TemplateChild<adw::Bin>,
         #[template_child]
@@ -100,6 +106,8 @@ mod imp {
         pub index: OnceCell<Rc<IndexService>>,
         pub inspector: OnceCell<Rc<Inspector>>,
         pub inspector_timer: RefCell<Option<glib::SourceId>>,
+        pub search: OnceCell<Rc<SearchPane>>,
+        pub tags: OnceCell<Rc<TagsPane>>,
     }
 
     #[glib::object_subclass]
@@ -209,6 +217,7 @@ fn install_actions(klass: &mut <imp::Window as ObjectSubclass>::Class) {
     });
     klass.install_action("win.reopen-tab", None, |w, _, _| w.reopen_tab());
     klass.install_action("win.go-back", None, |w, _, _| w.go(false));
+    klass.install_action("win.search", None, |w, _, _| w.show_search());
     klass.install_action("win.toggle-reading", None, |w, _, _| {
         if let Some(note) = w.selected_note() {
             note.toggle_reading();
@@ -459,8 +468,22 @@ impl Window {
         index.connect_changed(move || {
             if let Some(window) = weak.upgrade() {
                 window.update_inspector();
+                let imp = window.imp();
+                if let Some(tags) = imp.tags.get() {
+                    tags.set_tags(&window.index().tags());
+                }
+                if let Some(search) = imp.search.get() {
+                    search.refresh();
+                }
             }
         });
+        let search = SearchPane::new(self);
+        imp.search_bin.set_child(Some(&search.widget));
+        imp.search.set(search).ok().unwrap();
+        let tags = TagsPane::new(self);
+        imp.tags_bin.set_child(Some(&tags.widget));
+        tags.set_tags(&[]);
+        imp.tags.set(tags).ok().unwrap();
         imp.index.set(index).ok().unwrap();
         let inspector = Inspector::new(self);
         imp.inspector_bin.set_child(Some(&inspector.widget));
@@ -1446,6 +1469,8 @@ impl Window {
         workspace.sidebar.visible = imp.split_view.shows_sidebar();
         workspace.sidebar.pane = match imp.sidebar_stack.visible_child_name().as_deref() {
             Some("changes") => SidebarPane::Changes,
+            Some("search") => SidebarPane::Search,
+            Some("tags") => SidebarPane::Tags,
             _ => SidebarPane::Files,
         };
         workspace.sidebar.expanded = self.tree().expanded_folders();
@@ -1490,7 +1515,11 @@ impl Window {
         {
             inspector.stack.set_visible_child_name("outline");
         }
-        imp.wanted_pane.set(Some(workspace.sidebar.pane));
+        match workspace.sidebar.pane {
+            SidebarPane::Search => imp.sidebar_stack.set_visible_child_name("search"),
+            SidebarPane::Tags => imp.sidebar_stack.set_visible_child_name("tags"),
+            pane => imp.wanted_pane.set(Some(pane)),
+        }
         imp.recently_closed
             .replace(workspace.recently_closed.clone());
         imp.recent_files.replace(workspace.recent_files.clone());
@@ -1577,6 +1606,136 @@ impl Window {
     /// Paths of the open tabs, in order.
     pub fn tab_paths(&self) -> Vec<VaultPath> {
         self.pages().iter().filter_map(Self::page_path).collect()
+    }
+
+    // --- search and tags ---------------------------------------------------------
+
+    fn show_search(&self) {
+        let imp = self.imp();
+        imp.split_view.set_show_sidebar(true);
+        imp.sidebar_stack.set_visible_child_name("search");
+        if let Some(search) = imp.search.get() {
+            search.entry.grab_focus();
+            search.entry.select_region(0, -1);
+        }
+    }
+
+    /// Shows the Search pane with `query`'s results.
+    pub fn search_vault(&self, query: &str) {
+        self.show_search();
+        if let Some(search) = self.imp().search.get() {
+            search.search(query);
+        }
+    }
+
+    pub fn rename_tag_dialog(&self, tag: &str) {
+        let entry = gtk::Entry::builder()
+            .text(format!("#{tag}"))
+            .activates_default(true)
+            .build();
+        let dialog = name_dialog("Rename Tag", "_Rename", &entry);
+        dialog.set_body(&format!(
+            "#{tag} and the tags nested in it are renamed in every note, including in tags properties"
+        ));
+        let old = tag.to_owned();
+        let validate_old = old.clone();
+        entry.connect_changed(glib::clone!(
+            #[weak]
+            dialog,
+            move |entry| {
+                let new = entry.text().trim().trim_start_matches('#').to_owned();
+                let valid = !new.is_empty()
+                    && new != validate_old
+                    && !new.contains(char::is_whitespace)
+                    && new.chars().any(|c| !c.is_ascii_digit() && c != '/');
+                dialog.set_response_enabled("ok", valid);
+            }
+        ));
+        dialog.set_response_enabled("ok", false);
+        dialog.connect_response(
+            Some("ok"),
+            glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                #[weak]
+                entry,
+                move |_, _| {
+                    let new = entry.text().trim().trim_start_matches('#').to_owned();
+                    window.rename_tag(&old, &new);
+                }
+            ),
+        );
+        dialog.present(Some(self));
+        entry.grab_focus();
+        entry.select_region(1, -1);
+    }
+
+    /// The notes in the Search pane's results. For tests.
+    #[doc(hidden)]
+    pub fn search_results(&self) -> Vec<VaultPath> {
+        self.imp()
+            .search
+            .get()
+            .map(|s| s.found.borrow().clone())
+            .unwrap_or_default()
+    }
+
+    pub fn rename_tag(&self, old: &str, new: &str) {
+        self.flush_all();
+        let window = self.downgrade();
+        let index = self.index().clone();
+        let (old, new) = (old.to_owned(), new.to_owned());
+        glib::spawn_future_local(async move {
+            let (o, n) = (old.clone(), new.clone());
+            let plan = index
+                .query(move |index| igneous_index::refactor::plan_tag_rename(index, &o, &n))
+                .await;
+            let Some(window) = window.upgrade() else {
+                return;
+            };
+            let plan = match plan {
+                Some(Ok(plan)) => plan,
+                Some(Err(e)) => return window.toast(&format!("Couldn’t rename the tag: {e}")),
+                None => return,
+            };
+            let mut undo: Vec<(VaultPath, String)> = Vec::new();
+            for file in &plan.files {
+                if file.edits.is_empty() {
+                    continue;
+                }
+                let text = file.apply();
+                if window
+                    .edit_note(&file.path, |current| {
+                        (current == file.text).then(|| text.clone())
+                    })
+                    .is_ok()
+                {
+                    undo.push((file.path.clone(), file.text.clone()));
+                }
+            }
+            let n = undo.len();
+            let toast = adw::Toast::builder()
+                .title(format!(
+                    "Renamed #{old} to #{new} in {}",
+                    if n == 1 {
+                        "1 note".to_owned()
+                    } else {
+                        format!("{n} notes")
+                    }
+                ))
+                .button_label("_Undo")
+                .timeout(8)
+                .build();
+            let weak = window.downgrade();
+            toast.connect_button_clicked(move |_| {
+                if let Some(window) = weak.upgrade() {
+                    for (path, text) in &undo {
+                        let _ = window.edit_note(path, |_| Some(text.clone()));
+                    }
+                }
+            });
+            window.imp().toast_overlay.add_toast(toast);
+        });
     }
 
     // --- index and inspector ------------------------------------------------------
@@ -1748,7 +1907,6 @@ impl Window {
         let available = sync.is_available();
         self.set_git_actions_enabled(available);
         imp.changes_page.set_visible(available);
-        imp.sidebar_switcher.set_visible(available);
         if available && let Some(pane) = imp.wanted_pane.take() {
             imp.restoring.set(true);
             if pane == SidebarPane::Changes {

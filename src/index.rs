@@ -19,6 +19,7 @@ pub struct IndexService {
     ready: Cell<bool>,
     notes: RefCell<Rc<Vec<NoteEntry>>>,
     tags: RefCell<Rc<Vec<(String, usize)>>>,
+    data: RefCell<Option<std::sync::Arc<Vec<igneous_query::NoteData>>>>,
     listeners: RefCell<Vec<Box<dyn Fn()>>>,
 }
 
@@ -42,6 +43,7 @@ impl IndexService {
             ready: Cell::default(),
             notes: RefCell::default(),
             tags: RefCell::default(),
+            data: RefCell::default(),
             listeners: RefCell::default(),
         });
         let weak = Rc::downgrade(&service);
@@ -72,7 +74,16 @@ impl IndexService {
         self.listeners.borrow_mut().push(Box::new(f));
     }
 
+    pub(crate) fn cached_data(&self) -> Option<std::sync::Arc<Vec<igneous_query::NoteData>>> {
+        self.data.borrow().clone()
+    }
+
+    pub(crate) fn cache_data(&self, data: std::sync::Arc<Vec<igneous_query::NoteData>>) {
+        self.data.replace(Some(data));
+    }
+
     async fn changed(&self) {
+        self.data.replace(None);
         let lists = self.query(|index| (index.notes(), index.tags())).await;
         if let Some((notes, tags)) = lists {
             self.notes.replace(Rc::new(notes.unwrap_or_default()));

@@ -23,6 +23,16 @@ pub fn note_data(row: NoteRow) -> NoteData {
 }
 
 impl crate::index::IndexService {
+    /// The vault as query data, built once per index update and shared.
+    pub async fn data(&self) -> std::sync::Arc<Vec<NoteData>> {
+        if let Some(data) = self.cached_data() {
+            return data;
+        }
+        let data = std::sync::Arc::new(self.note_data().await);
+        self.cache_data(data.clone());
+        data
+    }
+
     /// Every file in the vault as query data. Building it reads every note,
     /// so it runs on the index's thread.
     pub async fn note_data(&self) -> Vec<NoteData> {

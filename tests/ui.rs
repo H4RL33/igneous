@@ -490,6 +490,10 @@ async fn screenshot() {
     let window = open(&dir);
     window.set_default_size(width, 720);
     wait(1500).await;
+    if let Ok(query) = std::env::var("IGNEOUS_SCREENSHOT_SEARCH") {
+        window.search_vault(&query);
+        wait(1000).await;
+    }
     if std::env::var("IGNEOUS_SCREENSHOT_TOP").is_ok()
         && let Some(note) = window.selected_note()
     {
