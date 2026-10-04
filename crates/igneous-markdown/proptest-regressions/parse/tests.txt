@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc aedc5530de672ac0b55144dcf901d76cc92fc260b863f2536aee8f3d4f8d17ea # shrinks to text = "^[[[ ](]]"
+cc ff6b3f271d48283379708dc88731ae695f6a70c04f37ad18fc8bc07cc2890451 # shrinks to text = "# ![[][|漢 ]()]]"

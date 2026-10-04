@@ -223,6 +223,7 @@ pub fn parse(text: &str) -> Document {
 
     let mut doc = b.doc;
     doc.frontmatter = frontmatter;
+    sanitize(&mut doc, text);
     doc.nodes.sort_by(|a, b| {
         a.range
             .start
@@ -237,6 +238,27 @@ fn collect_events(body: &str, options: Options) -> Option<Vec<(Event<'_>, Span)>
         Parser::new_ext(body, options).into_offset_iter().collect()
     }))
     .ok()
+}
+
+/// Drops ranges that don't lie on character boundaries inside the note. The
+/// builder shouldn't produce any; this keeps a parser surprise from becoming
+/// a slicing panic in the editor.
+fn sanitize(doc: &mut Document, text: &str) {
+    let ok = |r: &Span| r.start <= r.end && text.get(r.clone()).is_some();
+    doc.nodes.retain(|n| ok(&n.range));
+    for node in &mut doc.nodes {
+        let range = node.range.clone();
+        node.markers
+            .retain(|m| ok(m) && m.start >= range.start && m.end <= range.end);
+    }
+    for link in &mut doc.links {
+        if link.display_range.as_ref().is_some_and(|d| !ok(d)) {
+            link.display_range = None;
+        }
+    }
+    doc.tags.retain(|t| ok(&t.range));
+    doc.block_ids.retain(|b| ok(&b.range));
+    doc.comments.retain(ok);
 }
 
 struct Open {
@@ -446,17 +468,17 @@ impl Builder<'_> {
                 open.container = Some(Vec::new());
             }
             MdTag::Emphasis => {
-                let markers = symmetric_markers(&range, 1);
+                let markers = symmetric_markers(text, &range, 1);
                 open.node = Some(self.push_node(NodeKind::Emphasis, range, markers));
             }
             MdTag::Strong => {
-                let markers = symmetric_markers(&range, 2);
+                let markers = symmetric_markers(text, &range, 2);
                 open.node = Some(self.push_node(NodeKind::Strong, range, markers));
             }
             MdTag::Strikethrough => {
                 // Obsidian only treats `~~` as strikethrough.
                 if text[range.clone()].starts_with("~~") {
-                    let markers = symmetric_markers(&range, 2);
+                    let markers = symmetric_markers(text, &range, 2);
                     open.node = Some(self.push_node(NodeKind::Strikethrough, range, markers));
                 }
             }
@@ -511,14 +533,20 @@ impl Builder<'_> {
             OpenKind::MarkdownLink { link } => {
                 self.link_depth -= 1;
                 let start = open.range.start;
-                let text_end = open.last_child_end.unwrap_or(start + 1).max(start + 1);
-                let display = start + 1..text_end;
-                let link = &mut self.doc.links[link];
-                link.reference.display = Some(self.text[display.clone()].to_owned());
-                link.display_range = Some(display);
-                if let Some(node) = open.node {
-                    self.doc.nodes[node].markers =
-                        smallvec![start..start + 1, text_end..open.range.end];
+                // Malformed input can give a link range that doesn't start
+                // at its `[`; then there are no markers to hide.
+                if self.text.as_bytes().get(start) == Some(&b'[') {
+                    let text_end = open.last_child_end.unwrap_or(start + 1).max(start + 1);
+                    let display = start + 1..text_end;
+                    if let Some(shown) = self.text.get(display.clone()) {
+                        let link = &mut self.doc.links[link];
+                        link.reference.display = Some(shown.to_owned());
+                        link.display_range = Some(display);
+                        if let Some(node) = open.node {
+                            self.doc.nodes[node].markers =
+                                smallvec![start..start + 1, text_end..open.range.end];
+                        }
+                    }
                 }
             }
             OpenKind::Other => {}
@@ -792,8 +820,14 @@ fn is_tag_char(c: char) -> bool {
         || (!c.is_ascii() && !c.is_whitespace() && !"，。、；：？！…“”‘’«»–—（）【】".contains(c))
 }
 
-fn symmetric_markers(range: &Span, n: usize) -> Markers {
-    if range.len() >= 2 * n {
+/// `n`-byte delimiters at both ends, if the source really has them there.
+fn symmetric_markers(text: &str, range: &Span, n: usize) -> Markers {
+    let bytes = text.as_bytes();
+    let is_delim = |i: usize| matches!(bytes.get(i), Some(b'*' | b'_' | b'~'));
+    if range.len() >= 2 * n
+        && (range.start..range.start + n).all(is_delim)
+        && (range.end - n..range.end).all(is_delim)
+    {
         smallvec![range.start..range.start + n, range.end - n..range.end]
     } else {
         smallvec![]
@@ -999,7 +1033,11 @@ fn link_parts(
         in_frontmatter: false,
     };
     match link_type {
-        LinkType::WikiLink { .. } => {
+        LinkType::WikiLink { .. }
+            if text[whole.clone()].starts_with(if embed { "![[" } else { "[[" })
+                && text[whole.clone()].ends_with("]]")
+                && whole.len() >= if embed { 5 } else { 4 } =>
+        {
             let open = if embed { 3 } else { 2 };
             let inner = whole.start + open..whole.end.saturating_sub(2).max(whole.start + open);
             let inner_text = &text[inner.clone()];
@@ -1024,7 +1062,9 @@ fn link_parts(
             };
             (link, markers, false)
         }
-        LinkType::Autolink | LinkType::Email => {
+        LinkType::Autolink | LinkType::Email
+            if text[whole.clone()].starts_with('<') && text[whole.clone()].ends_with('>') =>
+        {
             let display = whole.start + 1..whole.end - 1;
             let link = Link {
                 kind: LinkKind::Autolink,
