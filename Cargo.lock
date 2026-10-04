@@ -738,6 +738,7 @@ version = "0.1.0"
 dependencies = [
  "glib-build-tools",
  "gtk4",
+ "igneous-markdown",
  "libadwaita",
  "sourceview5",
  "tempfile",

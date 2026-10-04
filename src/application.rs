@@ -110,6 +110,7 @@ impl Application {
             ("win.sync-now", &["<Control><Alt>s"]),
             ("win.command-palette", &["<Control>p"]),
             ("win.go-back", &["<Alt>Left"]),
+            ("win.toggle-reading", &["<Control>e"]),
             ("win.go-forward", &["<Alt>Right"]),
         ] {
             self.set_accels_for_action(action, accels);

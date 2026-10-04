@@ -38,3 +38,28 @@ textview.igneous-note {
   background-color: color-mix(in srgb, var(--error-bg-color) 12%, transparent);
   border-bottom: 1px solid var(--border-color);
 }
+
+/* Live Preview widgets. */
+.md-table {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.md-table-cell {
+  padding: 4px 10px;
+  border-bottom: 1px solid alpha(var(--border-color), 0.6);
+  border-right: 1px solid alpha(var(--border-color), 0.6);
+}
+
+.md-table-head {
+  font-weight: bold;
+}
+
+.note-embed textview.embedded,
+.note-embed textview.embedded text {
+  background: none;
+}
+
+.properties row.property {
+  min-height: 36px;
+}

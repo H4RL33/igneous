@@ -4,6 +4,7 @@ mod application;
 mod changes;
 mod command_palette;
 mod config;
+mod editor_host;
 mod files;
 mod gsettings;
 mod history;

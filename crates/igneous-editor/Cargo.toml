@@ -10,6 +10,7 @@ authors.workspace = true
 [dependencies]
 adw.workspace = true
 gtk.workspace = true
+igneous-markdown.workspace = true
 sourceview.workspace = true
 thiserror.workspace = true
 toml.workspace = true

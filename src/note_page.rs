@@ -16,9 +16,8 @@ use adw::{prelude::*, subclass::prelude::*};
 use gtk::glib;
 use igneous_core::fs::{self, Expect, FileStamp, ReadError, WriteError};
 use igneous_core::{TextFile, VaultPath};
-use igneous_editor::NoteView;
+use igneous_editor::{Mode, NoteView};
 use igneous_git::conflicts::{self, Keep};
-use sourceview::prelude::*;
 
 use crate::vault::VaultContext;
 
@@ -72,6 +71,8 @@ mod imp {
         /// Notes visited in this tab before and after the current one.
         pub back: RefCell<Vec<VaultPath>>,
         pub forward: RefCell<Vec<VaultPath>>,
+        /// The editing mode to return to when leaving Reading mode.
+        pub last_edit_mode: Cell<Mode>,
     }
 
     #[glib::object_subclass]
@@ -108,8 +109,7 @@ mod imp {
     impl ObjectImpl for NotePage {
         fn constructed(&self) {
             self.parent_constructed();
-            let buffer = igneous_editor::new_buffer();
-            self.view.set_buffer(Some(&buffer));
+            let buffer = self.view.source_buffer();
             let page = self.obj().downgrade();
             buffer.connect_changed(move |_| {
                 if let Some(page) = page.upgrade() {
@@ -154,7 +154,52 @@ impl NotePage {
     pub fn new(ctx: &Rc<VaultContext>) -> Self {
         let page: Self = glib::Object::new();
         page.imp().ctx.set(ctx.clone()).ok().unwrap();
+        page.imp()
+            .view
+            .set_host(Rc::new(crate::editor_host::NoteHost {
+                ctx: ctx.clone(),
+                page: page.downgrade(),
+            }));
         page
+    }
+
+    pub fn view(&self) -> NoteView {
+        self.imp().view.get()
+    }
+
+    pub fn mode(&self) -> Mode {
+        self.imp().view.mode()
+    }
+
+    pub fn set_mode(&self, mode: Mode) {
+        if mode != Mode::Reading {
+            self.imp().last_edit_mode.set(mode);
+        }
+        self.imp().view.set_mode(mode);
+    }
+
+    /// Ctrl+E: between Reading and the last editing mode.
+    pub fn toggle_reading(&self) {
+        let mode = if self.mode() == Mode::Reading {
+            self.imp().last_edit_mode.get()
+        } else {
+            Mode::Reading
+        };
+        self.set_mode(mode);
+    }
+
+    /// Moves the cursor to a heading or block, e.g. after following a link.
+    pub fn scroll_to_subpath(&self, subpath: &igneous_markdown::Subpath) {
+        let text = self.text();
+        let doc = igneous_markdown::parse(&text);
+        if let Some(range) = igneous_markdown::subpath_range(&doc, &text, subpath) {
+            self.set_cursor_byte(range.start);
+        }
+    }
+
+    /// Checks link targets again (files were added, removed or renamed).
+    pub fn refresh_links(&self) {
+        self.imp().view.refresh_links();
     }
 
     fn ctx(&self) -> &Rc<VaultContext> {
@@ -538,8 +583,8 @@ impl NotePage {
         ));
     }
 
-    pub fn set_style_scheme(&self, scheme: Option<&sourceview::StyleScheme>) {
-        self.buffer().set_style_scheme(scheme);
+    pub fn set_theme(&self, theme: &igneous_editor::theme::Theme, dark: bool) {
+        self.imp().view.set_theme(theme, dark);
     }
 
     pub fn focus_editor(&self) {

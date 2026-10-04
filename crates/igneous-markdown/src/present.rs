@@ -98,6 +98,8 @@ pub enum Replacement {
     Rule,
     /// Draw the callout's icon (and its type as the title when it has none).
     CalloutHeader { kind: String, has_title: bool },
+    /// Show the table as a grid while the cursor is outside it.
+    Table,
 }
 
 const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "bmp", "svg", "webp", "avif"];
@@ -238,7 +240,16 @@ pub fn spans(doc: &Document, text: &str) -> Vec<StyledSpan> {
                     None => push(bullet, Style::ListNumber, smallvec![], Reveal::Never, None),
                 }
             }
-            NodeKind::Table => push(range, Style::Table, smallvec![], Reveal::Never, None),
+            NodeKind::Table => {
+                let lines = line_span(text, &range);
+                push(
+                    range.clone(),
+                    Style::Table,
+                    smallvec![range],
+                    Reveal::Within(lines),
+                    Some(Replacement::Table),
+                );
+            }
             NodeKind::Rule => {
                 let line = line_span(text, &range);
                 push(

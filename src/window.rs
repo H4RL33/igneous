@@ -15,8 +15,10 @@ use igneous_core::settings::{
 };
 use igneous_core::watch::VaultEvent;
 use igneous_core::{TextFile, VaultPath};
+use igneous_editor::Mode;
 use igneous_editor::theme::{Catalog, Theme};
 use igneous_git::{Commit, SyncKind};
+use igneous_markdown::LinkRef;
 
 use crate::application::Application;
 use crate::changes::ChangesPane;
@@ -60,6 +62,8 @@ mod imp {
         #[template_child]
         pub sync_banner: TemplateChild<adw::Banner>,
         #[template_child]
+        pub mode_toggle: TemplateChild<adw::ToggleGroup>,
+        #[template_child]
         pub note_title: TemplateChild<adw::WindowTitle>,
         #[template_child]
         pub tab_view: TemplateChild<adw::TabView>,
@@ -84,6 +88,8 @@ mod imp {
         /// The sidebar pane to show once it exists (Changes appears only
         /// after Git has been found).
         pub wanted_pane: Cell<Option<SidebarPane>>,
+        /// Set while the mode toggle is being updated to match a tab.
+        pub updating_mode: Cell<bool>,
     }
 
     #[glib::object_subclass]
@@ -193,6 +199,13 @@ fn install_actions(klass: &mut <imp::Window as ObjectSubclass>::Class) {
     });
     klass.install_action("win.reopen-tab", None, |w, _, _| w.reopen_tab());
     klass.install_action("win.go-back", None, |w, _, _| w.go(false));
+    klass.install_action("win.toggle-reading", None, |w, _, _| {
+        if let Some(note) = w.selected_note() {
+            note.toggle_reading();
+            w.sync_mode_toggle();
+            w.schedule_workspace_save();
+        }
+    });
     klass.install_action("win.go-forward", None, |w, _, _| w.go(true));
     klass.install_action("win.command-palette", None, |w, _, _| {
         crate::command_palette::show(w)
@@ -430,6 +443,12 @@ impl Window {
             move |_| window.schedule_workspace_save()
         ));
 
+        imp.mode_toggle.connect_active_name_notify(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |_| window.on_mode_toggled()
+        ));
+
         // Save when the window loses focus; check Git when it comes back.
         self.connect_is_active_notify(|window| {
             if window.is_active() {
@@ -448,9 +467,16 @@ impl Window {
         });
         let vault = ctx.vault.clone();
         let scan_ctx = ctx.clone();
+        let weak_window = self.downgrade();
         glib::spawn_future_local(async move {
             if let Ok(files) = gio::spawn_blocking(move || VaultContext::scan(&vault)).await {
                 scan_ctx.set_files(files);
+                // Links can be checked now that every file is known.
+                if let Some(window) = weak_window.upgrade() {
+                    for note in window.notes() {
+                        note.refresh_links();
+                    }
+                }
             }
         });
 
@@ -568,7 +594,8 @@ impl Window {
         }
         let child: gtk::Widget = if is_note {
             let note = NotePage::new(&ctx);
-            note.set_style_scheme(self.editor_scheme().as_ref());
+            note.set_theme(&self.editor_theme(), adw::StyleManager::default().is_dark());
+            note.set_mode(mode_from(self.ctx().settings.editor.default_mode));
             if let Err(e) = note.load(path) {
                 self.toast(&format!("Couldn't open “{path}”: {e}"));
                 return;
@@ -616,7 +643,69 @@ impl Window {
             }
         }
         self.tree().select(path.as_ref());
+        self.sync_mode_toggle();
         self.schedule_workspace_save();
+    }
+
+    /// Shows the selected note's mode in the header bar's toggle.
+    fn sync_mode_toggle(&self) {
+        let imp = self.imp();
+        let note = self.selected_note();
+        imp.mode_toggle.set_visible(note.is_some());
+        if let Some(note) = note {
+            imp.updating_mode.set(true);
+            imp.mode_toggle.set_active_name(Some(match note.mode() {
+                Mode::Live => "live",
+                Mode::Source => "source",
+                Mode::Reading => "reading",
+            }));
+            imp.updating_mode.set(false);
+        }
+    }
+
+    fn on_mode_toggled(&self) {
+        let imp = self.imp();
+        if imp.updating_mode.get() {
+            return;
+        }
+        let mode = match imp.mode_toggle.active_name().as_deref() {
+            Some("source") => Mode::Source,
+            Some("reading") => Mode::Reading,
+            _ => Mode::Live,
+        };
+        if let Some(note) = self.selected_note() {
+            note.set_mode(mode);
+            note.focus_editor();
+            self.schedule_workspace_save();
+        }
+    }
+
+    /// Follows a link from `from`: opens the file (scrolling to a heading or
+    /// block), opens a web link in the browser, or creates a missing note.
+    pub fn follow_link(&self, link: &LinkRef, from: Option<&VaultPath>, new_tab: bool) {
+        let target = link.target.trim();
+        if target.contains("://") || target.starts_with("mailto:") {
+            gtk::UriLauncher::new(target).launch(Some(self), gio::Cancellable::NONE, |_| {});
+            return;
+        }
+        let path = match self.ctx().resolve(link, from) {
+            Some(path) => path,
+            None => {
+                // Obsidian creates the note when an unresolved link is followed.
+                let name = target.trim_end_matches(".md");
+                if name.is_empty() {
+                    return;
+                }
+                self.create_named_note_in(name, new_tab);
+                return;
+            }
+        };
+        if Some(&path) != from || new_tab {
+            self.open_path(&path, new_tab);
+        }
+        if let (Some(subpath), Some(note)) = (&link.subpath, self.selected_note()) {
+            note.scroll_to_subpath(subpath);
+        }
     }
 
     fn remember_recent(&self, path: &VaultPath) {
@@ -640,6 +729,7 @@ impl Window {
         state.pinned = page.is_pinned();
         if let Some(note) = child.downcast_ref::<NotePage>() {
             (state.back, state.forward) = note.history();
+            state.mode = Some(mode_to(note.mode()));
         }
         Some(state)
     }
@@ -697,6 +787,12 @@ impl Window {
         self.sync().refresh();
         let ctx = self.ctx();
         ctx.apply_events(&events);
+        // Files appearing or disappearing change which links resolve.
+        if events.iter().any(|e| !matches!(e, VaultEvent::Modified(_))) {
+            for note in self.notes() {
+                note.refresh_links();
+            }
+        }
         self.tree().refresh_for_events(&events);
         for event in &events {
             match event {
@@ -1043,6 +1139,10 @@ impl Window {
 
     /// Creates a note from a typed name, which may include folders.
     fn create_named_note(&self, name: &str) {
+        self.create_named_note_in(name, false);
+    }
+
+    fn create_named_note_in(&self, name: &str, new_tab: bool) {
         let name = name.trim().trim_end_matches(".md");
         let Ok(path) = VaultPath::new(&format!("{name}.md")) else {
             self.toast("That isn't a valid note name");
@@ -1070,7 +1170,7 @@ impl Window {
             }
             self.on_vault_events(vec![VaultEvent::Created(path.clone())]);
         }
-        self.open_path(&path, false);
+        self.open_path(&path, new_tab);
     }
 
     // --- editor theme ----------------------------------------------------------
@@ -1127,10 +1227,12 @@ impl Window {
 
     fn apply_editor_theme(&self) {
         let scheme = self.editor_scheme();
+        let theme = self.editor_theme();
+        let dark = adw::StyleManager::default().is_dark();
         for page in self.pages() {
             let child = page.child();
             if let Some(note) = child.downcast_ref::<NotePage>() {
-                note.set_style_scheme(scheme.as_ref());
+                note.set_theme(&theme, dark);
             } else if let Some(text) = child.downcast_ref::<TextPage>() {
                 text.set_style_scheme(scheme.as_ref());
             }
@@ -1236,6 +1338,9 @@ impl Window {
             if let Ok(note) = page.child().downcast::<NotePage>() {
                 note.set_cursor_byte(tab.cursor);
                 note.set_history(tab.back.clone(), tab.forward.clone());
+                if let Some(mode) = tab.mode {
+                    note.set_mode(mode_from(mode));
+                }
             }
             if workspace.active_tab == Some(i) {
                 active = Some(page);
@@ -1546,4 +1651,20 @@ fn name_dialog(heading: &str, accept: &str, entry: &gtk::Entry) -> adw::AlertDia
     dialog.add_responses(&[("cancel", "_Cancel"), ("ok", accept)]);
     dialog.set_response_appearance("ok", adw::ResponseAppearance::Suggested);
     dialog
+}
+
+fn mode_from(mode: igneous_core::settings::EditorMode) -> Mode {
+    match mode {
+        igneous_core::settings::EditorMode::Live => Mode::Live,
+        igneous_core::settings::EditorMode::Source => Mode::Source,
+        igneous_core::settings::EditorMode::Reading => Mode::Reading,
+    }
+}
+
+fn mode_to(mode: Mode) -> igneous_core::settings::EditorMode {
+    match mode {
+        Mode::Live => igneous_core::settings::EditorMode::Live,
+        Mode::Source => igneous_core::settings::EditorMode::Source,
+        Mode::Reading => igneous_core::settings::EditorMode::Reading,
+    }
 }

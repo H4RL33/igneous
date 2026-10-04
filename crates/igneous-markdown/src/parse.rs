@@ -966,6 +966,10 @@ fn fence_markers(text: &str, range: &Span) -> Markers {
 /// `(ordered, markers, task)` for a list item. Markers are the bullet or
 /// number, then the task box; task is `(box, status)`.
 fn item_parts(text: &str, range: &Span) -> (bool, Markers, Option<(Span, char)>) {
+    // pulldown-cmark starts a nested item's range at the newline before it.
+    let skipped =
+        text[range.clone()].len() - text[range.clone()].trim_start_matches(['\n', '\r']).len();
+    let range = &(range.start + skipped..range.end);
     let line_end = line_end(text, range.start);
     let line = &text[range.start..line_end];
     let indent = line.len() - line.trim_start_matches([' ', '\t']).len();

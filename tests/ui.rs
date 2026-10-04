@@ -524,6 +524,10 @@ async fn screenshot() {
         .and_then(|w| w.parse().ok())
         .unwrap_or(1100);
     let dir = vault(None);
+    if let Ok(extra) = std::env::var("IGNEOUS_SCREENSHOT_EXTRA") {
+        let name = Path::new(&extra).file_name().unwrap();
+        std::fs::copy(&extra, dir.path().join(name)).unwrap();
+    }
     // Expanded folders and three tabs, as if restored from a previous session.
     std::fs::create_dir_all(dir.path().join(".igneous")).unwrap();
     std::fs::write(
@@ -547,6 +551,14 @@ async fn screenshot() {
     let window = open(&dir);
     window.set_default_size(width, 720);
     wait(1500).await;
+    if std::env::var("IGNEOUS_SCREENSHOT_TOP").is_ok()
+        && let Some(note) = window.selected_note()
+    {
+        let view = note.view();
+        let mut start = view.buffer().start_iter();
+        view.scroll_to_iter(&mut start, 0.0, true, 0.0, 0.0);
+        wait(500).await;
+    }
     save_png(window.upcast_ref(), &out);
     WidgetExt::activate_action(&window, "win.preferences", None).unwrap();
     wait(800).await;

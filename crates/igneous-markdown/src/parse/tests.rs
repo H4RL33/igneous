@@ -160,6 +160,23 @@ fn tags() {
 }
 
 #[test]
+fn nested_items_have_markers() {
+    let text = "- A bullet\n\t- A nested bullet\n\t- [ ] nested task\n";
+    let doc = parse(text);
+    let items: Vec<_> = doc
+        .nodes
+        .iter()
+        .filter(|n| matches!(n.kind, NodeKind::ListItem { .. }))
+        .collect();
+    assert_eq!(items.len(), 3);
+    for item in &items {
+        assert_eq!(&text[item.markers[0].clone()], "-");
+    }
+    assert_eq!(doc.tasks.len(), 1);
+    assert_eq!(&text[doc.tasks[0].marker.clone()], "[ ]");
+}
+
+#[test]
 fn tasks() {
     let text =
         "- [ ] todo\n- [x] done\n- [/] half\n1. [ ] numbered\n- not [ ] task\n- [ ]\n* [-] star\n";

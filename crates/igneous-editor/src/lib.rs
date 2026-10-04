@@ -1,17 +1,21 @@
-//! The note editor widget.
-//!
-//! M1 provides Source mode: GtkSourceView with Obsidian-flavoured Markdown
-//! highlighting, Adwaita style schemes that follow the system, and a readable
-//! line length. Live Preview (see docs/decisions/0001-editor.md) is added in M4.
+//! The note editor widget: Live Preview, Source and Reading modes on
+//! GtkSourceView (see docs/decisions/0001-editor.md), coloured by editor
+//! themes.
 
 mod buffer;
+mod host;
+mod live;
+pub mod markup;
+mod rangeset;
 mod scheme;
+mod tags;
 pub mod theme;
 mod view;
 
-pub use buffer::{LANGUAGE_ID, new_buffer};
+pub use buffer::LANGUAGE_ID;
+pub use host::{Embed, Host, NoHost};
 pub use scheme::{style_scheme, system_accent};
-pub use view::NoteView;
+pub use view::{Mode, NoteView};
 
 use std::sync::Once;
 

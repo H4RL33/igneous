@@ -1,30 +1,22 @@
-//! Buffers for notes.
+//! Source mode's syntax highlighting: the `igneous-markdown` language.
 
-use sourceview::prelude::*;
-
+/// The GtkSourceView language for notes (`igneous-markdown.lang`).
 pub const LANGUAGE_ID: &str = "igneous-markdown";
-
-/// A buffer with Markdown highlighting. Its colours come from whichever
-/// editor theme its owner applies (see [`crate::style_scheme`]).
-pub fn new_buffer() -> sourceview::Buffer {
-    crate::init();
-    let buffer = sourceview::Buffer::new(None);
-    buffer.set_language(
-        sourceview::LanguageManager::default()
-            .language(LANGUAGE_ID)
-            .as_ref(),
-    );
-    buffer.set_highlight_matching_brackets(false);
-    buffer
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sourceview::prelude::*;
 
     #[gtk::test]
     fn highlights_obsidian_syntax() {
-        let buffer = new_buffer();
+        crate::init();
+        let buffer = sourceview::Buffer::new(None);
+        buffer.set_language(
+            sourceview::LanguageManager::default()
+                .language(LANGUAGE_ID)
+                .as_ref(),
+        );
         assert_eq!(
             buffer.language().map(|l| l.id().to_string()).as_deref(),
             Some(LANGUAGE_ID)

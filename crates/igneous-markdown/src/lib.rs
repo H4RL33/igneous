@@ -16,6 +16,7 @@ pub mod frontmatter;
 pub mod link;
 mod parse;
 pub mod present;
+mod section;
 pub mod text;
 
 pub use edit::TextEdit;
@@ -24,6 +25,7 @@ pub use link::{LinkRef, Subpath};
 pub use parse::{
     BlockId, Callout, Document, Fold, Heading, Link, LinkKind, Node, NodeKind, Tag, Task, parse,
 };
+pub use section::subpath_range;
 
 /// A byte range in a note.
 pub type Span = std::ops::Range<usize>;
