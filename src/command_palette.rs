@@ -53,6 +53,12 @@ pub const COMMANDS: &[Command] = &[
     command("win.show-changes", "Git: Show changes", Needs::Git),
     command("win.note-history", "Git: Show note history", Needs::Git),
     command("win.publish-branch", "Git: Publish branch", Needs::Git),
+    command("win.lint-note", "Lint: Lint note", Needs::Note),
+    command(
+        "win.lint-vault",
+        "Lint: Lint every note in the vault",
+        Needs::Nothing,
+    ),
     command("win.preferences", "Open preferences", Needs::Nothing),
     command("app.shortcuts", "Show keyboard shortcuts", Needs::Nothing),
     command("app.new-window", "Open another vault", Needs::Nothing),

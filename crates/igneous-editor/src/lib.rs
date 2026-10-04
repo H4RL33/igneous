@@ -4,6 +4,7 @@
 
 mod buffer;
 pub mod completion;
+mod diagnostics;
 mod host;
 mod hover;
 mod input;
@@ -17,6 +18,7 @@ pub mod theme;
 mod view;
 
 pub use buffer::LANGUAGE_ID;
+pub use diagnostics::Diagnostic;
 pub use host::{Embed, Host, NoHost, NoteName};
 pub use input::InputOptions;
 pub use properties::PropertyKind;

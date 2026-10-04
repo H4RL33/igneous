@@ -92,6 +92,9 @@ pub trait Host {
     fn attach_file(&self, _path: &Path) -> Option<String> {
         None
     }
+
+    /// Fixes the problems `rule` found (the Fix button on an underline).
+    fn fix(&self, _rule: &str) {}
 }
 
 /// A host that knows nothing: every link exists, nothing opens.

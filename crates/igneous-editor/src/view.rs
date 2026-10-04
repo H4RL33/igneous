@@ -57,6 +57,8 @@ pub(crate) struct State {
     pub properties_source: String,
     /// Links whose targets don't exist.
     pub unresolved: Vec<std::ops::Range<usize>>,
+    /// Problems underlined in the text (see `diagnostics.rs`).
+    pub diagnostics: Vec<crate::Diagnostic>,
 }
 
 mod imp {
@@ -120,6 +122,8 @@ mod imp {
             completion.set_select_on_show(true);
             view.hover()
                 .add_provider(&crate::hover::LinkPreview::new(&view));
+            view.hover()
+                .add_provider(&crate::diagnostics::ProblemHover::new(&view));
         }
     }
 

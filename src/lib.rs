@@ -11,6 +11,8 @@ mod history;
 mod image_page;
 mod index;
 mod inspector;
+mod lint;
+mod lint_prefs;
 mod note_page;
 mod preferences;
 mod query_data;

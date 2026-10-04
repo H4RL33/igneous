@@ -77,6 +77,7 @@ impl Preferences {
         });
         prefs.imp().dark_handler.replace(Some(handler));
         prefs.add_sync_page(window);
+        prefs.add(&crate::lint_prefs::page(window, prefs.upcast_ref()));
         prefs
     }
 

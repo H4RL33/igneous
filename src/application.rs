@@ -108,6 +108,7 @@ impl Application {
             ("win.rename-note", &["F2"]),
             ("win.preferences", &["<Control>comma"]),
             ("win.sync-now", &["<Control><Alt>s"]),
+            ("win.lint-note", &["<Control><Alt>l"]),
             ("win.command-palette", &["<Control>p"]),
             ("win.go-back", &["<Alt>Left"]),
             ("win.toggle-reading", &["<Control>e"]),

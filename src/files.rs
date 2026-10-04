@@ -460,6 +460,17 @@ pub fn show_context_menu(widget: &gtk::Widget, item: Option<&FileItem>, x: f64, 
         show.append_item(&entry("_Show in Files", "win.file-show", p.as_str()));
         menu.append_section(None, &show);
     }
+    // Linting a folder, or the whole vault from the empty area.
+    if folder || path.is_none() {
+        let lint = gio::Menu::new();
+        let label = if path.is_some() {
+            "_Lint Folder…"
+        } else {
+            "_Lint Vault…"
+        };
+        lint.append_item(&entry(label, "win.lint-folder", &base));
+        menu.append_section(None, &lint);
+    }
 
     let popover = gtk::PopoverMenu::from_model(Some(&menu));
     popover.set_parent(widget);
