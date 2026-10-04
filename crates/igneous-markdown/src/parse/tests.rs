@@ -348,6 +348,9 @@ fn markdownish() -> impl Strategy<Value = String> {
         Just("\n\n".to_owned()),
         Just(" ".to_owned()),
         Just("https://a.b/c".to_owned()),
+        // Fragments of the input that crashes pulldown-cmark 0.13.4.
+        Just("![[]".to_owned()),
+        Just(" ]()]]".to_owned()),
         "[a-zé漢😀]{1,4}",
     ];
     proptest::collection::vec(pieces, 0..40).prop_map(|v| v.concat())
@@ -378,4 +381,26 @@ proptest! {
             prop_assert_eq!(tag_text, Some(format!("#{}", tag.name)));
         }
     }
+}
+
+/// pulldown-cmark 0.13.4 panics in its wikilink handling on some malformed
+/// input (upstream issue #1108, fixed on main by PR #1111 but not yet
+/// released). parse() must survive it by re-parsing without wikilinks.
+#[test]
+fn survives_upstream_wikilink_panic() {
+    let text = " \u{fffd}  ![[] ]()]]";
+    let doc = parse(text);
+    assert!(
+        doc.degraded,
+        "the upstream bug no longer triggers: drop the fallback note"
+    );
+    let text = "ok [[Link]]\n\n ![[] ]()]]";
+    let doc = parse(text);
+    assert!(doc.degraded);
+    // Everything else is still parsed.
+    assert!(
+        doc.nodes
+            .iter()
+            .any(|n| matches!(n.kind, NodeKind::Paragraph))
+    );
 }

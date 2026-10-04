@@ -180,6 +180,9 @@ pub struct Document {
     pub callouts: Vec<Callout>,
     pub block_ids: Vec<BlockId>,
     pub comments: Vec<Span>,
+    /// pulldown-cmark panicked on this note, so it was parsed again without
+    /// its wikilink extension. Wikilinks are then missing from the document.
+    pub degraded: bool,
 }
 
 pub fn parse(text: &str) -> Document {
@@ -200,7 +203,16 @@ pub fn parse(text: &str) -> Document {
         raw_depth: 0,
         quote_depth: 0,
     };
-    for (event, range) in Parser::new_ext(&text[base..], options).into_offset_iter() {
+    // A parser bug must never take the editor down with it.
+    let body = &text[base..];
+    let events = match collect_events(body, options) {
+        Some(events) => events,
+        None => {
+            b.doc.degraded = true;
+            collect_events(body, options - Options::ENABLE_WIKILINKS).unwrap_or_default()
+        }
+    };
+    for (event, range) in events {
         b.event(event, range.start + base..range.end + base);
     }
     b.scan_comments(base);
@@ -218,6 +230,13 @@ pub fn parse(text: &str) -> Document {
             .then(b.range.end.cmp(&a.range.end))
     });
     doc
+}
+
+fn collect_events(body: &str, options: Options) -> Option<Vec<(Event<'_>, Span)>> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        Parser::new_ext(body, options).into_offset_iter().collect()
+    }))
+    .ok()
 }
 
 struct Open {
