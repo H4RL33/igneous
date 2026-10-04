@@ -96,8 +96,13 @@ pub fn plan_rename(
         after.insert(new.clone());
     }
 
+    // Notes linking to a moved file, notes whose links a new name could
+    // capture, and the moved notes themselves (for their relative links).
     let mut sources: BTreeSet<VaultPath> = BTreeSet::new();
-    let keys: HashSet<String> = moves.iter().map(|(old, _)| name_key(old)).collect();
+    let keys: HashSet<String> = moves
+        .iter()
+        .flat_map(|(old, new)| [name_key(old), name_key(new)])
+        .collect();
     for key in keys {
         sources.extend(index.sources_linking(&key)?);
     }
