@@ -76,6 +76,10 @@ mod imp {
         #[template_child]
         pub mode_toggle: TemplateChild<adw::ToggleGroup>,
         #[template_child]
+        pub tab_button: TemplateChild<adw::TabButton>,
+        #[template_child]
+        pub tab_overview: TemplateChild<adw::TabOverview>,
+        #[template_child]
         pub inspector_split: TemplateChild<adw::OverlaySplitView>,
         #[template_child]
         pub inspector_bin: TemplateChild<adw::Bin>,
@@ -107,6 +111,9 @@ mod imp {
         /// Set while the mode toggle is being updated to match a tab.
         pub updating_mode: Cell<bool>,
         pub index: OnceCell<Rc<IndexService>>,
+        /// Set once the template is built; property actions are queried
+        /// before that.
+        pub constructed: Cell<bool>,
         pub inspector: OnceCell<Rc<Inspector>>,
         pub inspector_timer: RefCell<Option<glib::SourceId>>,
         pub search: OnceCell<Rc<SearchPane>>,
@@ -137,7 +144,10 @@ mod imp {
         fn properties() -> &'static [glib::ParamSpec] {
             static PROPERTIES: std::sync::LazyLock<Vec<glib::ParamSpec>> =
                 std::sync::LazyLock::new(|| {
-                    vec![glib::ParamSpecBoolean::builder("menu-page-pinned").build()]
+                    vec![
+                        glib::ParamSpecBoolean::builder("menu-page-pinned").build(),
+                        glib::ParamSpecString::builder("note-mode").build(),
+                    ]
                 });
             PROPERTIES.as_ref()
         }
@@ -145,6 +155,9 @@ mod imp {
         fn set_property(&self, _id: usize, value: &glib::Value, pspec: &glib::ParamSpec) {
             match pspec.name() {
                 "menu-page-pinned" => self.obj().set_menu_page_pinned(value.get().unwrap()),
+                "note-mode" => self
+                    .obj()
+                    .set_note_mode(value.get::<Option<String>>().unwrap().as_deref()),
                 _ => unimplemented!(),
             }
         }
@@ -152,6 +165,7 @@ mod imp {
         fn property(&self, _id: usize, pspec: &glib::ParamSpec) -> glib::Value {
             match pspec.name() {
                 "menu-page-pinned" => self.obj().menu_page_pinned().to_value(),
+                "note-mode" => self.obj().note_mode().to_value(),
                 _ => unimplemented!(),
             }
         }
@@ -165,6 +179,7 @@ mod imp {
 
         fn constructed(&self) {
             self.parent_constructed();
+            self.constructed.set(true);
             let obj = self.obj();
             if config::PROFILE == "Devel" {
                 obj.add_css_class("devel");
@@ -291,6 +306,7 @@ fn install_actions(klass: &mut <imp::Window as ObjectSubclass>::Class) {
         }
     });
     klass.install_property_action("win.tab-pinned", "menu-page-pinned");
+    klass.install_property_action("win.mode", "note-mode");
 
     // Git.
     klass.install_action("win.sync-now", None, |w, _, _| w.sync_now(SyncKind::Full));
@@ -518,6 +534,11 @@ impl Window {
                 }
             ));
 
+        imp.tab_button.connect_clicked(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |_| window.imp().tab_overview.set_open(true)
+        ));
         imp.mode_toggle.connect_active_name_notify(glib::clone!(
             #[weak(rename_to = window)]
             self,
@@ -788,10 +809,40 @@ impl Window {
         self.schedule_workspace_save();
     }
 
+    fn note_mode(&self) -> Option<String> {
+        if !self.imp().constructed.get() {
+            return None;
+        }
+        self.selected_note().map(|note| {
+            match note.mode() {
+                Mode::Live => "live",
+                Mode::Source => "source",
+                Mode::Reading => "reading",
+            }
+            .to_owned()
+        })
+    }
+
+    /// The main menu's mode items (shown on narrow windows).
+    fn set_note_mode(&self, mode: Option<&str>) {
+        let Some(note) = self.selected_note() else {
+            return;
+        };
+        note.set_mode(match mode {
+            Some("source") => Mode::Source,
+            Some("reading") => Mode::Reading,
+            _ => Mode::Live,
+        });
+        self.sync_mode_toggle();
+        self.schedule_workspace_save();
+    }
+
     /// Shows the selected note's mode in the header bar's toggle.
     fn sync_mode_toggle(&self) {
         let imp = self.imp();
         let note = self.selected_note();
+        self.action_set_enabled("win.mode", note.is_some());
+        self.notify("note-mode");
         imp.mode_toggle.set_visible(note.is_some());
         if let Some(note) = note {
             imp.updating_mode.set(true);
@@ -817,6 +868,7 @@ impl Window {
         if let Some(note) = self.selected_note() {
             note.set_mode(mode);
             note.focus_editor();
+            self.notify("note-mode");
             self.schedule_workspace_save();
         }
     }

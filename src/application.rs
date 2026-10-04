@@ -220,7 +220,26 @@ impl Application {
             .version(config::VERSION)
             .license_type(gtk::License::Bsd3)
             .copyright("© 2026 Harley Welsh")
+            .comments("Read and edit Markdown vaults, including Obsidian vaults")
             .build();
+        about.add_legal_section(
+            "obsidian-linter",
+            Some("© Platers and contributors"),
+            gtk::License::MitX11,
+            Some("Igneous’s linter follows obsidian-linter’s rules and is tested with its test cases."),
+        );
+        about.add_legal_section(
+            "RaTeX and the KaTeX fonts",
+            Some("© the RaTeX and KaTeX authors"),
+            gtk::License::MitX11,
+            Some("Math is typeset with RaTeX using the KaTeX fonts."),
+        );
+        about.add_legal_section(
+            "Catppuccin, Dracula, Gruvbox, Nord, Rosé Pine, Solarized and Tokyo Night",
+            None,
+            gtk::License::MitX11,
+            Some("The bundled editor themes use these palettes, which are MIT-licensed by their authors."),
+        );
         about.present(self.active_window().as_ref());
     }
 }

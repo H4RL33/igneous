@@ -24,6 +24,21 @@ template $IgneousWindow: Adw.ApplicationWindow {
     }
   }
 
+  // Phones: the mode switch moves into the main menu, and tabs into an
+  // overview.
+  Adw.Breakpoint {
+    condition ("max-width: 450sp")
+
+    setters {
+      split_view.collapsed: true;
+      inspector_split.collapsed: true;
+      mode_slot.visible: false;
+      inspector_button.visible: false;
+      tab_bar.visible: false;
+      tab_button.visible: true;
+    }
+  }
+
   content: Adw.ToastOverlay toast_overlay {
     child: Adw.OverlaySplitView split_view {
       min-sidebar-width: 220;
@@ -142,7 +157,14 @@ template $IgneousWindow: Adw.ApplicationWindow {
           }
 
           [end]
-          ToggleButton {
+          Adw.TabButton tab_button {
+            view: tab_view;
+            visible: false;
+            tooltip-text: _("View Open Tabs");
+          }
+
+          [end]
+          ToggleButton inspector_button {
             icon-name: "sidebar-show-right-symbolic";
             tooltip-text: _("Toggle Inspector");
             active: bind inspector_split.show-sidebar bidirectional;
@@ -152,7 +174,8 @@ template $IgneousWindow: Adw.ApplicationWindow {
           Adw.Bin sync_slot {}
 
           [end]
-          Adw.ToggleGroup mode_toggle {
+          Adw.Bin mode_slot {
+          child: Adw.ToggleGroup mode_toggle {
             visible: false;
             active-name: "live";
 
@@ -177,6 +200,7 @@ template $IgneousWindow: Adw.ApplicationWindow {
             styles [
               "flat",
             ]
+          };
           }
         }
 
@@ -205,7 +229,12 @@ template $IgneousWindow: Adw.ApplicationWindow {
 
           StackPage {
             name: "tabs";
-            child: Adw.TabView tab_view {};
+
+            child: Adw.TabOverview tab_overview {
+              view: tab_view;
+
+              child: Adw.TabView tab_view {};
+            };
           }
         };
       };
@@ -239,6 +268,31 @@ menu primary_menu {
     item {
       label: _("_Graph View");
       action: "win.graph";
+    }
+  }
+
+  section {
+    label: _("Show Note As");
+
+    item {
+      label: _("_Live Preview");
+      action: "win.mode";
+      target: "live";
+      hidden-when: "action-disabled";
+    }
+
+    item {
+      label: _("S_ource");
+      action: "win.mode";
+      target: "source";
+      hidden-when: "action-disabled";
+    }
+
+    item {
+      label: _("_Reading");
+      action: "win.mode";
+      target: "reading";
+      hidden-when: "action-disabled";
     }
   }
 

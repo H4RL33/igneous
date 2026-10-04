@@ -9,6 +9,7 @@ mod config;
 mod editor_host;
 mod editor_prefs;
 mod files;
+mod files_prefs;
 mod graph_data;
 mod graph_page;
 mod graph_view;
