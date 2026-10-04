@@ -15,7 +15,7 @@ pub mod theme;
 mod view;
 
 pub use buffer::LANGUAGE_ID;
-pub use host::{Embed, Host, NoHost, NoteName};
+pub use host::{BaseEmbed, Embed, Host, NoHost, NoteName};
 pub use scheme::{style_scheme, system_accent};
 pub use view::{Mode, NoteView};
 

@@ -63,3 +63,22 @@ textview.igneous-note {
 .properties row.property {
   min-height: 36px;
 }
+
+/* Bases. */
+.base-pill {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background-color: alpha(currentColor, 0.1);
+}
+
+.base-card {
+  padding: 12px;
+}
+
+.base-summaries {
+  border-top: 1px solid var(--border-color);
+}
+
+.base-embed-card {
+  padding: 4px;
+}

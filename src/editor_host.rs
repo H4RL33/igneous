@@ -7,9 +7,10 @@ use std::rc::Rc;
 use gtk::{glib, prelude::*};
 use igneous_core::VaultPath;
 use igneous_core::fs::read_text;
-use igneous_editor::{Embed, Host, NoteName};
+use igneous_editor::{BaseEmbed, Embed, Host, NoteName};
 use igneous_markdown::{LinkRef, Subpath, parse, subpath_range};
 
+use crate::base_view::EmbedSource;
 use crate::note_page::NotePage;
 use crate::vault::VaultContext;
 use crate::window::Window;
@@ -122,6 +123,26 @@ impl Host for NoteHost {
         self.window()
             .map(|w| w.index().tags().as_ref().clone())
             .unwrap_or_default()
+    }
+
+    fn embeds_bases(&self) -> bool {
+        true
+    }
+
+    fn base_widget(&self, base: BaseEmbed<'_>) -> Option<gtk::Widget> {
+        let source = match base {
+            BaseEmbed::File(link) => {
+                let path = self.ctx.resolve(link, self.from().as_ref())?;
+                // `![[File.base#View]]` picks a view by name.
+                let view = match &link.subpath {
+                    Some(Subpath::Heading(names)) => names.last().cloned(),
+                    _ => None,
+                };
+                EmbedSource::File { path, view }
+            }
+            BaseEmbed::Block(body) => EmbedSource::Block(body.to_owned()),
+        };
+        Some(crate::base_view::embed(source, self.from()))
     }
 }
 

@@ -39,7 +39,12 @@ pub(crate) enum OverlayKind {
     Image(String),
     NoteEmbed(LinkRef),
     Table,
-    CalloutIcon { kind: String, has_title: bool },
+    /// A ` ```base ` block, shown as the base's results.
+    Base,
+    CalloutIcon {
+        kind: String,
+        has_title: bool,
+    },
     Properties,
 }
 
@@ -294,10 +299,14 @@ impl NoteView {
         let mut conceal = Vec::new();
         let mut ghost = Vec::new();
         let mut headings = Vec::new();
+        let bases = self.host().embeds_bases();
         for span in &st.spans {
             let revealed = st.mode == Mode::Live && span.reveal.is_revealed_by(&st.selection);
             if !revealed {
                 match &span.replace {
+                    // A base block becomes its results, if the app can show
+                    // them; otherwise it stays a code block.
+                    Some(Replacement::Base) if bases => conceal.push(span.range.clone()),
                     Some(
                         Replacement::Checkbox { .. } | Replacement::Bullet | Replacement::Rule,
                     ) => ghost.extend(span.markers.iter().cloned()),
@@ -373,7 +382,7 @@ impl NoteView {
     }
 
     fn update_reveal(&self) {
-        let guard_target = {
+        let (guard_target, widgets_change) = {
             let Ok(mut guard) = self.imp().state.try_borrow_mut() else {
                 return;
             };
@@ -385,13 +394,29 @@ impl NoteView {
             if selection == st.selection {
                 return;
             }
-            st.selection = selection;
+            let old = std::mem::replace(&mut st.selection, selection);
+            // Tables, base blocks and callout icons are widgets only while
+            // their source is hidden.
+            let widgets_change = st.mode == Mode::Live
+                && st.spans.iter().any(|s| {
+                    matches!(
+                        s.replace,
+                        Some(
+                            Replacement::Table
+                                | Replacement::Base
+                                | Replacement::CalloutHeader { .. }
+                        )
+                    ) && s.reveal.is_revealed_by(&old) != s.reveal.is_revealed_by(&st.selection)
+                });
             let mut desired = HashMap::new();
             self.add_concealment(st, &mut desired);
             let keys = Self::REVEAL_KEYS.map(kind_key);
             self.apply(st, desired, &keys);
-            self.cursor_guard(st)
+            (self.cursor_guard(st), widgets_change)
         };
+        if widgets_change {
+            self.sync_overlays();
+        }
         self.queue_draw();
         if let Some(target) = guard_target {
             let st = self.imp().state.borrow();
@@ -454,6 +479,7 @@ impl NoteView {
         let desired: Vec<(OverlayKind, usize, usize, bool)> = {
             let st = self.imp().state.borrow();
             let mut desired = Vec::new();
+            let bases = self.host().embeds_bases();
             if st.mode != Mode::Source {
                 for span in &st.spans {
                     let revealed =
@@ -475,6 +501,7 @@ impl NoteView {
                             OverlayKind::NoteEmbed(link.reference.clone())
                         }
                         Some(Replacement::Table) if !revealed => OverlayKind::Table,
+                        Some(Replacement::Base) if !revealed && bases => OverlayKind::Base,
                         Some(Replacement::CalloutHeader { kind, has_title }) if !revealed => {
                             OverlayKind::CalloutIcon {
                                 kind: kind.clone(),
@@ -594,7 +621,7 @@ impl NoteView {
                         .or_default()
                         .push(line_of(anchor));
                 }
-                OverlayKind::Table => {
+                OverlayKind::Table | OverlayKind::Base => {
                     let last = overlay.end.saturating_sub(1).max(anchor);
                     spacing
                         .entry(format!("space:below-{}", height + 8))
@@ -683,6 +710,11 @@ impl NoteView {
             OverlayKind::Table => {
                 let anchor = byte_of(&st.lines, &self.buffer().iter_at_mark(&overlay.mark));
                 self.table_widget(&st.text[anchor..overlay.end.min(st.text.len())])
+            }
+            OverlayKind::Base => {
+                let anchor = byte_of(&st.lines, &self.buffer().iter_at_mark(&overlay.mark));
+                let block = &st.text[anchor..overlay.end.min(st.text.len())];
+                self.base_widget(crate::BaseEmbed::Block(fence_body(block)))
             }
             OverlayKind::CalloutIcon { kind, has_title } => {
                 self.callout_icon_widget(kind, *has_title)
@@ -791,8 +823,40 @@ impl NoteView {
         frame.upcast()
     }
 
+    /// A base's results in a card, or a note saying they can't be shown.
+    fn base_widget(&self, base: crate::BaseEmbed<'_>) -> gtk::Widget {
+        let card = gtk::Box::new(gtk::Orientation::Vertical, 4);
+        card.add_css_class("card");
+        card.add_css_class("base-embed-card");
+        match self.host().base_widget(base) {
+            Some(widget) => {
+                widget.set_margin_start(8);
+                widget.set_margin_end(8);
+                widget.set_margin_top(8);
+                widget.set_margin_bottom(8);
+                card.append(&widget);
+            }
+            None => {
+                let label = gtk::Label::new(Some("This base can’t be shown here"));
+                label.add_css_class("dim-label");
+                label.set_margin_top(12);
+                label.set_margin_bottom(12);
+                card.append(&label);
+            }
+        }
+        card.upcast()
+    }
+
     fn embed_widget(&self, link: &LinkRef) -> gtk::Widget {
         let host = self.host();
+        if host.embeds_bases()
+            && link
+                .target
+                .rsplit_once('.')
+                .is_some_and(|(_, ext)| ext.eq_ignore_ascii_case("base"))
+        {
+            return self.base_widget(crate::BaseEmbed::File(link));
+        }
         let card = gtk::Box::new(gtk::Orientation::Vertical, 4);
         card.add_css_class("card");
         card.add_css_class("note-embed");
@@ -1024,7 +1088,9 @@ impl NoteView {
             let anchor = byte_of(&st.lines, &iter);
             let near = match overlay.kind {
                 OverlayKind::Properties => visible.start <= fm_end.unwrap_or(0),
-                OverlayKind::Table => anchor <= visible.end && overlay.end >= visible.start,
+                OverlayKind::Table | OverlayKind::Base => {
+                    anchor <= visible.end && overlay.end >= visible.start
+                }
                 _ => visible.contains(&anchor),
             };
             if overlay.stale.take() {
@@ -1085,7 +1151,7 @@ impl NoteView {
                     let (y, h) = self.line_yrange(&iter);
                     (left, y + h - overlay.height.get() - 4)
                 }
-                OverlayKind::Table => {
+                OverlayKind::Table | OverlayKind::Base => {
                     let (y, _) = self.line_yrange(&iter);
                     (left, y + 2)
                 }
@@ -1149,8 +1215,12 @@ impl NoteView {
             .spans
             .iter()
             .filter(|s| s.range.start <= on_screen.end && s.range.end >= on_screen.start);
+        let bases = self.host().embeds_bases();
         for span in spans {
             match &span.style {
+                // A base block showing its results has its own card.
+                Style::CodeBlock { .. }
+                    if bases && span.replace == Some(Replacement::Base) && !revealed(span) => {}
                 Style::CodeBlock { .. } => {
                     if let Some(rect) = block(&span.range) {
                         rounded(snapshot, &rect, 6.0, &palette.code_background);
@@ -1277,6 +1347,18 @@ fn is_external(target: &str) -> bool {
     target.contains("://") || target.starts_with("mailto:")
 }
 
+/// The lines between a fenced block's opening and closing fences.
+fn fence_body(block: &str) -> &str {
+    let after_open = block.find('\n').map_or(block.len(), |i| i + 1);
+    let body = &block[after_open..];
+    let trimmed = body.trim_end_matches(['\n', '\r']);
+    match trimmed.rfind('\n') {
+        Some(i) if trimmed[i + 1..].trim_start().starts_with(['`', '~']) => &body[..i + 1],
+        None if trimmed.trim_start().starts_with(['`', '~']) => "",
+        _ => body,
+    }
+}
+
 /// Splits a table row into cells, honouring escaped pipes.
 fn split_row(line: &str) -> Vec<String> {
     let line = line.trim();
@@ -1330,6 +1412,7 @@ impl NoteView {
                 OverlayKind::Image(t) => format!("image:{t}"),
                 OverlayKind::NoteEmbed(l) => format!("embed:{}", l.target),
                 OverlayKind::Table => "table".to_owned(),
+                OverlayKind::Base => "base".to_owned(),
                 OverlayKind::CalloutIcon { kind, .. } => format!("callout:{kind}"),
                 OverlayKind::Properties => "properties".to_owned(),
             })
@@ -1596,6 +1679,64 @@ mod tests {
             children(&view)
         );
         window.close();
+    }
+
+    /// A host that shows bases as labels naming what it was asked for.
+    #[derive(Default)]
+    struct Bases {
+        asked: std::cell::RefCell<Vec<String>>,
+    }
+    impl crate::Host for Bases {
+        fn embeds_bases(&self) -> bool {
+            true
+        }
+        fn base_widget(&self, base: crate::BaseEmbed<'_>) -> Option<gtk::Widget> {
+            let asked = match base {
+                crate::BaseEmbed::Block(body) => format!("block:{body}"),
+                crate::BaseEmbed::File(link) => format!("file:{}", link.target),
+            };
+            self.asked.borrow_mut().push(asked.clone());
+            Some(gtk::Label::new(Some(&asked)).upcast())
+        }
+    }
+
+    #[gtk::test]
+    fn base_blocks_and_embeds_show_results() {
+        let text = "intro\n\n```base\nviews:\n  - type: table\n```\n\n![[Tasks.base]]\n\nafter\n";
+        let view = view(text);
+        place(&view, 0);
+        // Without a host that can show bases, the block stays code.
+        assert!(!view.overlay_kinds().contains(&"base".to_owned()));
+        assert!(!concealed_text(&view).join("|").contains("views:"));
+
+        let host = Rc::new(Bases::default());
+        let view = NoteView::new();
+        view.set_host(host.clone());
+        view.source_buffer().set_text(text);
+        place(&view, 0);
+        assert!(view.overlay_kinds().contains(&"base".to_owned()));
+        assert!(concealed_text(&view).join("|").contains("views:"));
+        // Widgets are built as overlays are created.
+        let asked = host.asked.borrow().clone();
+        assert!(
+            asked.contains(&"block:views:\n  - type: table\n".to_owned()),
+            "{asked:?}"
+        );
+        assert!(asked.contains(&"file:Tasks.base".to_owned()), "{asked:?}");
+
+        // With the cursor inside, the source shows again.
+        place(&view, text.find("views").unwrap());
+        assert!(!view.overlay_kinds().contains(&"base".to_owned()));
+        assert!(!concealed_text(&view).join("|").contains("views:"));
+        view.check_invariants().unwrap();
+    }
+
+    #[test]
+    fn fence_bodies() {
+        assert_eq!(fence_body("```base\na: 1\nb: 2\n```"), "a: 1\nb: 2\n");
+        assert_eq!(fence_body("```base\n```"), "");
+        assert_eq!(fence_body("```base\nunclosed"), "unclosed");
+        assert_eq!(fence_body("~~~base\nx\n~~~"), "x\n");
     }
 
     #[test]

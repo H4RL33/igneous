@@ -100,6 +100,9 @@ pub enum Replacement {
     CalloutHeader { kind: String, has_title: bool },
     /// Show the table as a grid while the cursor is outside it.
     Table,
+    /// A ` ```base ` block: show the base's results while the cursor is
+    /// outside it (if the editor can).
+    Base,
 }
 
 const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "bmp", "svg", "webp", "avif"];
@@ -187,12 +190,15 @@ pub fn spans(doc: &Document, text: &str) -> Vec<StyledSpan> {
                 }
             }
             NodeKind::CodeBlock { lang, .. } => {
+                let base = lang
+                    .as_deref()
+                    .is_some_and(|l| l.eq_ignore_ascii_case("base"));
                 push(
                     range,
                     Style::CodeBlock { lang: lang.clone() },
                     markers,
                     within,
-                    None,
+                    base.then_some(Replacement::Base),
                 );
             }
             NodeKind::ListItem { ordered, task } => {
@@ -438,6 +444,19 @@ mod tests {
                 },
             ]
         );
+    }
+
+    #[test]
+    fn base_blocks_can_be_replaced() {
+        let text = "```base\nviews:\n  - type: table\n```\n\n```rust\nx\n```\n";
+        let spans = spans(&parse(text), text);
+        let blocks: Vec<_> = spans
+            .iter()
+            .filter(|s| matches!(s.style, Style::CodeBlock { .. }))
+            .collect();
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].replace, Some(Replacement::Base));
+        assert_eq!(blocks[1].replace, None);
     }
 
     #[test]

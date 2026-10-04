@@ -1,6 +1,8 @@
 //! Igneous: read and edit Markdown vaults on GNOME.
 
 mod application;
+mod base_page;
+mod base_view;
 mod changes;
 mod command_palette;
 mod config;
@@ -24,6 +26,7 @@ mod window;
 mod worker;
 
 pub use application::Application;
+pub use base_page::BasePage;
 pub use index::IndexService;
 pub use note_page::{NotePage, State as NoteState};
 pub use sync::{State as SyncState, SyncService};
