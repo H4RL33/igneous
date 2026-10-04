@@ -30,6 +30,9 @@ const LAST: &[&str] = &[
     "yaml-timestamp",
 ];
 
+/// Passes over a note before giving up on it settling.
+const MAX_PASSES: usize = 4;
+
 /// A problem found in a note.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
@@ -144,20 +147,29 @@ impl Linter {
         }
 
         let mut run = Run::new(text, now, path, file);
-        let mut deferred: Option<&(&'static dyn Rule, Options)> = None;
-        for entry in &self.plan {
-            let (rule, options) = entry;
-            if disabled.iter().any(|r| r == rule.id()) {
-                continue;
+        // One rule's change can give another something to do (as when
+        // moving math delimiters makes a new block), so run until nothing
+        // changes. That makes linting idempotent.
+        for _ in 0..MAX_PASSES {
+            let before = run.steps.len();
+            let mut deferred: Option<&(&'static dyn Rule, Options)> = None;
+            for entry in &self.plan {
+                let (rule, options) = entry;
+                if disabled.iter().any(|r| r == rule.id()) {
+                    continue;
+                }
+                if rule.id() == "add-blank-line-after-yaml" && syntax::yaml(&run.text).is_none() {
+                    deferred = Some(entry);
+                    continue;
+                }
+                run.step(*rule, options);
             }
-            if rule.id() == "add-blank-line-after-yaml" && syntax::yaml(&run.text).is_none() {
-                deferred = Some(entry);
-                continue;
+            if let Some((rule, options)) = deferred {
+                run.step(*rule, options);
             }
-            run.step(*rule, options);
-        }
-        if let Some((rule, options)) = deferred {
-            run.step(*rule, options);
+            if run.steps.len() == before {
+                break;
+            }
         }
 
         result.edits = edits_between(text, &run.text);
@@ -299,20 +311,28 @@ impl<'a> Run<'a> {
     }
 }
 
+/// Maps an offset back through one step's edits. A start offset inside
+/// inserted text goes to the start of what was replaced; an end offset, to
+/// its end.
 fn map_back(edits: &[TextEdit], pos: usize, to_end: bool) -> usize {
     let mut delta: isize = 0;
     for edit in edits {
         let new_start = (edit.range.start as isize + delta) as usize;
         let new_end = new_start + edit.insert.len();
-        if pos < new_start || (pos == new_start && !to_end) {
-            return (pos as isize - delta) as usize;
-        }
-        if pos <= new_end {
-            return if to_end || pos == new_end && pos != new_start {
-                edit.range.end
-            } else {
-                edit.range.start
-            };
+        if to_end {
+            if pos <= new_start {
+                return (pos as isize - delta) as usize;
+            }
+            if pos <= new_end {
+                return edit.range.end;
+            }
+        } else {
+            if pos < new_start {
+                return (pos as isize - delta) as usize;
+            }
+            if pos < new_end {
+                return edit.range.start;
+            }
         }
         delta += edit.insert.len() as isize - edit.range.len() as isize;
     }

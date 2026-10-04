@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 59228257b7b741031f34e2c1dba88eb0b9d54400ecf6b6435442491844242604 # shrinks to text = "text $$y$$ more\n$$\nx  = 1\n$$"
+cc d36c8cd400f9383f0f353c885c0b2adcf5ee20ec08ab1770d8bd68e472731f4a # shrinks to text = "---\ntags: [a, b, a]\naliases: x\n---\n- [ ]   task\na  \n# Heading.\n   \n> quote\n[[Link]] and [md](x.md) #tag\n```\ncode  \n```\n> > nested"

@@ -53,26 +53,35 @@ pub fn edits_between(before: &str, after: &str) -> Vec<TextEdit> {
         Some(deadline),
     );
 
+    // Positions come from the ops' lengths: an insertion's reported
+    // `old_index` isn't always where it applies.
     let mut edits: Vec<TextEdit> = Vec::new();
     let mut pending: Option<(Span, Span)> = None;
+    let (mut old_pos, mut new_pos) = (0, 0);
     for op in ops {
-        match op {
-            DiffOp::Equal { .. } => {
-                if let Some((o, n)) = pending.take() {
-                    edits.push(TextEdit::replace(
-                        prefix + old_offsets[o.start]..prefix + old_offsets[o.end],
-                        &new[new_offsets[n.start]..new_offsets[n.end]],
-                    ));
-                }
+        let (old_len, new_len) = match op {
+            DiffOp::Equal { len, .. } => (len, len),
+            DiffOp::Delete { old_len, .. } => (old_len, 0),
+            DiffOp::Insert { new_len, .. } => (0, new_len),
+            DiffOp::Replace {
+                old_len, new_len, ..
+            } => (old_len, new_len),
+        };
+        let (o, n) = (old_pos..old_pos + old_len, new_pos..new_pos + new_len);
+        (old_pos, new_pos) = (o.end, n.end);
+        if let DiffOp::Equal { .. } = op {
+            if let Some((o, n)) = pending.take() {
+                edits.push(TextEdit::replace(
+                    prefix + old_offsets[o.start]..prefix + old_offsets[o.end],
+                    &new[new_offsets[n.start]..new_offsets[n.end]],
+                ));
             }
-            _ => {
-                let (o, n) = (op.old_range(), op.new_range());
-                pending = Some(match pending.take() {
-                    Some((po, pn)) => (po.start..o.end, pn.start..n.end),
-                    None => (o, n),
-                });
-            }
+            continue;
         }
+        pending = Some(match pending.take() {
+            Some((po, pn)) => (po.start..o.end, pn.start..n.end),
+            None => (o, n),
+        });
     }
     if let Some((o, n)) = pending {
         edits.push(TextEdit::replace(
@@ -494,17 +503,19 @@ fn end_of_last_non_empty_line(text: &str, current_end: usize, level: usize) -> u
     let mut found = false;
     let mut current_level = 0;
     while index >= 0 {
-        let current = bytes[index as usize];
-        if !is_ws(current) && current != b'>' {
+        // Past the end, JavaScript's `charAt` gives `''`, which counts as
+        // whitespace.
+        let current = at(bytes, index);
+        if !blank(bytes, index) && current != Some(b'>') {
             found = true;
             break;
-        } else if current == b'\n' {
+        } else if current == Some(b'\n') {
             if current_level != level {
                 break;
             }
             current_level = 0;
             actual = index as usize;
-        } else if current == b'>' {
+        } else if current == Some(b'>') {
             current_level += 1;
         }
         index -= 1;

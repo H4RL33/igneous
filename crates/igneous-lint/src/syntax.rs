@@ -47,10 +47,10 @@ pub fn positions(text: &str, doc: &Document, element: Element) -> Vec<Span> {
                 (NodeKind::HtmlBlock, Element::Html) => Some(trim_block(text, range)),
                 (NodeKind::InlineHtml, Element::Html) => Some(range),
                 (NodeKind::List { .. }, Element::List) => {
-                    Some(skip_indent(text, trim_block(text, range)))
+                    Some(to_marker(text, trim_block(text, range)))
                 }
                 (NodeKind::ListItem { .. }, Element::ListItem) => {
-                    Some(skip_indent(text, trim_block(text, range)))
+                    Some(to_marker(text, trim_block(text, range)))
                 }
                 (NodeKind::Quote | NodeKind::Callout(_), Element::Blockquote) => {
                     Some(skip_indent(text, trim_block(text, range)))
@@ -72,6 +72,17 @@ pub fn positions(text: &str, doc: &Document, element: Element) -> Vec<Span> {
     // Stable, so a parent stays ahead of a child starting at the same place.
     out.sort_by_key(|r| std::cmp::Reverse(r.start));
     out
+}
+
+/// A list or list item's range, starting at its marker. pulldown-cmark can
+/// start one at the indentation, or even at an enclosing blockquote's `>`
+/// when tabs are involved.
+fn to_marker(text: &str, range: Span) -> Span {
+    let skipped = text[range.clone()]
+        .bytes()
+        .take_while(|b| matches!(b, b' ' | b'\t' | b'>'))
+        .count();
+    (range.start + skipped).min(range.end)..range.end
 }
 
 /// A range starting after any spaces or tabs at its start.
@@ -230,7 +241,7 @@ pub fn list_item_texts(text: &str, doc: &Document, include_empty: bool) -> Vec<(
         if !matches!(item.kind, NodeKind::ListItem { .. }) {
             continue;
         }
-        let range = trim_block(text, item.range.clone());
+        let range = to_marker(text, trim_block(text, item.range.clone()));
         let children: Vec<&igneous_markdown::Node> = doc.nodes[index + 1..]
             .iter()
             .take_while(|n| n.range.start < item.range.end)
