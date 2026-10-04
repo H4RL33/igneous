@@ -464,6 +464,7 @@ impl Window {
 
         // The index, and the inspector that shows what it knows.
         let index = IndexService::new(&ctx.vault);
+        index.set_overrides(ctx.settings.properties.types.clone());
         let weak = self.downgrade();
         index.connect_changed(move || {
             if let Some(window) = weak.upgrade() {

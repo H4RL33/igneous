@@ -7,7 +7,8 @@ use std::rc::Rc;
 use gtk::{glib, prelude::*};
 use igneous_core::VaultPath;
 use igneous_core::fs::read_text;
-use igneous_editor::{Embed, Host, NoteName};
+use igneous_core::settings::{self as vault_settings, PropertyType, VaultSettings};
+use igneous_editor::{Embed, Host, NoteName, PropertyKind};
 use igneous_markdown::{LinkRef, Subpath, parse, subpath_range};
 
 use crate::note_page::NotePage;
@@ -122,6 +123,73 @@ impl Host for NoteHost {
         self.window()
             .map(|w| w.index().tags().as_ref().clone())
             .unwrap_or_default()
+    }
+
+    fn property_kind(&self, key: &str) -> Option<PropertyKind> {
+        let window = self.window()?;
+        let properties = window.index().properties();
+        let info = properties.iter().find(|p| p.key == key)?;
+        Some(kind_of(info.ty))
+    }
+
+    fn set_property_kind(&self, key: &str, kind: PropertyKind) {
+        let Some(window) = self.window() else { return };
+        let dir = self.ctx.vault.igneous_dir();
+        // Never overwrite a vault.json that can't be read.
+        let mut settings = match vault_settings::load::<VaultSettings>(&dir) {
+            Ok(settings) => settings,
+            Err(e) => {
+                window.toast(&format!("Couldn’t save the property type: {e}"));
+                return;
+            }
+        };
+        settings
+            .properties
+            .types
+            .insert(key.to_owned(), type_of(kind));
+        if let Err(e) = vault_settings::save(&dir, &settings) {
+            window.toast(&format!("Couldn’t save the property type: {e}"));
+            return;
+        }
+        window.index().set_overrides(settings.properties.types);
+    }
+
+    fn property_keys(&self) -> Vec<String> {
+        self.window()
+            .map(|w| {
+                w.index()
+                    .properties()
+                    .iter()
+                    .map(|p| p.key.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+}
+
+fn kind_of(ty: PropertyType) -> PropertyKind {
+    match ty {
+        PropertyType::Text => PropertyKind::Text,
+        PropertyType::List => PropertyKind::List,
+        PropertyType::Number => PropertyKind::Number,
+        PropertyType::Checkbox => PropertyKind::Checkbox,
+        PropertyType::Date => PropertyKind::Date,
+        PropertyType::Datetime => PropertyKind::DateTime,
+        PropertyType::Tags => PropertyKind::Tags,
+        PropertyType::Aliases => PropertyKind::Aliases,
+    }
+}
+
+fn type_of(kind: PropertyKind) -> PropertyType {
+    match kind {
+        PropertyKind::Text => PropertyType::Text,
+        PropertyKind::List => PropertyType::List,
+        PropertyKind::Number => PropertyType::Number,
+        PropertyKind::Checkbox => PropertyType::Checkbox,
+        PropertyKind::Date => PropertyType::Date,
+        PropertyKind::DateTime => PropertyType::Datetime,
+        PropertyKind::Tags => PropertyType::Tags,
+        PropertyKind::Aliases => PropertyType::Aliases,
     }
 }
 

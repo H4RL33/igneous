@@ -9,7 +9,10 @@ use std::rc::Rc;
 use gtk::glib;
 use igneous_core::watch::VaultEvent;
 use igneous_core::{Vault, VaultPath};
-use igneous_index::{Index, NoteEntry};
+use std::collections::BTreeMap;
+
+use igneous_core::settings::PropertyType;
+use igneous_index::{Index, NoteEntry, PropertyInfo};
 
 use crate::worker::Worker;
 
@@ -20,6 +23,9 @@ pub struct IndexService {
     notes: RefCell<Rc<Vec<NoteEntry>>>,
     tags: RefCell<Rc<Vec<(String, usize)>>>,
     data: RefCell<Option<std::sync::Arc<Vec<igneous_query::NoteData>>>>,
+    /// Property types the user chose, from `.igneous/vault.json`.
+    overrides: RefCell<BTreeMap<String, PropertyType>>,
+    properties: RefCell<Rc<Vec<PropertyInfo>>>,
     listeners: RefCell<Vec<Box<dyn Fn()>>>,
 }
 
@@ -44,6 +50,8 @@ impl IndexService {
             notes: RefCell::default(),
             tags: RefCell::default(),
             data: RefCell::default(),
+            overrides: RefCell::default(),
+            properties: RefCell::default(),
             listeners: RefCell::default(),
         });
         let weak = Rc::downgrade(&service);
@@ -84,10 +92,22 @@ impl IndexService {
 
     async fn changed(&self) {
         self.data.replace(None);
-        let lists = self.query(|index| (index.notes(), index.tags())).await;
-        if let Some((notes, tags)) = lists {
+        let overrides = self.overrides.borrow().clone();
+        let lists = self
+            .query(move |index| {
+                (
+                    index.notes(),
+                    index.tags(),
+                    index.property_catalog(&overrides),
+                )
+            })
+            .await;
+        if let Some((notes, tags, properties)) = lists {
             self.notes.replace(Rc::new(notes.unwrap_or_default()));
             self.tags.replace(Rc::new(tags.unwrap_or_default()));
+            let mut properties = properties.unwrap_or_default();
+            properties.sort_by(|a, b| b.count.cmp(&a.count).then(a.key.cmp(&b.key)));
+            self.properties.replace(Rc::new(properties));
         }
         for listener in self.listeners.borrow().iter() {
             listener();
@@ -151,6 +171,21 @@ impl IndexService {
     /// Every tag with the number of notes using it.
     pub fn tags(&self) -> Rc<Vec<(String, usize)>> {
         self.tags.borrow().clone()
+    }
+
+    /// Every property key with its type and how many notes use it, most
+    /// used first.
+    pub fn properties(&self) -> Rc<Vec<PropertyInfo>> {
+        self.properties.borrow().clone()
+    }
+
+    /// Sets the user's property types and refreshes the catalogue.
+    pub fn set_overrides(self: &Rc<Self>, overrides: BTreeMap<String, PropertyType>) {
+        self.overrides.replace(overrides);
+        if self.is_ready() {
+            let this = self.clone();
+            glib::spawn_future_local(async move { this.changed().await });
+        }
     }
 
     /// The aliases of `path`, from the last update.

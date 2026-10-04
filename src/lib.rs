@@ -38,6 +38,9 @@ use gtk::{gio, glib, prelude::*};
 pub fn init() {
     static INIT: std::sync::Once = std::sync::Once::new();
     INIT.call_once(|| {
+        // libadwaita's styles and icons; an AdwApplication does this itself,
+        // but windows made without one (tests) need it too.
+        let _ = adw::init();
         gio::resources_register_include!("igneous.gresource").expect("app resources are valid");
         igneous_editor::init();
         // The application adds this itself on startup; windows created before

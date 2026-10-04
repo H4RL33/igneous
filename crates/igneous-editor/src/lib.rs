@@ -8,6 +8,7 @@ mod host;
 mod hover;
 mod live;
 pub mod markup;
+mod properties;
 mod rangeset;
 mod scheme;
 mod tags;
@@ -16,6 +17,7 @@ mod view;
 
 pub use buffer::LANGUAGE_ID;
 pub use host::{Embed, Host, NoHost, NoteName};
+pub use properties::PropertyKind;
 pub use scheme::{style_scheme, system_accent};
 pub use view::{Mode, NoteView};
 

@@ -21,7 +21,7 @@ use std::ops::Range;
 
 use gtk::{gdk, glib, graphene, gsk, pango, prelude::*, subclass::prelude::*};
 use igneous_markdown::present::{self, Replacement, Reveal, Style, StyledSpan};
-use igneous_markdown::{LinkKind, LinkRef, frontmatter::Value, parse};
+use igneous_markdown::{LinkKind, LinkRef, parse};
 use sourceview::prelude::*;
 
 use crate::rangeset::RangeSet;
@@ -945,37 +945,10 @@ impl NoteView {
     }
 
     fn properties_widget(&self, st: &State) -> gtk::Widget {
-        let list = gtk::ListBox::new();
-        list.add_css_class("boxed-list");
-        list.add_css_class("properties");
-        list.set_selection_mode(gtk::SelectionMode::None);
-        if let Some(fm) = &st.doc.frontmatter {
-            for entry in &fm.entries {
-                let value = match &entry.value {
-                    Value::Null => String::new(),
-                    Value::List(_) => entry.value.string_list().join(", "),
-                    Value::String(s) => s.clone(),
-                    Value::Bool(b) => b.to_string(),
-                    Value::Int(i) => i.to_string(),
-                    Value::Float(f) => f.to_string(),
-                    Value::Map(_) => "{…}".into(),
-                };
-                let row = adw::ActionRow::builder()
-                    .title(glib::markup_escape_text(&entry.key))
-                    .subtitle(glib::markup_escape_text(&value))
-                    .css_classes(["property"])
-                    .build();
-                list.append(&row);
-            }
-            if let Some(error) = &fm.error {
-                let row = adw::ActionRow::builder()
-                    .title("Invalid frontmatter")
-                    .subtitle(glib::markup_escape_text(error))
-                    .build();
-                list.append(&row);
-            }
+        match &st.doc.frontmatter {
+            Some(fm) => self.properties_widget_for(fm),
+            None => gtk::Box::new(gtk::Orientation::Vertical, 0).upcast(),
         }
-        list.upcast()
     }
 
     // --- per-frame work -----------------------------------------------------------

@@ -4,6 +4,8 @@ use std::path::PathBuf;
 
 use igneous_markdown::LinkRef;
 
+use crate::properties::PropertyKind;
+
 /// A note shown inside another (`![[Note]]`, `![[Note#Heading]]`).
 pub struct Embed {
     pub title: String,
@@ -61,6 +63,20 @@ pub trait Host {
 
     /// The vault's tags, with how many notes use each.
     fn tags(&self) -> Vec<(String, usize)> {
+        Vec::new()
+    }
+
+    /// The type the vault gives a property (set by the user or inferred
+    /// from every note). `None` to judge by this note's value alone.
+    fn property_kind(&self, _key: &str) -> Option<PropertyKind> {
+        None
+    }
+
+    /// Makes `key` a property of this kind throughout the vault.
+    fn set_property_kind(&self, _key: &str, _kind: PropertyKind) {}
+
+    /// Property keys used in the vault, most common first.
+    fn property_keys(&self) -> Vec<String> {
         Vec::new()
     }
 }
