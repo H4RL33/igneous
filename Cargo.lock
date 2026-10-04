@@ -745,6 +745,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "igneous-graph"
+version = "0.1.0"
+
+[[package]]
 name = "igneous-markdown"
 version = "0.1.0"
 dependencies = [
