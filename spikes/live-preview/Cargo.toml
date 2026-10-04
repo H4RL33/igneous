@@ -1,0 +1,17 @@
+[package]
+name = "live-preview-spike"
+description = "M0: Live Preview feasibility prototype on GtkSourceView (throwaway)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+adw.workspace = true
+anyhow.workspace = true
+gtk.workspace = true
+igneous-core.workspace = true
+igneous-markdown.workspace = true
+sourceview.workspace = true

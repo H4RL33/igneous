@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/igneous-core", "crates/igneous-markdown"]
+members = ["crates/igneous-core", "crates/igneous-markdown", "spikes/live-preview"]
 
 [workspace.package]
 version = "0.1.0"
