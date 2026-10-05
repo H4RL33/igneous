@@ -77,6 +77,19 @@ The fields at the top of a note are its YAML frontmatter:
 
 Igneous changes only the property you edit, leaving the rest of the frontmatter, comments included, exactly as written.
 
+### Daily notes, templates and bookmarks
+
+- **Daily notes (Ctrl+Alt+D)** opens today's note, creating it if needed. Ctrl+Alt+Page Up and Page Down go to the previous and next ones, and the calendar button in the sidebar opens any day (days with a note are marked).
+- **Insert Template** (main menu or command palette) inserts a note from your templates folder at the cursor, filling in `{{title}}`, `{{date}}`, `{{time}}`, `{{date:YYYY-MM-DD}}` and `{{time:HH:mm}}`. The template's properties merge into the note's.
+- **Bookmarks** collect notes, folders, headings and searches in the sidebar's Bookmarks page; **Bookmark Note** in the main menu or command palette adds or removes the open note. They follow renames.
+- **A startup note** can open whenever the vault does.
+
+**Preferences → Notes** sets the daily notes folder, date format and template, the templates folder, and the startup note.
+
+### File recovery
+
+While you edit, Igneous keeps snapshots of each note: at most one every few minutes, for a week, up to a size limit. **Note Snapshots…** in the main menu lists them. Open one to read it, then use **Restore** to put it back as one step you can undo. Snapshots are kept outside the vault, in `~/.local/share/igneous/snapshots/`.
+
 ## Finding things
 
 **Search (Ctrl+Shift+F)** understands Obsidian's search syntax:
@@ -164,6 +177,8 @@ Code, math, frontmatter (except for YAML rules) and anything between `<!-- linte
 | Back / forward | Alt+← / Alt+→ |
 | Close tab / reopen closed tab | Ctrl+W / Ctrl+Shift+T |
 | Graph | Ctrl+G |
+| Today's daily note | Ctrl+Alt+D |
+| Previous / next daily note | Ctrl+Alt+Page Up / Ctrl+Alt+Page Down |
 | Sync now | Ctrl+Alt+S |
 | Lint note | Ctrl+Alt+L |
 | Toggle sidebar | F9 |
@@ -179,6 +194,7 @@ Code, math, frontmatter (except for YAML rules) and anything between `<!-- linte
 | `<vault>/.igneous/` | the vault's settings, open tabs, appearance, Git, linter, graph, bookmarks and its own themes |
 | `~/.cache/igneous/` | the index and generated style schemes; safe to delete |
 | `~/.local/share/igneous/themes/` | your own editor themes |
+| `~/.local/share/igneous/snapshots/` | file recovery snapshots |
 | GSettings `dev.h4rl3y.igneous` | recent vaults, window size, the default editor theme |
 
 ## Not yet
