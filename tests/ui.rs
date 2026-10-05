@@ -1217,7 +1217,7 @@ async fn add_property_offers_the_vaults_names_and_new_ones() {
     assert_eq!(names, ["created", "status", "tags"]);
 
     // An existing name is added straight from the menu, and from then on
-    // the note's menu leaves out the names it has.
+    // the note's menu greys out the names it has.
     let action = |key: &str| {
         igneous_editor::property_name_item(key)
             .attribute_value("action", Some(gtk::glib::VariantTy::STRING))
@@ -1234,8 +1234,26 @@ async fn add_property_offers_the_vaults_names_and_new_ones() {
         .await
     );
     let row = add_property_row(&view).unwrap();
-    assert!(WidgetExt::activate_action(&row, &action("tags"), None).is_err());
-    assert!(WidgetExt::activate_action(&row, &action("status"), None).is_err());
+    let button = find_widget(row.upcast_ref(), &|w| w.is::<gtk::MenuButton>())
+        .and_downcast::<gtk::MenuButton>()
+        .unwrap();
+    button.popup();
+    wait(300).await;
+    let popover = button.popover().unwrap();
+    let item = |label: &str| {
+        find_widget(popover.upcast_ref(), &|w| {
+            w.type_().name() == "GtkModelButton"
+                && w.property::<Option<String>>("text").as_deref() == Some(label)
+        })
+        .unwrap_or_else(|| panic!("{label} isn't in the menu"))
+    };
+    assert!(!item("tags").is_sensitive());
+    assert!(!item("status").is_sensitive());
+    assert!(item("created").is_sensitive());
+    button.popdown();
+    let before = note.text();
+    let _ = WidgetExt::activate_action(&row, &action("tags"), None);
+    assert_eq!(note.text(), before);
     WidgetExt::activate_action(&row, &action("created"), None).unwrap();
     assert!(note.text().contains("\ncreated:"), "{:?}", note.text());
     note.discard();
@@ -1272,6 +1290,33 @@ async fn refreshing_property_names_rescans_the_vault() {
     let file: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&names_file).unwrap()).unwrap();
     assert_eq!(file["names"], serde_json::json!(["created", "tags"]));
+    // The menu shows the new list.
+    let row = add_property_row(&view).unwrap();
+    let button = find_widget(row.upcast_ref(), &|w| w.is::<gtk::MenuButton>())
+        .and_downcast::<gtk::MenuButton>()
+        .unwrap();
+    button.popup();
+    let popover = button.popover().unwrap();
+    let shown = || {
+        let mut shown = Vec::new();
+        let mut stack = vec![popover.clone().upcast::<gtk::Widget>()];
+        while let Some(widget) = stack.pop() {
+            if widget.type_().name() == "GtkModelButton" && widget.is_visible() {
+                shown.extend(widget.property::<Option<String>>("text"));
+            }
+            let mut child = widget.last_child();
+            while let Some(c) = child {
+                child = c.prev_sibling();
+                stack.push(c);
+            }
+        }
+        shown
+    };
+    let expected = ["created", "tags", "New Property…", "Refresh Property Names"];
+    // (Whether the compositor maps a popup opened without real input is
+    // up to it, so this checks the items, not that they're on screen.)
+    assert!(until(3000, || shown() == expected).await, "{:?}", shown());
+    button.popdown();
     window.selected_note().unwrap().discard();
     window.close();
 }

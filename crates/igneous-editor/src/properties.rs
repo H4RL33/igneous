@@ -528,7 +528,7 @@ impl NoteView {
         row.upcast()
     }
 
-    /// The vault's property names (those the note has are hidden), then New
+    /// The vault's property names (those the note has are greyed out), then New
     /// Property…, then a way to remake the names from the notes.
     fn add_property_menu(&self) -> gio::Menu {
         let new = gio::Menu::new();
@@ -612,14 +612,12 @@ impl NoteView {
 
 /// An item for the vault's property names menu (see
 /// [`Host::property_names`](crate::Host::property_names)): it adds `key` to
-/// the note, and is hidden in notes that already have it.
+/// the note, and is greyed out in notes that already have it.
 pub fn property_name_item(key: &str) -> gio::MenuItem {
-    let item = gio::MenuItem::new(
+    gio::MenuItem::new(
         Some(&key.replace('_', "__")),
         Some(&format!("property.{}", add_action(key))),
-    );
-    item.set_attribute_value("hidden-when", Some(&"action-missing".to_variant()));
-    item
+    )
 }
 
 /// The action that adds `key`: its bytes in hex, as an action's name can't
@@ -642,9 +640,9 @@ fn key_of_action(name: &str) -> Option<String> {
 }
 
 glib::wrapper! {
-    /// Add Property's actions for one note: `new`, `refresh`, and `add-…` for each of
-    /// the vault's names the note doesn't have. They're answered from the
-    /// name, so nothing is made per name.
+    /// Add Property's actions for one note: `new`, `refresh`, and `add-…`
+    /// for each of the vault's names, disabled for those the note has.
+    /// They're answered from the name, so nothing is made per name.
     pub struct AddPropertyActions(ObjectSubclass<imp::AddPropertyActions>)
         @implements gio::ActionGroup;
 }
@@ -691,6 +689,15 @@ mod imp {
         fn key(&self, name: &str) -> Option<String> {
             key_of_action(name).filter(|key| !self.existing.borrow().contains(key))
         }
+
+        /// Whether `name` is one of the actions, and if so whether it's
+        /// enabled.
+        fn enabled(&self, name: &str) -> Option<bool> {
+            match name {
+                "new" | "refresh" => Some(true),
+                _ => key_of_action(name).map(|key| !self.existing.borrow().contains(&key)),
+            }
+        }
     }
 
     impl ActionGroupImpl for AddPropertyActions {
@@ -704,7 +711,7 @@ mod imp {
                     .item_attribute_value(i, "action", Some(glib::VariantTy::STRING))
                     .and_then(|a| a.get::<String>());
                 if let Some(name) = action.as_deref().and_then(|a| a.strip_prefix("property."))
-                    && self.key(name).is_some()
+                    && self.enabled(name).is_some()
                 {
                     names.push(name.to_owned());
                 }
@@ -722,8 +729,8 @@ mod imp {
             Option<glib::Variant>,
             Option<glib::Variant>,
         )> {
-            (name == "new" || name == "refresh" || self.key(name).is_some())
-                .then_some((true, None, None, None, None))
+            self.enabled(name)
+                .map(|enabled| (enabled, None, None, None, None))
         }
 
         fn activate_action(&self, name: &str, _parameter: Option<&glib::Variant>) {
