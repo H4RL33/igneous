@@ -43,7 +43,7 @@ use igneous_index::refactor::RefactorPlan;
 const MAX_RECENT_FILES: usize = 50;
 const MAX_CLOSED_TABS: usize = 20;
 
-mod imp {
+pub(crate) mod imp {
     use super::*;
 
     #[derive(Default, gtk::CompositeTemplate)]
@@ -69,6 +69,10 @@ mod imp {
         pub search_bin: TemplateChild<adw::Bin>,
         #[template_child]
         pub tags_bin: TemplateChild<adw::Bin>,
+        #[template_child]
+        pub bookmarks_bin: TemplateChild<adw::Bin>,
+        #[template_child]
+        pub calendar_button: TemplateChild<gtk::MenuButton>,
         #[template_child]
         pub sync_slot: TemplateChild<adw::Bin>,
         #[template_child]
@@ -115,6 +119,7 @@ mod imp {
         pub tags: OnceCell<Rc<TagsPane>>,
         pub lint: OnceCell<Rc<crate::lint::LintConfig>>,
         pub graph_timer: RefCell<Option<glib::SourceId>>,
+        pub bookmarks: OnceCell<Rc<crate::bookmarks::BookmarksPane>>,
     }
 
     #[glib::object_subclass]
@@ -307,6 +312,9 @@ fn install_actions(klass: &mut <imp::Window as ObjectSubclass>::Class) {
             w.show_history(&path);
         }
     });
+
+    // Daily notes, templates, bookmarks and file recovery.
+    crate::builtins::install_actions(klass);
 }
 
 impl Window {
@@ -573,6 +581,7 @@ impl Window {
         self.imp().style_handlers.replace(vec![on_dark, on_accent]);
 
         self.restore_workspace();
+        self.set_up_builtins();
     }
 
     // --- tabs ----------------------------------------------------------------
@@ -1009,6 +1018,7 @@ impl Window {
                 *path = new;
             }
         }
+        self.bookmarks_follow_rename(from, to);
         self.on_selected_page();
     }
 
@@ -2343,7 +2353,7 @@ impl Window {
         });
     }
 
-    fn open_text_page(&self, path: &VaultPath, contents: Contents, text: &str) {
+    pub(crate) fn open_text_page(&self, path: &VaultPath, contents: Contents, text: &str) {
         let imp = self.imp();
         let page = TextPage::new(path, contents.clone(), text, self.editor_scheme().as_ref());
         let existing = self.pages().into_iter().find(|p| {
@@ -2365,6 +2375,7 @@ impl Window {
         tab.set_tooltip(&glib::markup_escape_text(path.as_str()));
         tab.set_icon(Some(&gio::ThemedIcon::new(match page.contents() {
             Some(Contents::Version { .. }) => "document-open-recent-symbolic",
+            Some(Contents::Snapshot { .. }) => "document-revert-symbolic",
             _ => "document-edit-symbolic",
         })));
         imp.tab_view.set_selected_page(&tab);

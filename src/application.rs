@@ -115,6 +115,9 @@ impl Application {
             ("win.toggle-reading", &["<Control>e"]),
             ("win.search", &["<Control><Shift>f"]),
             ("win.go-forward", &["<Alt>Right"]),
+            ("win.daily-note", &["<Control><Alt>d"]),
+            ("win.daily-note-previous", &["<Control><Alt>Page_Up"]),
+            ("win.daily-note-next", &["<Control><Alt>Page_Down"]),
         ] {
             self.set_accels_for_action(action, accels);
         }

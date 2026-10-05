@@ -91,6 +91,25 @@ Adw.ShortcutsDialog shortcuts_dialog {
   }
 
   Adw.ShortcutsSection {
+    title: _("Daily Notes");
+
+    Adw.ShortcutsItem {
+      title: _("Today’s note");
+      action-name: "win.daily-note";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Previous daily note");
+      action-name: "win.daily-note-previous";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Next daily note");
+      action-name: "win.daily-note-next";
+    }
+  }
+
+  Adw.ShortcutsSection {
     title: _("Git");
 
     Adw.ShortcutsItem {

@@ -500,6 +500,7 @@ impl NotePage {
         match fs::write_atomic(&self.ctx().abs(&path), &file, expect) {
             Ok(stamp) => {
                 self.ctx().expect_write(&path, &stamp);
+                crate::snapshots::record(self.ctx(), &path, file.text());
                 imp.file.replace(file);
                 imp.stamp.replace(Some(stamp));
                 self.set_state(State::Clean);

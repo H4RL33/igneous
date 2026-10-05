@@ -142,6 +142,7 @@ pub struct VaultSettings {
     pub templates: TemplateSettings,
     /// Note opened when the vault opens, if any.
     pub startup_note: Option<VaultPath>,
+    pub recovery: RecoverySettings,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
@@ -158,6 +159,35 @@ impl Default for VaultSettings {
             daily_notes: DailyNoteSettings::default(),
             templates: TemplateSettings::default(),
             startup_note: None,
+            recovery: RecoverySettings::default(),
+            extra: Map::new(),
+        }
+    }
+}
+
+/// File recovery: snapshots of notes as they're edited, kept outside the
+/// vault (in `$XDG_DATA_HOME/igneous/snapshots/`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct RecoverySettings {
+    /// Minutes between snapshots of a note being edited; 0 takes one at
+    /// every save.
+    pub interval_minutes: u32,
+    /// Snapshots older than this many days are deleted.
+    pub keep_days: u32,
+    /// The vault's snapshots are kept under this many megabytes, oldest
+    /// deleted first.
+    pub max_megabytes: u32,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl Default for RecoverySettings {
+    fn default() -> Self {
+        Self {
+            interval_minutes: 5,
+            keep_days: 7,
+            max_megabytes: 100,
             extra: Map::new(),
         }
     }

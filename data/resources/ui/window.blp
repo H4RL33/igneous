@@ -42,6 +42,12 @@ template $IgneousWindow: Adw.ApplicationWindow {
             action-name: "win.new-note";
           }
 
+          [start]
+          MenuButton calendar_button {
+            icon-name: "x-office-calendar-symbolic";
+            tooltip-text: _("Daily Notes");
+          }
+
           [end]
           Button {
             icon-name: "folder-new-symbolic";
@@ -97,6 +103,14 @@ template $IgneousWindow: Adw.ApplicationWindow {
             icon-name: "tag-symbolic";
 
             child: Adw.Bin tags_bin {};
+          }
+
+          Adw.ViewStackPage {
+            name: "bookmarks";
+            title: _("Bookmarks");
+            icon-name: "user-bookmarks-symbolic";
+
+            child: Adw.Bin bookmarks_bin {};
           }
 
           Adw.ViewStackPage changes_page {
@@ -239,6 +253,28 @@ menu primary_menu {
     item {
       label: _("_Graph View");
       action: "win.graph";
+    }
+  }
+
+  section {
+    item {
+      label: _("_Today’s Note");
+      action: "win.daily-note";
+    }
+
+    item {
+      label: _("Insert _Template…");
+      action: "win.insert-template";
+    }
+
+    item {
+      label: _("_Bookmark Note");
+      action: "win.bookmark";
+    }
+
+    item {
+      label: _("Note _Snapshots…");
+      action: "win.note-snapshots";
     }
   }
 
