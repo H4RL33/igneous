@@ -860,9 +860,10 @@ pub enum Bookmark {
 
 // --- icons.json ------------------------------------------------------------
 
-/// Custom icons for files, by path. Igneous moves an entry when it renames
-/// or moves the file (or a folder above it) and drops it when it deletes
-/// the file; changes made by other programs aren't followed.
+/// Custom icons for files and custom colours for files and folders, by
+/// path. Igneous moves an entry when it renames or moves the file (or a
+/// folder above it) and drops it when it deletes the file; changes made by
+/// other programs aren't followed.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Icons {
@@ -870,8 +871,24 @@ pub struct Icons {
     pub version: u32,
     /// File path → symbolic icon name, such as `starred-symbolic`.
     pub icons: BTreeMap<VaultPath, String>,
+    /// File or folder path → the colour its icon is drawn in, as `#rrggbb`.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub colors: BTreeMap<VaultPath, String>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
+}
+
+/// What [`Icons::remove_under`] took out, so it can be put back.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Removed {
+    pub icons: Vec<(VaultPath, String)>,
+    pub colors: Vec<(VaultPath, String)>,
+}
+
+impl Removed {
+    pub fn is_empty(&self) -> bool {
+        self.icons.is_empty() && self.colors.is_empty()
+    }
 }
 settings_file!(Icons, "icons.json", 1);
 
@@ -880,6 +897,7 @@ impl Default for Icons {
         Self {
             version: 1,
             icons: BTreeMap::new(),
+            colors: BTreeMap::new(),
             extra: Map::new(),
         }
     }
@@ -893,51 +911,100 @@ impl Icons {
     /// Sets the icon for `path`, or removes it with `None` (or an empty
     /// name). Returns whether anything changed.
     pub fn set(&mut self, path: &VaultPath, icon: Option<&str>) -> bool {
-        match icon.filter(|i| !i.is_empty()) {
-            Some(icon) if self.get(path) == Some(icon) => false,
-            Some(icon) => {
-                self.icons.insert(path.clone(), icon.to_owned());
-                true
-            }
-            None => self.icons.remove(path).is_some(),
+        set_entry(&mut self.icons, path, icon)
+    }
+
+    pub fn color(&self, path: &VaultPath) -> Option<&str> {
+        self.colors.get(path).map(String::as_str)
+    }
+
+    /// Sets the colour for `path` (`#rrggbb`), or removes it with `None`.
+    /// Returns whether anything changed.
+    pub fn set_color(&mut self, path: &VaultPath, color: Option<&str>) -> bool {
+        set_entry(&mut self.colors, path, color)
+    }
+
+    /// Moves the icons and colours of `from`, a file or a folder, and of
+    /// everything under it to `to`. Returns whether anything moved.
+    pub fn follow_rename(&mut self, from: &VaultPath, to: &VaultPath) -> bool {
+        let icons = move_entries(&mut self.icons, from, to);
+        let colors = move_entries(&mut self.colors, from, to);
+        icons || colors
+    }
+
+    /// Removes the icons and colours of `path` and of everything under it,
+    /// returning them.
+    pub fn remove_under(&mut self, path: &VaultPath) -> Removed {
+        Removed {
+            icons: remove_entries(&mut self.icons, path),
+            colors: remove_entries(&mut self.colors, path),
         }
     }
 
-    /// Moves the icons of `from`, a file or a folder, and of everything
-    /// under it to `to`. Returns whether anything moved.
-    pub fn follow_rename(&mut self, from: &VaultPath, to: &VaultPath) -> bool {
-        let moved: Vec<(VaultPath, VaultPath)> = self
-            .icons
-            .keys()
-            .filter_map(|path| Some((path.clone(), rebased(path, from, to)?)))
-            .collect();
-        // Take every entry out before putting any back, so none overwrites
-        // another that hasn't moved yet.
-        let icons: Vec<(VaultPath, String)> = moved
-            .into_iter()
-            .filter_map(|(old, new)| Some((new, self.icons.remove(&old)?)))
-            .collect();
-        let changed = !icons.is_empty();
-        self.icons.extend(icons);
+    /// Puts back what [`Icons::remove_under`] took out. Returns whether
+    /// anything changed.
+    pub fn restore(&mut self, removed: &Removed) -> bool {
+        let mut changed = false;
+        for (path, icon) in &removed.icons {
+            changed |= self.set(path, Some(icon));
+        }
+        for (path, color) in &removed.colors {
+            changed |= self.set_color(path, Some(color));
+        }
         changed
     }
 
-    /// Removes the icons of `path` and of everything under it, returning
-    /// them.
-    pub fn remove_under(&mut self, path: &VaultPath) -> Vec<(VaultPath, String)> {
-        let gone: Vec<VaultPath> = self
-            .icons
+    /// Whether `path`, or anything under it, has an icon or a colour.
+    pub fn has_under(&self, path: &VaultPath) -> bool {
+        self.icons
             .keys()
-            .filter(|p| p.starts_with(path))
-            .cloned()
-            .collect();
-        gone.into_iter()
-            .filter_map(|p| {
-                let icon = self.icons.remove(&p)?;
-                Some((p, icon))
-            })
-            .collect()
+            .chain(self.colors.keys())
+            .any(|p| p.starts_with(path))
     }
+}
+
+fn set_entry(map: &mut BTreeMap<VaultPath, String>, path: &VaultPath, value: Option<&str>) -> bool {
+    match value.filter(|v| !v.is_empty()) {
+        Some(value) if map.get(path).map(String::as_str) == Some(value) => false,
+        Some(value) => {
+            map.insert(path.clone(), value.to_owned());
+            true
+        }
+        None => map.remove(path).is_some(),
+    }
+}
+
+fn move_entries(map: &mut BTreeMap<VaultPath, String>, from: &VaultPath, to: &VaultPath) -> bool {
+    let moved: Vec<(VaultPath, VaultPath)> = map
+        .keys()
+        .filter_map(|path| Some((path.clone(), rebased(path, from, to)?)))
+        .collect();
+    // Take every entry out before putting any back, so none overwrites
+    // another that hasn't moved yet.
+    let entries: Vec<(VaultPath, String)> = moved
+        .into_iter()
+        .filter_map(|(old, new)| Some((new, map.remove(&old)?)))
+        .collect();
+    let changed = !entries.is_empty();
+    map.extend(entries);
+    changed
+}
+
+fn remove_entries(
+    map: &mut BTreeMap<VaultPath, String>,
+    path: &VaultPath,
+) -> Vec<(VaultPath, String)> {
+    let gone: Vec<VaultPath> = map
+        .keys()
+        .filter(|p| p.starts_with(path))
+        .cloned()
+        .collect();
+    gone.into_iter()
+        .filter_map(|p| {
+            let value = map.remove(&p)?;
+            Some((p, value))
+        })
+        .collect()
 }
 
 /// `path` after `from` moved to `to`, if it's `from` or under it.
@@ -1161,12 +1228,12 @@ mod tests {
         icons.set(&p("Projects/Deep/Task.md"), Some("heart-symbolic"));
         icons.set(&p("Projects2/Other.md"), Some("heart-symbolic"));
         assert_eq!(
-            icons.remove_under(&p("Projects/Plan.md")),
+            icons.remove_under(&p("Projects/Plan.md")).icons,
             [(p("Projects/Plan.md"), "starred-symbolic".to_owned())]
         );
         icons.set(&p("Projects/Plan.md"), Some("starred-symbolic"));
         let gone = icons.remove_under(&p("Projects"));
-        assert_eq!(gone.len(), 2);
+        assert_eq!(gone.icons.len(), 2);
         assert_eq!(
             icons
                 .icons
@@ -1176,5 +1243,40 @@ mod tests {
             ["Projects2/Other.md"]
         );
         assert!(icons.remove_under(&p("Nothing")).is_empty());
+    }
+
+    #[test]
+    fn colours_are_their_own_setting() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut icons = Icons::default();
+        // A folder's colour, with no icon.
+        assert!(icons.set_color(&p("Projects"), Some("#e01b24")));
+        assert!(!icons.set_color(&p("Projects"), Some("#e01b24")));
+        assert!(icons.set_color(&p("Projects/Plan.md"), Some("#3584e4")));
+        icons.set(&p("Projects/Plan.md"), Some("starred-symbolic"));
+        assert!(save(dir.path(), &icons).unwrap());
+        assert_eq!(load::<Icons>(dir.path()).unwrap(), icons);
+
+        // Renames and deletions take colours along with icons.
+        assert!(icons.follow_rename(&p("Projects"), &p("Work")));
+        assert_eq!(icons.color(&p("Work")), Some("#e01b24"));
+        assert_eq!(icons.color(&p("Work/Plan.md")), Some("#3584e4"));
+        assert_eq!(icons.color(&p("Projects")), None);
+        assert!(icons.has_under(&p("Work")));
+        let gone = icons.remove_under(&p("Work"));
+        assert_eq!(gone.colors.len(), 2);
+        assert_eq!(gone.icons.len(), 1);
+        assert!(icons.colors.is_empty() && icons.icons.is_empty());
+        assert!(icons.restore(&gone));
+        assert_eq!(icons.color(&p("Work")), Some("#e01b24"));
+
+        assert!(icons.set_color(&p("Work"), None));
+        assert!(!icons.set_color(&p("Work"), None));
+        // No colours, no "colors" key.
+        let mut plain = Icons::default();
+        plain.set(&p("a.md"), Some("heart-symbolic"));
+        save(dir.path(), &plain).unwrap();
+        let out = std::fs::read_to_string(dir.path().join("icons.json")).unwrap();
+        assert!(!out.contains("colors"));
     }
 }

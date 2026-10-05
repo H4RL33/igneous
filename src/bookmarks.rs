@@ -186,9 +186,15 @@ impl BookmarksPane {
                 .subtitle(glib::markup_escape_text(&subtitle))
                 .activatable(true)
                 .build();
-            row.add_prefix(&gtk::Image::from_icon_name(
-                custom.as_deref().unwrap_or(icon),
-            ));
+            let image = gtk::Image::from_icon_name(custom.as_deref().unwrap_or(icon));
+            // And their colour, as in the file tree.
+            if let (Bookmark::File { path, .. } | Bookmark::Folder { path, .. }, Some(window)) =
+                (&bookmark, self.window.upgrade())
+                && let Some(color) = window.path_color(path)
+            {
+                image.add_css_class(&crate::icons::color_class(&color));
+            }
+            row.add_prefix(&image);
             row.add_suffix(&self.row_menu(i, count));
             let window = self.window.clone();
             row.connect_activated(move |_| {

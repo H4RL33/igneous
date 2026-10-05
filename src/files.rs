@@ -26,6 +26,10 @@ mod imp {
         /// The row's icon: a custom one, or the usual one for its kind.
         #[property(get, set)]
         pub icon_name: RefCell<String>,
+        /// The CSS class colouring the icon (see `icons::color_class`), or
+        /// empty.
+        #[property(get, set)]
+        pub color: RefCell<String>,
     }
 
     #[glib::object_subclass]
@@ -43,8 +47,11 @@ glib::wrapper! {
 }
 
 impl FileItem {
-    pub fn new(path: &VaultPath, folder: bool, icon: &str) -> Self {
-        let item: Self = glib::Object::builder().property("icon-name", icon).build();
+    pub fn new(path: &VaultPath, folder: bool, icon: &str, color: &str) -> Self {
+        let item: Self = glib::Object::builder()
+            .property("icon-name", icon)
+            .property("color", color)
+            .build();
         item.imp().path.replace(path.to_string());
         item.imp().folder.set(folder);
         item
@@ -81,6 +88,17 @@ pub struct FileTree {
     stores: RefCell<HashMap<String, glib::WeakRef<gio::ListStore>>>,
     on_open: RefCell<Option<Rc<OpenFn>>>,
     on_move: RefCell<Option<Rc<MoveFn>>>,
+    /// A class per custom colour in use, for the tree's and bookmarks'
+    /// icons.
+    colors: gtk::CssProvider,
+}
+
+impl Drop for FileTree {
+    fn drop(&mut self) {
+        if let Some(display) = gdk::Display::default() {
+            gtk::style_context_remove_provider_for_display(&display, &self.colors);
+        }
+    }
 }
 
 impl FileTree {
@@ -101,6 +119,14 @@ impl FileTree {
                 .autoselect(false)
                 .can_unselect(true)
                 .build();
+            let colors = gtk::CssProvider::new();
+            if let Some(display) = gdk::Display::default() {
+                gtk::style_context_add_provider_for_display(
+                    &display,
+                    &colors,
+                    gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+                );
+            }
             FileTree {
                 ctx,
                 model,
@@ -108,8 +134,10 @@ impl FileTree {
                 stores: RefCell::default(),
                 on_open: RefCell::default(),
                 on_move: RefCell::default(),
+                colors,
             }
         });
+        tree.write_colors();
         tree.fill(&root, None);
         tree.stores
             .borrow_mut()
@@ -153,7 +181,39 @@ impl FileTree {
     }
 
     fn item(&self, path: &VaultPath, folder: bool) -> FileItem {
-        FileItem::new(path, folder, &self.icon_of(path, folder))
+        FileItem::new(
+            path,
+            folder,
+            &self.icon_of(path, folder),
+            &self.color_of(path),
+        )
+    }
+
+    /// The class colouring the icon of `path`, or an empty string.
+    fn color_of(&self, path: &VaultPath) -> String {
+        self.ctx
+            .icons
+            .color(path)
+            .map(|c| crate::icons::color_class(&c))
+            .unwrap_or_default()
+    }
+
+    /// One CSS class for each custom colour in use.
+    fn write_colors(&self) {
+        let css: String = self
+            .ctx
+            .icons
+            .colors()
+            .iter()
+            .map(|c| {
+                format!(
+                    ".{} {{ color: {}; }}\n",
+                    crate::icons::color_class(c),
+                    crate::icons::hex(c)
+                )
+            })
+            .collect();
+        self.colors.load_from_string(&css);
     }
 
     /// A note's custom icon, or the usual one.
@@ -162,8 +222,9 @@ impl FileTree {
         custom.unwrap_or_else(|| icon_for(folder).to_owned())
     }
 
-    /// Shows changed custom icons on every loaded row.
+    /// Shows changed custom icons and colours on every loaded row.
     pub fn refresh_icons(&self) {
+        self.write_colors();
         let stores: Vec<gio::ListStore> = self
             .stores
             .borrow()
@@ -174,6 +235,10 @@ impl FileTree {
             let icon = self.icon_of(&item.path(), item.is_folder());
             if item.icon_name() != icon {
                 item.set_icon_name(icon);
+            }
+            let color = self.color_of(&item.path());
+            if item.color() != color {
+                item.set_color(color);
             }
         }
     }
@@ -311,6 +376,20 @@ impl FileTree {
                 .chain_property::<gtk::TreeListRow>("item")
                 .chain_property::<FileItem>("icon-name")
                 .bind(&icon, "icon-name", gtk::Widget::NONE);
+            list_item
+                .property_expression_weak("item")
+                .chain_property::<gtk::TreeListRow>("item")
+                .chain_property::<FileItem>("color")
+                .chain_closure::<Vec<String>>(glib::closure!(
+                    |_: Option<glib::Object>, color: String| {
+                        if color.is_empty() {
+                            vec![]
+                        } else {
+                            vec![color]
+                        }
+                    }
+                ))
+                .bind(&icon, "css-classes", gtk::Widget::NONE);
             let label = gtk::Label::builder()
                 .xalign(0.0)
                 .ellipsize(pango::EllipsizeMode::End)
@@ -487,6 +566,10 @@ pub fn show_context_menu(widget: &gtk::Widget, item: Option<&FileItem>, x: f64, 
         edit.append_item(&entry("_Rename…", "win.file-rename", p.as_str()));
         if !folder {
             edit.append_item(&entry("Set _Icon…", "win.file-set-icon", p.as_str()));
+        }
+        edit.append_item(&entry("Set _Color…", "win.file-set-color", p.as_str()));
+        if item.is_some_and(|i| !i.color().is_empty()) {
+            edit.append_item(&entry("Remove C_olor", "win.file-reset-color", p.as_str()));
         }
         edit.append_item(&entry("Move to _Trash", "win.file-trash", p.as_str()));
         menu.append_section(None, &edit);

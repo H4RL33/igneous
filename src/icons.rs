@@ -1,6 +1,8 @@
-//! Custom icons for notes: any symbolic icon from the icon theme, saved in
-//! `.igneous/icons.json` and shown in the file tree, on tabs and in
-//! bookmarks. They follow notes that Igneous renames, moves or deletes.
+//! Custom icons for notes (any symbolic icon from the icon theme) and
+//! custom colours for notes and folders (from GTK's colour chooser), saved
+//! in `.igneous/icons.json`. Icons show in the file tree, on tabs and in
+//! bookmarks; colours tint the file tree's and bookmarks' icons. Both
+//! follow files that Igneous renames, moves or deletes.
 
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -9,7 +11,7 @@ use std::rc::Rc;
 use adw::prelude::*;
 use gtk::{gdk, gio, glib, subclass::prelude::*};
 use igneous_core::VaultPath;
-use igneous_core::settings::{self as vault_settings, Icons, SettingsError};
+use igneous_core::settings::{self as vault_settings, Icons, Removed, SettingsError};
 
 use crate::window::Window;
 
@@ -78,42 +80,78 @@ impl IconStore {
         self.update(|icons| icons.set(path, icon))
     }
 
-    /// Moves the icons of a renamed file, or of everything in a renamed
-    /// folder.
+    /// The colour set for `path`, if it's a valid one.
+    pub fn color(&self, path: &VaultPath) -> Option<gdk::RGBA> {
+        let icons = self.icons.borrow();
+        gdk::RGBA::parse(icons.color(path)?).ok()
+    }
+
+    /// Every colour in use, each once.
+    pub fn colors(&self) -> Vec<gdk::RGBA> {
+        let mut colors: Vec<String> = self
+            .icons
+            .borrow()
+            .colors
+            .values()
+            .filter_map(|c| gdk::RGBA::parse(c).ok())
+            .map(|c| hex(&c))
+            .collect();
+        colors.sort_unstable();
+        colors.dedup();
+        colors
+            .iter()
+            .filter_map(|c| gdk::RGBA::parse(c).ok())
+            .collect()
+    }
+
+    /// Sets the colour for `path`, or removes it with `None`. Returns
+    /// whether that changed anything.
+    pub fn set_color(&self, path: &VaultPath, color: Option<&gdk::RGBA>) -> Result<bool, String> {
+        let color = color.map(hex);
+        self.update(|icons| icons.set_color(path, color.as_deref()))
+    }
+
+    /// Moves the icons and colours of a renamed file, or of everything in a
+    /// renamed folder.
     pub fn follow_rename(&self, from: &VaultPath, to: &VaultPath) -> Result<bool, String> {
-        if !self.has_under(from) {
+        if !self.icons.borrow().has_under(from) {
             return Ok(false);
         }
         self.update(|icons| icons.follow_rename(from, to))
     }
 
-    /// Removes the icons of a deleted file or folder, returning them.
-    pub fn forget(&self, path: &VaultPath) -> Result<Vec<(VaultPath, String)>, String> {
-        if !self.has_under(path) {
-            return Ok(Vec::new());
+    /// Removes the icons and colours of a deleted file or folder, returning
+    /// them.
+    pub fn forget(&self, path: &VaultPath) -> Result<Removed, String> {
+        if !self.icons.borrow().has_under(path) {
+            return Ok(Removed::default());
         }
         self.update(|icons| icons.remove_under(path))
     }
 
-    /// Puts back icons that [`IconStore::forget`] removed.
-    pub fn restore(&self, entries: &[(VaultPath, String)]) -> Result<bool, String> {
-        if entries.is_empty() {
+    /// Puts back what [`IconStore::forget`] removed.
+    pub fn restore(&self, removed: &Removed) -> Result<bool, String> {
+        if removed.is_empty() {
             return Ok(false);
         }
-        self.update(|icons| {
-            entries.iter().fold(false, |changed, (path, icon)| {
-                icons.set(path, Some(icon)) || changed
-            })
-        })
+        self.update(|icons| icons.restore(removed))
     }
+}
 
-    fn has_under(&self, path: &VaultPath) -> bool {
-        self.icons
-            .borrow()
-            .icons
-            .keys()
-            .any(|p| p.starts_with(path))
-    }
+/// A colour as `#rrggbb`, the form icons.json keeps.
+pub fn hex(color: &gdk::RGBA) -> String {
+    let channel = |c: f32| (c.clamp(0.0, 1.0) * 255.0).round() as u8;
+    format!(
+        "#{:02x}{:02x}{:02x}",
+        channel(color.red()),
+        channel(color.green()),
+        channel(color.blue())
+    )
+}
+
+/// The CSS class that tints an icon in `color`.
+pub fn color_class(color: &gdk::RGBA) -> String {
+    format!("file-color-{}", hex(color).trim_start_matches('#'))
 }
 
 /// Every symbolic icon in the display's icon theme, sorted, each once.
@@ -159,6 +197,30 @@ pub fn install_actions(
         None => w.toast("Open a note to set its icon"),
     });
     klass.install_action(
+        "win.file-set-color",
+        Some(glib::VariantTy::STRING),
+        |w, _, p| {
+            if let Some(path) = p
+                .and_then(|p| p.get::<String>())
+                .and_then(|p| VaultPath::new(&p).ok())
+            {
+                w.color_dialog(path);
+            }
+        },
+    );
+    klass.install_action(
+        "win.file-reset-color",
+        Some(glib::VariantTy::STRING),
+        |w, _, p| {
+            if let Some(path) = p
+                .and_then(|p| p.get::<String>())
+                .and_then(|p| VaultPath::new(&p).ok())
+            {
+                w.set_path_color(&path, None);
+            }
+        },
+    );
+    klass.install_action(
         "win.file-set-icon",
         Some(glib::VariantTy::STRING),
         |w, _, p| {
@@ -187,6 +249,44 @@ impl Window {
         }
     }
 
+    /// The colour set for a file or folder, if any.
+    pub fn path_color(&self, path: &VaultPath) -> Option<gdk::RGBA> {
+        self.ctx().icons.color(path)
+    }
+
+    /// Gives a file or folder's icon a colour, or its usual one with `None`.
+    pub fn set_path_color(&self, path: &VaultPath, color: Option<&gdk::RGBA>) {
+        match self.ctx().icons.set_color(path, color) {
+            Ok(true) => self.show_icons(),
+            Ok(false) => {}
+            Err(e) => self.toast(&e),
+        }
+    }
+
+    /// Picks a colour for a file or folder with GTK's colour chooser.
+    pub fn color_dialog(&self, path: VaultPath) {
+        let folder = self.ctx().abs(&path).is_dir();
+        let dialog = gtk::ColorDialog::builder()
+            .title(if folder { "Folder Color" } else { "Note Color" })
+            .modal(true)
+            .with_alpha(false)
+            .build();
+        let current = self.path_color(&path);
+        let window = self.downgrade();
+        glib::spawn_future_local(async move {
+            let Some(parent) = window.upgrade() else {
+                return;
+            };
+            // Cancelling is an error too; it changes nothing.
+            if let Ok(color) = dialog
+                .choose_rgba_future(Some(&parent), current.as_ref())
+                .await
+            {
+                parent.set_path_color(&path, Some(&color));
+            }
+        });
+    }
+
     /// Moves icons along with a renamed file or folder.
     pub(crate) fn icons_follow_rename(&self, from: &VaultPath, to: &VaultPath) {
         match self.ctx().icons.follow_rename(from, to) {
@@ -196,9 +296,9 @@ impl Window {
         }
     }
 
-    /// Drops the icons of a deleted file or folder, returning them so an
-    /// undo can put them back.
-    pub(crate) fn forget_icons(&self, path: &VaultPath) -> Vec<(VaultPath, String)> {
+    /// Drops the icons and colours of a deleted file or folder, returning
+    /// them so an undo can put them back.
+    pub(crate) fn forget_icons(&self, path: &VaultPath) -> Removed {
         match self.ctx().icons.forget(path) {
             Ok(gone) => {
                 if !gone.is_empty() {
@@ -208,13 +308,13 @@ impl Window {
             }
             Err(e) => {
                 self.toast(&e);
-                Vec::new()
+                Removed::default()
             }
         }
     }
 
-    pub(crate) fn restore_icons(&self, entries: &[(VaultPath, String)]) {
-        match self.ctx().icons.restore(entries) {
+    pub(crate) fn restore_icons(&self, removed: &Removed) {
+        match self.ctx().icons.restore(removed) {
             Ok(true) => self.show_icons(),
             Ok(false) => {}
             Err(e) => self.toast(&e),
@@ -252,6 +352,23 @@ impl Window {
             })
             .find(|item| item.path() == *path)
             .map(|item| item.icon_name())
+    }
+
+    /// The colour class on the file tree row for `path` (empty for none),
+    /// if the row is showing.
+    pub fn sidebar_color(&self, path: &VaultPath) -> Option<String> {
+        let tree = self.imp().tree.get()?;
+        let model = &tree.model;
+        (0..model.n_items())
+            .filter_map(|i| {
+                model
+                    .item(i)
+                    .and_downcast::<gtk::TreeListRow>()?
+                    .item()
+                    .and_downcast::<crate::files::FileItem>()
+            })
+            .find(|item| item.path() == *path)
+            .map(|item| item.color())
     }
 
     /// The icon on the tab showing `path`, if it has one.

@@ -228,6 +228,49 @@ async fn note_icons_are_picked_saved_and_follow_renames() {
     window.close();
 }
 
+/// A colour is a setting of its own: a folder can have one without a custom
+/// icon. It's saved, shown in the tree, follows renames and goes with the
+/// folder to the trash.
+#[gtk::test]
+async fn folder_colours_are_saved_shown_and_follow_renames() {
+    let dir = vault_with(r#"{"version":1,"files":{"trash":"vaultFolder","confirmDelete":false}}"#);
+    let window = open(&dir);
+    let red = gtk::gdk::RGBA::parse("#e01b24").unwrap();
+    window.set_path_color(&p("Projects"), Some(&red));
+    assert_eq!(
+        window.sidebar_color(&p("Projects")).as_deref(),
+        Some("file-color-e01b24")
+    );
+    assert_eq!(
+        window.sidebar_icon(&p("Projects")).as_deref(),
+        Some("folder-symbolic")
+    );
+    let saved: serde_json::Value =
+        serde_json::from_str(&read(dir.path(), ".igneous/icons.json")).unwrap();
+    assert_eq!(saved["colors"]["Projects"], "#e01b24");
+    assert!(saved["icons"].as_object().unwrap().is_empty());
+
+    window.rename(&p("Projects"), &p("Work"));
+    wait(300).await;
+    assert_eq!(window.path_color(&p("Work")), Some(red));
+    assert_eq!(
+        window.sidebar_color(&p("Work")).as_deref(),
+        Some("file-color-e01b24")
+    );
+
+    // Remove Color, from the folder's menu.
+    WidgetExt::activate_action(&window, "win.file-reset-color", Some(&"Work".to_variant()))
+        .unwrap();
+    assert_eq!(window.path_color(&p("Work")), None);
+    assert_eq!(window.sidebar_color(&p("Work")).as_deref(), Some(""));
+
+    window.set_path_color(&p("Work"), Some(&red));
+    window.trash(p("Work"));
+    wait(300).await;
+    assert_eq!(window.path_color(&p("Work")), None);
+    window.close();
+}
+
 /// The picker opens at the note's icon. Scrolling the grid before it was
 /// laid out left it blank, at the top.
 #[gtk::test]
