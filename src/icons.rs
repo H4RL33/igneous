@@ -5,7 +5,8 @@
 //! follow files that Igneous renames, moves or deletes.
 
 use std::cell::RefCell;
-use std::path::PathBuf;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use adw::prelude::*;
@@ -165,6 +166,98 @@ fn symbolic_icons(display: &gdk::Display) -> Vec<String> {
     names.sort_unstable();
     names.dedup();
     names
+}
+
+/// The icon theme contexts the picker shows as categories, in order: the
+/// context's name in `index.theme`, a label, and an icon for its button.
+const CATEGORIES: &[(&str, &str, &str)] = &[
+    ("Actions", "Actions", "document-edit-symbolic"),
+    ("Applications", "Apps", "application-x-executable-symbolic"),
+    ("Categories", "Categories", "applications-system-symbolic"),
+    ("Devices", "Devices", "computer-symbolic"),
+    ("Emblems", "Emblems", "starred-symbolic"),
+    ("Emotes", "Emotes", "face-smile-symbolic"),
+    ("MimeTypes", "File Types", "text-x-generic-symbolic"),
+    ("Places", "Places", "folder-symbolic"),
+    ("Status", "Status", "dialog-information-symbolic"),
+    ("UI", "Interface", "view-grid-symbolic"),
+];
+
+/// Icons in none of [`CATEGORIES`]: other contexts, or none at all.
+const OTHER: (&str, &str, &str) = ("Other", "Other", "view-more-symbolic");
+
+/// Each icon's context (such as "Places" or "Status"), from the
+/// `index.theme` of `theme` and of the themes it inherits from (hicolor
+/// last), looked for in each of `search`. The first theme with an icon
+/// decides its context.
+fn icon_contexts(search: &[PathBuf], theme: &str) -> HashMap<String, String> {
+    let mut contexts = HashMap::new();
+    let mut queue = VecDeque::from([theme.to_owned()]);
+    let mut seen = HashSet::new();
+    while let Some(name) = queue.pop_front() {
+        if !seen.insert(name.clone()) {
+            continue;
+        }
+        for base in search {
+            let dir = base.join(&name);
+            let index = glib::KeyFile::new();
+            if index
+                .load_from_file(dir.join("index.theme"), glib::KeyFileFlags::NONE)
+                .is_err()
+            {
+                continue;
+            }
+            if let Ok(inherits) = index.string("Icon Theme", "Inherits") {
+                queue.extend(
+                    inherits
+                        .split(',')
+                        .map(str::trim)
+                        .filter(|t| !t.is_empty())
+                        .map(str::to_owned),
+                );
+            }
+            for group in index.groups().iter() {
+                let Ok(context) = index.string(group, "Context") else {
+                    continue;
+                };
+                for icon in icons_in(&dir.join(group.as_str())) {
+                    contexts.entry(icon).or_insert_with(|| context.to_string());
+                }
+            }
+        }
+        if queue.is_empty() && !seen.contains("hicolor") {
+            queue.push_back("hicolor".to_owned());
+        }
+    }
+    contexts
+}
+
+/// The icons in a theme directory: `foo-symbolic.svg` and
+/// `foo.symbolic.png` hold `foo-symbolic`.
+fn icons_in(dir: &Path) -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .filter_map(|entry| {
+            let file = entry.file_name().to_string_lossy().into_owned();
+            let stem = file
+                .strip_suffix(".svg")
+                .or_else(|| file.strip_suffix(".png"))?;
+            Some(match stem.strip_suffix(".symbolic") {
+                Some(base) => format!("{base}-symbolic"),
+                None => stem.to_owned(),
+            })
+        })
+        .collect()
+}
+
+/// The picker's category for an icon in `context`.
+fn category_of(context: Option<&String>) -> &'static str {
+    context
+        .and_then(|c| CATEGORIES.iter().find(|(name, _, _)| name == c))
+        .map_or(OTHER.0, |(name, _, _)| name)
 }
 
 /// How names and queries are compared: lower case, without `-symbolic`,
@@ -384,18 +477,61 @@ impl Window {
     /// Shows the icon picker for `path`.
     pub fn icon_dialog(&self, path: VaultPath) {
         let current = self.note_icon(&path);
-        let names = symbolic_icons(&WidgetExt::display(self));
+        let display = WidgetExt::display(self);
+        let theme = gtk::IconTheme::for_display(&display);
+        let names = symbolic_icons(&display);
         let names: Vec<&str> = names.iter().map(String::as_str).collect();
         let icons = gtk::StringList::new(&names);
 
+        // Categories: the theme's contexts.
+        let contexts = icon_contexts(&theme.search_path(), &theme.theme_name());
+        let categories: Rc<HashMap<String, &'static str>> = Rc::new(
+            names
+                .iter()
+                .map(|n| (n.to_string(), category_of(contexts.get(*n))))
+                .collect(),
+        );
+        let category: Rc<RefCell<String>> = Rc::new(RefCell::new("all".to_owned()));
         let words: Rc<RefCell<Vec<String>>> = Rc::default();
         let filter = gtk::CustomFilter::new({
             let words = words.clone();
+            let category = category.clone();
+            let categories = categories.clone();
             move |obj| {
-                obj.downcast_ref::<gtk::StringObject>()
-                    .is_some_and(|name| matches(&words.borrow(), &name.string()))
+                obj.downcast_ref::<gtk::StringObject>().is_some_and(|name| {
+                    let name = name.string();
+                    let wanted = category.borrow();
+                    (*wanted == "all"
+                        || categories.get(name.as_str()).copied() == Some(wanted.as_str()))
+                        && matches(&words.borrow(), &name)
+                })
             }
         });
+        let group = adw::ToggleGroup::builder()
+            .homogeneous(true)
+            .margin_start(6)
+            .margin_end(6)
+            .margin_bottom(6)
+            .build();
+        group
+            .upcast_ref::<gtk::Widget>()
+            .update_property(&[gtk::accessible::Property::Label("Categories")]);
+        let toggle = |name: &str, label: &str, icon: &str| {
+            let toggle = adw::Toggle::builder().name(name).tooltip(label).build();
+            if theme.has_icon(icon) {
+                toggle.set_icon_name(Some(icon));
+            } else {
+                toggle.set_label(Some(label));
+            }
+            toggle
+        };
+        group.add(toggle("all", "All", "view-app-grid-symbolic"));
+        for (name, label, icon) in CATEGORIES.iter().chain([&OTHER]) {
+            if categories.values().any(|c| c == name) {
+                group.add(toggle(name, label, icon));
+            }
+        }
+        group.set_active_name(Some("all"));
         let filtered = gtk::FilterListModel::new(Some(icons), Some(filter.clone()));
         let selection = gtk::SingleSelection::builder()
             .model(&filtered)
@@ -430,6 +566,34 @@ impl Window {
         stack.add_named(&scrolled, Some("icons"));
         stack.add_named(&empty, Some("empty"));
 
+        // The icons given most recently, in one row above the rest.
+        let recent: Vec<String> = crate::gsettings::recent_icons(&crate::gsettings::settings())
+            .into_iter()
+            .filter(|i| theme.has_icon(i))
+            .collect();
+        let recent_row = gtk::Box::builder().margin_start(6).margin_end(6).build();
+        let recent_section = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(2)
+            .margin_top(6)
+            .visible(!recent.is_empty())
+            .build();
+        recent_section.append(
+            &gtk::Label::builder()
+                .label("Recent")
+                .xalign(0.0)
+                .margin_start(12)
+                .css_classes(["caption-heading", "dim-label"])
+                .build(),
+        );
+        recent_section.append(&recent_row);
+        recent_section.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
+        let content = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .build();
+        content.append(&recent_section);
+        content.append(&stack);
+
         let reset = gtk::Button::builder()
             .label("_Reset to Default")
             .use_underline(true)
@@ -441,13 +605,14 @@ impl Window {
         let header = adw::HeaderBar::builder().title_widget(&entry).build();
         let toolbar = adw::ToolbarView::new();
         toolbar.add_top_bar(&header);
+        toolbar.add_top_bar(&group);
         toolbar.add_bottom_bar(&bottom);
-        toolbar.set_content(Some(&stack));
+        toolbar.set_content(Some(&content));
         let (name, _) = crate::files::display_name(&path, false);
         let dialog = adw::Dialog::builder()
             .title(format!("Icon for “{name}”"))
             .content_width(560)
-            .content_height(480)
+            .content_height(540)
             .child(&toolbar)
             .build();
 
@@ -455,6 +620,9 @@ impl Window {
             let window = self.downgrade();
             let dialog = dialog.downgrade();
             Rc::new(move |icon| {
+                if let Some(icon) = &icon {
+                    crate::gsettings::add_recent_icon(&crate::gsettings::settings(), icon);
+                }
                 if let Some(window) = window.upgrade() {
                     window.set_note_icon(&path, icon.as_deref());
                 }
@@ -485,6 +653,48 @@ impl Window {
             let choose = choose.clone();
             reset.connect_clicked(move |_| choose(None));
         }
+        for icon in recent {
+            let button = gtk::Button::builder()
+                .child(
+                    &gtk::Image::builder()
+                        .icon_name(&icon)
+                        .pixel_size(32)
+                        .build(),
+                )
+                .tooltip_text(&icon)
+                .css_classes(["flat"])
+                .build();
+            button.update_property(&[gtk::accessible::Property::Label(&icon)]);
+            let choose = choose.clone();
+            button.connect_clicked(move |_| choose(Some(icon.clone())));
+            recent_row.append(&button);
+        }
+        // Recent shows over all icons, until a search or a category narrows
+        // them.
+        let refilter = {
+            let filter = filter.clone();
+            let filtered = filtered.clone();
+            let stack = stack.clone();
+            let recent_section = recent_section.clone();
+            let has_recent = recent_row.first_child().is_some();
+            let words = words.clone();
+            let category = category.clone();
+            Rc::new(move || {
+                filter.changed(gtk::FilterChange::Different);
+                let found = filtered.n_items() > 0;
+                stack.set_visible_child_name(if found { "icons" } else { "empty" });
+                recent_section.set_visible(
+                    has_recent && words.borrow().is_empty() && *category.borrow() == "all",
+                );
+            })
+        };
+        {
+            let refilter = refilter.clone();
+            group.connect_active_name_notify(move |group| {
+                category.replace(group.active_name().map_or("all".into(), |n| n.to_string()));
+                refilter();
+            });
+        }
         {
             let dialog = dialog.downgrade();
             entry.connect_stop_search(move |_| {
@@ -508,9 +718,7 @@ impl Window {
         }
         entry.connect_search_changed(move |entry| {
             words.replace(query_words(&entry.text()));
-            filter.changed(gtk::FilterChange::Different);
-            let found = filtered.n_items() > 0;
-            stack.set_visible_child_name(if found { "icons" } else { "empty" });
+            refilter();
         });
         // Down moves from the search into the icons.
         let keys = gtk::EventControllerKey::new();
@@ -611,5 +819,54 @@ mod tests {
         assert!(!found("symbolic", "go-home-symbolic"));
         assert!(!found("gohome", "go-home-symbolic"));
         assert!(!found("home office", "go-home-symbolic"));
+    }
+
+    /// Writes an icon theme: its index.theme and an icon file per entry.
+    fn theme(root: &Path, name: &str, inherits: &str, icons: &[(&str, &str, &str)]) {
+        let mut index = format!("[Icon Theme]\nName={name}\nInherits={inherits}\n");
+        for (dir, context, file) in icons {
+            index.push_str(&format!("\n[{dir}]\nContext={context}\nType=Scalable\n"));
+            std::fs::create_dir_all(root.join(name).join(dir)).unwrap();
+            std::fs::write(root.join(name).join(dir).join(file), "").unwrap();
+        }
+        std::fs::write(root.join(name).join("index.theme"), index).unwrap();
+    }
+
+    #[test]
+    fn categories_come_from_the_theme_and_its_parents() {
+        let dir = tempfile::tempdir().unwrap();
+        theme(
+            dir.path(),
+            "Mine",
+            "Base",
+            &[("symbolic/places", "Places", "folder-symbolic.svg")],
+        );
+        theme(
+            dir.path(),
+            "Base",
+            "",
+            &[
+                // The child theme's context wins.
+                ("symbolic/status", "Status", "folder-symbolic.svg"),
+                ("symbolic/status", "Status", "starred-symbolic.svg"),
+                ("16x16/devices", "Devices", "phone.symbolic.png"),
+                ("symbolic/stock", "Stock", "odd-symbolic.svg"),
+            ],
+        );
+        theme(
+            dir.path(),
+            "hicolor",
+            "",
+            &[("symbolic/apps", "Applications", "app-symbolic.svg")],
+        );
+        let contexts = icon_contexts(&[dir.path().to_owned()], "Mine");
+        let category = |icon: &str| category_of(contexts.get(icon));
+        assert_eq!(category("folder-symbolic"), "Places");
+        assert_eq!(category("starred-symbolic"), "Status");
+        assert_eq!(category("phone-symbolic"), "Devices");
+        assert_eq!(category("app-symbolic"), "Applications");
+        // A context the picker doesn't list, and no context at all.
+        assert_eq!(category("odd-symbolic"), "Other");
+        assert_eq!(category("unknown-symbolic"), "Other");
     }
 }

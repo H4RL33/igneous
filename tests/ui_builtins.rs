@@ -271,6 +271,52 @@ async fn folder_colours_are_saved_shown_and_follow_renames() {
     window.close();
 }
 
+/// The picker's categories are the icon theme's contexts, and icons given
+/// lately show in one row above them.
+#[gtk::test]
+async fn the_icon_picker_has_categories_and_recents() {
+    let dir = vault(None);
+    let window = open(&dir);
+    window.open_path(&p("Home.md"), false);
+    let open_picker = || {
+        WidgetExt::activate_action(&window, "win.set-icon", None).unwrap();
+        window.visible_dialog().unwrap()
+    };
+    let dialog = open_picker();
+    let grid = find(dialog.upcast_ref(), &|w| w.is::<gtk::GridView>())
+        .and_downcast::<gtk::GridView>()
+        .unwrap();
+    let group = find(dialog.upcast_ref(), &|w| w.is::<adw::ToggleGroup>())
+        .and_downcast::<adw::ToggleGroup>()
+        .unwrap();
+    let all = grid_icons(&grid);
+    group.set_active_name(Some("Places"));
+    let places = grid_icons(&grid);
+    assert!(places.len() < all.len());
+    assert!(places.contains(&"folder-symbolic".to_owned()));
+    assert!(!places.contains(&"starred-symbolic".to_owned()));
+    group.set_active_name(Some("all"));
+    assert_eq!(grid_icons(&grid).len(), all.len());
+
+    // Pick an icon; the next picker has it in the Recent row.
+    let position = all.iter().position(|i| i == "starred-symbolic").unwrap() as u32;
+    grid.emit_by_name::<()>("activate", &[&position]);
+    assert_eq!(
+        window.note_icon(&p("Home.md")).as_deref(),
+        Some("starred-symbolic")
+    );
+    let dialog = open_picker();
+    let recent: Vec<String> = descendants(dialog.upcast_ref())
+        .into_iter()
+        .filter_map(|w| w.downcast::<gtk::Button>().ok())
+        .filter_map(|b| b.child().and_downcast::<gtk::Image>())
+        .filter_map(|i| i.icon_name().map(|n| n.to_string()))
+        .collect();
+    assert_eq!(recent.first().map(String::as_str), Some("starred-symbolic"));
+    dialog.close();
+    window.close();
+}
+
 /// The picker opens at the note's icon. Scrolling the grid before it was
 /// laid out left it blank, at the top.
 #[gtk::test]
@@ -341,6 +387,18 @@ async fn snapshots_are_taken_listed_and_restored() {
 }
 
 /// Finds the first widget under `root` (depth first) that `pred` accepts.
+/// Every widget under `root`.
+fn descendants(root: &gtk::Widget) -> Vec<gtk::Widget> {
+    let mut out = Vec::new();
+    let mut child = root.first_child();
+    while let Some(c) = child {
+        out.push(c.clone());
+        out.extend(descendants(&c));
+        child = c.next_sibling();
+    }
+    out
+}
+
 fn find(root: &gtk::Widget, pred: &dyn Fn(&gtk::Widget) -> bool) -> Option<gtk::Widget> {
     if pred(root) {
         return Some(root.clone());

@@ -22,6 +22,11 @@
       <default>[]</default>
       <summary>Recently opened vaults, most recent first</summary>
     </key>
+    <key name="recent-icons" type="as">
+      <default>[]</default>
+      <summary>Icons recently given to notes, most recent first</summary>
+      <description>Shown in a row at the top of the icon picker.</description>
+    </key>
     <key name="open-vaults" type="as">
       <default>[]</default>
       <summary>Vaults that were open when Igneous last quit</summary>

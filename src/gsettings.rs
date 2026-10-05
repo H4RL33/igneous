@@ -22,6 +22,27 @@ pub fn settings() -> gio::Settings {
 
 const MAX_RECENT: usize = 10;
 
+/// How many icons the icon picker's Recent row holds.
+pub const MAX_RECENT_ICONS: usize = 8;
+
+/// Icons recently given to notes, most recent first.
+pub fn recent_icons(settings: &gio::Settings) -> Vec<String> {
+    settings
+        .strv("recent-icons")
+        .iter()
+        .map(|s| s.to_string())
+        .collect()
+}
+
+/// Moves `icon` to the front of the recent icons.
+pub fn add_recent_icon(settings: &gio::Settings, icon: &str) {
+    let mut list = recent_icons(settings);
+    list.retain(|i| i != icon);
+    list.insert(0, icon.to_owned());
+    list.truncate(MAX_RECENT_ICONS);
+    let _ = settings.set_strv("recent-icons", list);
+}
+
 pub fn recent_vaults(settings: &gio::Settings) -> Vec<String> {
     settings
         .strv("recent-vaults")
