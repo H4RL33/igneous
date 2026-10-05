@@ -199,6 +199,14 @@ impl NoteView {
             st.lines = line_starts(&st.text);
             if let [(pos, deleted, inserted)] = edits[..] {
                 crate::fold::shift(&mut st.folded, pos, deleted, inserted);
+                // Overlay starts are marks and move by themselves; their ends
+                // are offsets and must follow the edit too, or every widget
+                // after the cursor would look moved and be rebuilt.
+                for overlay in &mut st.overlays {
+                    if overlay.end > pos {
+                        overlay.end = (overlay.end.max(pos + deleted) - deleted) + inserted;
+                    }
+                }
                 for set in st.applied.values_mut() {
                     set.apply_edit(pos, deleted, inserted);
                 }
@@ -591,12 +599,19 @@ impl NoteView {
             .unwrap_or_default();
         let mut keep = vec![false; st.overlays.len()];
         let mut create = Vec::new();
+        // Existing widgets by where they are, so matching is one pass (a long
+        // note can have hundreds).
+        let mut by_place: HashMap<(usize, usize), Vec<usize>> = HashMap::new();
+        for (i, o) in st.overlays.iter().enumerate() {
+            let anchor = byte_of(&st.lines, &buffer.iter_at_mark(&o.mark));
+            by_place.entry((anchor, o.end)).or_default().push(i);
+        }
         for (kind, anchor, end, checked) in desired {
-            let found = st.overlays.iter().enumerate().position(|(i, o)| {
-                !keep[i]
-                    && o.kind == kind
-                    && o.end == end
-                    && byte_of(&st.lines, &buffer.iter_at_mark(&o.mark)) == anchor
+            let found = by_place.get(&(anchor, end)).and_then(|candidates| {
+                candidates
+                    .iter()
+                    .copied()
+                    .find(|&i| !keep[i] && st.overlays[i].kind == kind)
             });
             match found {
                 Some(_) if kind == OverlayKind::Properties && fm_source != st.properties_source => {
@@ -1983,6 +1998,72 @@ mod tests {
         place(&view, text.find("e^").unwrap());
         assert!(!view.overlay_kinds().contains(&"math".to_owned()));
         view.check_invariants().unwrap();
+    }
+
+    /// Typing above a widget keeps it: rebuilding every widget below the
+    /// cursor on each keystroke cost 40 ms on a long note.
+    #[gtk::test]
+    fn widgets_survive_edits_above_them() {
+        let text = "intro\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\nafter\n";
+        let view = view(text);
+        place(&view, text.len());
+        let table = || {
+            let st = view.imp().state.borrow();
+            let overlay = st
+                .overlays
+                .iter()
+                .find(|o| o.kind == OverlayKind::Table)
+                .unwrap();
+            let widget = view.make_widget(overlay, &st);
+            drop(widget);
+            overlay.mark.clone()
+        };
+        let before = table();
+        let buffer = view.buffer();
+        buffer.insert(&mut buffer.start_iter(), "more ");
+        assert_eq!(table(), before);
+        view.check_invariants().unwrap();
+    }
+
+    /// The M0 budget: under 8 ms of work per keystroke on a 50 KB note.
+    /// Run in release: `cargo test --release -p igneous-editor -- --ignored keystroke`.
+    #[gtk::test]
+    #[ignore = "timing"]
+    async fn keystroke_cost_on_a_large_note() {
+        let mut text = String::new();
+        let mut i = 0;
+        while text.len() < 50_000 {
+            text.push_str(&format!(
+                "## Section {i}\n\nSome **bold** and *italic* text with a [[Link {i}]] and #tag{i}.\n\n- [ ] task {i}\n- item with `code`\n\n> [!note] Callout {i}\n> body\n\n| a | b |\n|---|---|\n| {i} | x |\n\n"
+            ));
+            i += 1;
+        }
+        let view = view(&text);
+        view.set_fold_headings(true);
+        let window = gtk::Window::builder()
+            .default_width(1000)
+            .default_height(800)
+            .child(&gtk::ScrolledWindow::builder().child(&view).build())
+            .build();
+        window.present();
+        for _ in 0..10 {
+            glib::timeout_future(std::time::Duration::from_millis(50)).await;
+        }
+        let buffer = view.buffer();
+        let middle = buffer.char_count() / 2;
+        let mut times = Vec::new();
+        for n in 0..200 {
+            let mut at = buffer.iter_at_offset(middle + n);
+            let start = std::time::Instant::now();
+            buffer.insert(&mut at, "x");
+            times.push(start.elapsed());
+        }
+        times.sort();
+        let p50 = times[times.len() / 2];
+        let p95 = times[times.len() * 95 / 100];
+        eprintln!("keystroke: p50 {p50:?}, p95 {p95:?} ({} bytes)", text.len());
+        assert!(p95 < std::time::Duration::from_millis(8), "p95 {p95:?}");
+        window.close();
     }
 
     #[test]
