@@ -114,6 +114,21 @@ impl IndexService {
         }
     }
 
+    /// Re-reads the whole vault, then tells the listeners.
+    pub async fn rescan(&self) {
+        let vault = self.vault.clone();
+        let result = self
+            .worker
+            .call(move |index| index.as_mut().map(|i| i.rescan(&vault)))
+            .await;
+        match result.flatten() {
+            Some(Ok(stats)) => tracing::debug!(?stats, "index rescanned"),
+            Some(Err(e)) => tracing::warn!(%e, "rescanning failed"),
+            None => {}
+        }
+        self.changed().await;
+    }
+
     /// Brings the index up to date with changes on disk.
     pub fn apply(self: &Rc<Self>, events: Vec<VaultEvent>) {
         let this = self.clone();

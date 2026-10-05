@@ -55,6 +55,25 @@ impl PropertyNames {
         }
     }
 
+    /// Makes the list just `names` (what the notes use now, after a rescan)
+    /// and saves it, returning how many there are.
+    pub fn replace<'a>(&self, names: impl IntoIterator<Item = &'a str>) -> Result<usize, String> {
+        self.names.borrow_mut().clear();
+        self.known.borrow_mut().clear();
+        self.menu.remove_all();
+        self.learn(names);
+        let names = self.names.borrow().clone();
+        let count = names.len();
+        // Keep anything else in the file, and never overwrite one that
+        // can't be read.
+        let mut file = vault_settings::load::<NamesFile>(&self.igneous_dir)
+            .map_err(|e| format!("Couldn’t read the property names: {e}"))?;
+        file.names = names;
+        vault_settings::save(&self.igneous_dir, &file)
+            .map_err(|e| format!("Couldn’t save the property names: {e}"))?;
+        Ok(count)
+    }
+
     /// Notes a property just made in Igneous, saving every name known so
     /// far to properties.json.
     pub fn add(&self, name: &str) {

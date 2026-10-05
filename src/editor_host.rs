@@ -221,6 +221,22 @@ impl Host for NoteHost {
             window.property_names().add(key);
         }
     }
+
+    fn refresh_property_names(&self) {
+        let Some(window) = self.window() else { return };
+        glib::spawn_future_local(async move {
+            window.index().rescan().await;
+            let properties = window.index().properties();
+            match window
+                .property_names()
+                .replace(properties.iter().map(|p| p.key.as_str()))
+            {
+                Ok(1) => window.toast("Found 1 property name"),
+                Ok(n) => window.toast(&format!("Found {n} property names")),
+                Err(e) => window.toast(&e),
+            }
+        });
+    }
 }
 
 fn kind_of(ty: PropertyType) -> PropertyKind {

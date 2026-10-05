@@ -305,6 +305,13 @@ impl Index {
         Ok(stats)
     }
 
+    /// Re-reads every file in the vault, changed or not.
+    pub fn rescan(&mut self, vault: &Vault) -> Result<ReconcileStats> {
+        let stats = self.sync(vault, None, true)?;
+        self.reload_files()?;
+        Ok(stats)
+    }
+
     /// Applies changes reported by the vault watcher.
     pub fn apply(&mut self, vault: &Vault, events: &[VaultEvent]) -> Result<()> {
         for event in events {

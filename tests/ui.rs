@@ -1105,6 +1105,16 @@ async fn three_dashes_start_properties() {
 }
 
 /// The Add Property row in a note, if it's showing.
+/// A menu's labels.
+fn labels(menu: &gtk::gio::MenuModel) -> Vec<String> {
+    (0..menu.n_items())
+        .filter_map(|i| {
+            menu.item_attribute_value(i, "label", Some(gtk::glib::VariantTy::STRING))
+                .and_then(|v| v.get::<String>())
+        })
+        .collect()
+}
+
 fn add_property_row(view: &igneous_editor::NoteView) -> Option<adw::ActionRow> {
     find_widget(view.upcast_ref(), &|w| {
         w.downcast_ref::<adw::ActionRow>()
@@ -1133,15 +1143,7 @@ async fn add_property_offers_the_vaults_names_and_new_ones() {
     // The menu has the names the index finds; opening writes nothing.
     let names_file = dir.path().join(".igneous/properties.json");
     let saved = || std::fs::read_to_string(&names_file).unwrap_or_default();
-    let menu_names = || {
-        let menu = window.property_names().menu();
-        (0..menu.n_items())
-            .filter_map(|i| {
-                menu.item_attribute_value(i, "label", Some(gtk::glib::VariantTy::STRING))
-                    .and_then(|v| v.get::<String>())
-            })
-            .collect::<Vec<_>>()
-    };
+    let menu_names = || labels(&window.property_names().menu());
     assert!(
         until(5000, || menu_names().len() == 2).await,
         "{:?}",
@@ -1180,7 +1182,13 @@ async fn add_property_offers_the_vaults_names_and_new_ones() {
         })
         .collect();
     assert!(names.contains(&"tags".to_owned()), "{names:?}");
-    assert_eq!(names.last().map(String::as_str), Some("_New Property…"));
+    assert!(
+        names.ends_with(&[
+            "_New Property…".to_owned(),
+            "_Refresh Property Names".to_owned()
+        ]),
+        "{names:?}"
+    );
     menu.popdown();
 
     // New Property… asks for a name; typing goes there, and Enter adds it.
@@ -1231,5 +1239,39 @@ async fn add_property_offers_the_vaults_names_and_new_ones() {
     WidgetExt::activate_action(&row, &action("created"), None).unwrap();
     assert!(note.text().contains("\ncreated:"), "{:?}", note.text());
     note.discard();
+    window.close();
+}
+
+/// Refresh Property Names rescans the vault and remakes the list from the
+/// names its notes use now, dropping old ones.
+#[gtk::test]
+async fn refreshing_property_names_rescans_the_vault() {
+    let dir = vault(Some(100));
+    std::fs::write(dir.path().join("Plain.md"), "Some text.\n").unwrap();
+    let names_file = dir.path().join(".igneous/properties.json");
+    std::fs::write(&names_file, r#"{"version":1,"names":["old","tags"]}"#).unwrap();
+    let window = open(&dir);
+    window.open_path(&p("Plain.md"), false);
+    let view = window.selected_note().unwrap().view();
+    let menu_names = || labels(&window.property_names().menu());
+    // The saved names come first, then what the index finds.
+    assert!(
+        until(5000, || menu_names() == ["old", "tags", "created"]).await,
+        "{:?}",
+        menu_names()
+    );
+    assert!(until(3000, || add_property_row(&view).is_some()).await);
+
+    let row = add_property_row(&view).unwrap();
+    WidgetExt::activate_action(&row, "property.refresh", None).unwrap();
+    assert!(
+        until(5000, || menu_names() == ["created", "tags"]).await,
+        "{:?}",
+        menu_names()
+    );
+    let file: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&names_file).unwrap()).unwrap();
+    assert_eq!(file["names"], serde_json::json!(["created", "tags"]));
+    window.selected_note().unwrap().discard();
     window.close();
 }

@@ -529,15 +529,18 @@ impl NoteView {
     }
 
     /// The vault's property names (those the note has are hidden), then New
-    /// Property….
+    /// Property…, then a way to remake the names from the notes.
     fn add_property_menu(&self) -> gio::Menu {
         let new = gio::Menu::new();
         new.append(Some("_New Property…"), Some("property.new"));
+        let refresh = gio::Menu::new();
+        refresh.append(Some("_Refresh Property Names"), Some("property.refresh"));
         let menu = gio::Menu::new();
         if let Some(names) = self.host().property_names() {
             menu.append_section(None, &names);
         }
         menu.append_section(None, &new);
+        menu.append_section(None, &refresh);
         menu
     }
 
@@ -634,7 +637,7 @@ fn key_of_action(name: &str) -> Option<String> {
 }
 
 glib::wrapper! {
-    /// Add Property's actions for one note: `new`, and `add-…` for each of
+    /// Add Property's actions for one note: `new`, `refresh`, and `add-…` for each of
     /// the vault's names the note doesn't have. They're answered from the
     /// name, so nothing is made per name.
     pub struct AddPropertyActions(ObjectSubclass<imp::AddPropertyActions>)
@@ -687,7 +690,7 @@ mod imp {
 
     impl ActionGroupImpl for AddPropertyActions {
         fn list_actions(&self) -> Vec<String> {
-            let mut names = vec!["new".to_owned()];
+            let mut names = vec!["new".to_owned(), "refresh".to_owned()];
             let Some(model) = self.view.upgrade().and_then(|v| v.host().property_names()) else {
                 return names;
             };
@@ -714,7 +717,8 @@ mod imp {
             Option<glib::Variant>,
             Option<glib::Variant>,
         )> {
-            (name == "new" || self.key(name).is_some()).then_some((true, None, None, None, None))
+            (name == "new" || name == "refresh" || self.key(name).is_some())
+                .then_some((true, None, None, None, None))
         }
 
         fn activate_action(&self, name: &str, _parameter: Option<&glib::Variant>) {
@@ -725,6 +729,8 @@ mod imp {
                 if let Some(row) = self.row.upgrade() {
                     view.name_new_property(&row);
                 }
+            } else if name == "refresh" {
+                view.host().refresh_property_names();
             } else if let Some(key) = self.key(name) {
                 view.set_property(&key, &Value::Null);
             }

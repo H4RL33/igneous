@@ -108,6 +108,10 @@ pub trait Host {
     /// `key` has just been made a property of a note.
     fn add_property_name(&self, _key: &str) {}
 
+    /// Rescans the vault and remakes [`property_names`](Self::property_names)
+    /// from the names its notes use now.
+    fn refresh_property_names(&self) {}
+
     /// Saves pasted data (an image) as an attachment named like `name`,
     /// returning the embed to insert, e.g. `![[Pasted image 1.png]]`.
     fn save_attachment(&self, _name: &str, _bytes: &[u8]) -> Option<String> {
