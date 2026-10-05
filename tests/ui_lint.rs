@@ -256,3 +256,47 @@ async fn lint_screenshot() {
     save_png(window.upcast_ref(), &out.replace(".png", "-dialog.png"));
     window.close();
 }
+
+/// Linting keeps the cursor where it was. With a change near the top (a
+/// blank line after the frontmatter) and another further down, replacing
+/// everything between them threw the cursor down to the second change, off
+/// screen, so typing seemed to do nothing.
+#[gtk::test]
+async fn linting_keeps_the_cursor_on_its_heading() {
+    let dir = vault(None);
+    lint_json(
+        &dir,
+        r#"{"version":1,"lintOnSave":true,"rules":{
+            "header-increment":{"enabled":true,"options":{"startAtH2":true}},
+            "add-blank-line-after-yaml":{"enabled":true},
+            "heading-blank-lines":{"enabled":true},
+            "trailing-spaces":{"enabled":true},
+            "remove-multiple-spaces":{"enabled":true}}}"#,
+    );
+    let text = "---\ntags: [a]\n---\n# Title\nSome  text.   \n## Part\nMore.\n";
+    let window = open(&dir);
+    // The cursor in the title, and at the start of its line.
+    for (cursor, column) in [
+        (text.find("Title").unwrap() + 2, 5),
+        (text.find("# Title").unwrap(), 0),
+    ] {
+        write(&dir, "Heading.md", text);
+        window.open_path(&p("Heading.md"), false);
+        let note = window.selected_note().unwrap();
+        note.reload();
+        wait(200).await;
+        note.set_cursor_byte(cursor);
+        WidgetExt::activate_action(&window, "win.save", None).unwrap();
+        let new = note.text();
+        assert!(new.contains("\n## Title\n"), "{new:?}");
+        let at = note.cursor_offset() as usize;
+        let byte = new.char_indices().nth(at).map_or(new.len(), |(b, _)| b);
+        let line_start = new[..byte].rfind('\n').map_or(0, |i| i + 1);
+        let line_end = new[byte..].find('\n').map_or(new.len(), |i| byte + i);
+        assert_eq!(&new[line_start..line_end], "## Title");
+        assert_eq!(byte - line_start, column);
+        note.view().check_invariants().unwrap();
+        note.discard();
+    }
+    window.close();
+}

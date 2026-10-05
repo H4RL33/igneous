@@ -230,30 +230,59 @@ impl NotePage {
     }
 
     /// Replaces the note's text with `new` (which was computed from `old`) as
-    /// one undoable edit, touching only the part that differs.
+    /// one undoable edit made of the changes alone, so the cursor, and
+    /// everything else in text that didn't change, stays where it was.
+    /// Replacing everything from the first change to the last instead would
+    /// throw the cursor to the end of that span, often far off screen.
     pub fn replace_text(&self, old: &str, new: &str) {
-        let prefix = old
-            .char_indices()
-            .zip(new.chars())
-            .take_while(|((_, a), b)| a == b)
-            .last()
-            .map_or(0, |((i, c), _)| i + c.len_utf8());
-        let suffix = old[prefix..]
-            .chars()
-            .rev()
-            .zip(new[prefix..].chars().rev())
-            .take_while(|(a, b)| a == b)
-            .map(|(c, _)| c.len_utf8())
-            .sum::<usize>()
-            .min(old.len() - prefix)
-            .min(new.len() - prefix);
-        let chars = |s: &str, byte: usize| s[..byte].chars().count() as i32;
         let buffer = self.buffer();
+        let cursor = {
+            let offset = self.cursor_offset() as usize;
+            old.char_indices().nth(offset).map_or(old.len(), |(i, _)| i)
+        };
+        let edits = merge_edits(old, igneous_lint::text::edits_between(old, new), cursor);
+        if edits.is_empty() {
+            return;
+        }
+        // Character offsets of the edits' ends, counted in one pass.
+        let mut bounds: Vec<usize> = edits
+            .iter()
+            .flat_map(|e| [e.range.start, e.range.end])
+            .collect();
+        bounds.sort_unstable();
+        bounds.dedup();
+        let mut chars = std::collections::HashMap::new();
+        let mut next = bounds.iter().peekable();
+        for (count, (byte, _)) in old
+            .char_indices()
+            .chain(std::iter::once((old.len(), ' ')))
+            .enumerate()
+        {
+            while next.peek().is_some_and(|b| **b == byte) {
+                chars.insert(byte, count as i32);
+                next.next();
+            }
+        }
+        let moved = new_cursor(&edits, cursor);
         buffer.begin_user_action();
-        let mut start = buffer.iter_at_offset(chars(old, prefix));
-        let mut end = buffer.iter_at_offset(chars(old, old.len() - suffix));
-        buffer.delete(&mut start, &mut end);
-        buffer.insert(&mut start, &new[prefix..new.len() - suffix]);
+        // From the end, so earlier offsets still hold.
+        for edit in edits.iter().rev() {
+            let mut start = buffer.iter_at_offset(chars[&edit.range.start]);
+            if edit.range.end > edit.range.start {
+                let mut end = buffer.iter_at_offset(chars[&edit.range.end]);
+                buffer.delete(&mut start, &mut end);
+            }
+            if !edit.insert.is_empty() {
+                buffer.insert(&mut start, &edit.insert);
+            }
+        }
+        // Text inserted right at the cursor goes after it, as it would for
+        // any edit that isn't typing. Placing the cursor also tells the
+        // input method about the new text around it.
+        if !buffer.has_selection() {
+            let offset = new[..moved.min(new.len())].chars().count() as i32;
+            buffer.place_cursor(&buffer.iter_at_offset(offset));
+        }
         buffer.end_user_action();
     }
 
@@ -771,4 +800,98 @@ fn current_conflict(found: &[conflicts::Conflict], cursor: usize) -> usize {
         .iter()
         .position(|c| c.range.end > cursor)
         .unwrap_or(found.len().saturating_sub(1))
+}
+
+/// Where byte `cursor` of the old text is after `edits` (sorted, not
+/// overlapping): shifted by the edits before it, and at the end of the new
+/// text of an edit around it. Text inserted right at the cursor goes after
+/// it, unless it holds a line break: then the cursor stays at the start of
+/// its own line, after the last one (a blank line added above a heading
+/// keeps the cursor on the heading).
+fn new_cursor(edits: &[igneous_markdown::TextEdit], cursor: usize) -> usize {
+    let mut shift: isize = 0;
+    for edit in edits {
+        let (start, end) = (edit.range.start, edit.range.end);
+        let at = |offset: usize| (start as isize + shift) as usize + offset;
+        if start == end && start == cursor {
+            return at(edit.insert.rfind('\n').map_or(0, |i| i + 1));
+        } else if end <= cursor {
+            shift += edit.insert.len() as isize - (end - start) as isize;
+        } else if start < cursor {
+            return at(edit.insert.len());
+        } else {
+            break;
+        }
+    }
+    (cursor as isize + shift).max(0) as usize
+}
+
+/// At most this many separate edits reach the buffer: each one restyles
+/// the note.
+const MAX_EDITS: usize = 32;
+
+/// Joins the closest edits until there are no more than [`MAX_EDITS`],
+/// never joining two on either side of the cursor (byte `cursor` of `old`),
+/// which would move it. A joined edit carries the unchanged text between
+/// the two.
+fn merge_edits(
+    old: &str,
+    mut edits: Vec<igneous_markdown::TextEdit>,
+    cursor: usize,
+) -> Vec<igneous_markdown::TextEdit> {
+    edits.sort_by_key(|e| e.range.start);
+    while edits.len() > MAX_EDITS {
+        let Some(i) = (0..edits.len() - 1)
+            .filter(|&i| !(edits[i].range.end <= cursor && cursor <= edits[i + 1].range.start))
+            .min_by_key(|&i| edits[i + 1].range.start - edits[i].range.end)
+        else {
+            break;
+        };
+        let next = edits.remove(i + 1);
+        let between = &old[edits[i].range.end..next.range.start];
+        edits[i].insert.push_str(between);
+        edits[i].insert.push_str(&next.insert);
+        edits[i].range.end = next.range.end;
+    }
+    edits
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use igneous_markdown::TextEdit;
+
+    #[test]
+    fn edits_are_joined_but_not_across_the_cursor() {
+        let old = "a.b.c.d.e";
+        let edits: Vec<TextEdit> = [0, 2, 4, 6, 8]
+            .into_iter()
+            .map(|i| TextEdit::replace(i..i + 1, "X"))
+            .chain((0..MAX_EDITS).map(|_| TextEdit::insert(9, "")))
+            .collect();
+        // Too many: they're joined until MAX_EDITS remain, and the text
+        // still comes out the same.
+        let joined = merge_edits(old, edits.clone(), 5);
+        assert!(joined.len() <= MAX_EDITS);
+        assert_eq!(
+            igneous_markdown::edit::apply(old, &joined),
+            igneous_markdown::edit::apply(old, &edits)
+        );
+        // Nothing joined spans the cursor.
+        assert!(
+            joined
+                .iter()
+                .all(|e| !(e.range.start < 5 && 5 < e.range.end))
+        );
+        // The cursor follows the text around it.
+        assert_eq!(new_cursor(&[TextEdit::insert(0, "#")], 0), 0);
+        assert_eq!(new_cursor(&[TextEdit::insert(4, "\n#")], 4), 5);
+        assert_eq!(new_cursor(&[TextEdit::insert(0, "#")], 4), 5);
+        assert_eq!(new_cursor(&[TextEdit::delete(0..2)], 4), 2);
+        assert_eq!(new_cursor(&[TextEdit::replace(2..6, "ab")], 4), 4);
+        assert_eq!(new_cursor(&[TextEdit::insert(9, "!")], 4), 4);
+        // Few edits are left alone.
+        let few = vec![TextEdit::insert(1, "#")];
+        assert_eq!(merge_edits(old, few.clone(), 0), few);
+    }
 }
