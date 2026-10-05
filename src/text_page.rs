@@ -1,5 +1,5 @@
-//! A read-only tab showing text that isn't a note on disk: a diff, or a note
-//! as it was in an earlier commit.
+//! A read-only tab showing text that isn't a note on disk: a diff, a note as
+//! it was in an earlier commit, or a file recovery snapshot.
 
 use std::cell::{OnceCell, RefCell};
 
@@ -14,6 +14,9 @@ pub enum Contents {
     Diff { staged: bool },
     /// The file as of a commit.
     Version { hash: String, short: String },
+    /// A file recovery snapshot, taken at `taken` (Unix milliseconds); `when`
+    /// describes it for the title.
+    Snapshot { taken: i64, when: String },
 }
 
 mod imp {
@@ -54,7 +57,7 @@ impl TextPage {
         let page: Self = glib::Object::new();
         let language = match contents {
             Contents::Diff { .. } => "diff",
-            Contents::Version { .. } => igneous_editor::LANGUAGE_ID,
+            Contents::Version { .. } | Contents::Snapshot { .. } => igneous_editor::LANGUAGE_ID,
         };
         let buffer = sourceview::Buffer::new(None);
         buffer.set_language(
@@ -80,7 +83,21 @@ impl TextPage {
             .vexpand(true)
             .child(&view)
             .build();
-        page.set_child(Some(&scrolled));
+        if let Contents::Snapshot { when, .. } = &contents {
+            // A snapshot can be put back into the note.
+            let banner = adw::Banner::builder()
+                .title(format!("Snapshot from {when}"))
+                .button_label("_Restore")
+                .action_name("win.restore-snapshot")
+                .revealed(true)
+                .build();
+            let column = gtk::Box::new(gtk::Orientation::Vertical, 0);
+            column.append(&banner);
+            column.append(&scrolled);
+            page.set_child(Some(&column));
+        } else {
+            page.set_child(Some(&scrolled));
+        }
         let imp = page.imp();
         imp.view.set(view).unwrap();
         imp.path.replace(Some(path.clone()));
@@ -112,6 +129,7 @@ impl TextPage {
             Some(Contents::Diff { staged: false }) => format!("{name} (changes)"),
             Some(Contents::Diff { staged: true }) => format!("{name} (staged)"),
             Some(Contents::Version { short, .. }) => format!("{name} @ {short}"),
+            Some(Contents::Snapshot { when, .. }) => format!("{name} ({when})"),
             None => name,
         }
     }
