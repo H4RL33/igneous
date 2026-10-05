@@ -26,7 +26,7 @@ pub use host::{BaseEmbed, Embed, Host, Mention, NoHost, NoteName};
 pub use input::InputOptions;
 pub use properties::PropertyKind;
 pub use scheme::{style_scheme, system_accent};
-pub use view::{Mode, NoteView};
+pub use view::{Mode, NoteView, READABLE_WIDTH};
 
 use std::sync::Once;
 

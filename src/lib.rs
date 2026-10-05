@@ -51,7 +51,7 @@ pub use note_page::{NotePage, State as NoteState};
 pub use sync::{State as SyncState, SyncService};
 pub use vault::VaultContext;
 pub use vault_picker::VaultPicker;
-pub use window::Window;
+pub use window::{TextStyle, Window};
 
 use gtk::{gio, glib, prelude::*};
 

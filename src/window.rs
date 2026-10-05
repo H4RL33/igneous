@@ -106,6 +106,10 @@ pub(crate) mod imp {
         pub themes: RefCell<Catalog>,
         pub theme_id: RefCell<String>,
         pub style_handlers: RefCell<Vec<glib::SignalHandlerId>>,
+        /// appearance.json's fonts and text width.
+        pub text_style: RefCell<TextStyle>,
+        /// The fonts as CSS for this window's notes (see `apply_text_style`).
+        pub text_css: OnceCell<gtk::CssProvider>,
         pub sync: OnceCell<Rc<SyncService>>,
         pub sync_button: OnceCell<Rc<SyncButton>>,
         pub changes: OnceCell<Rc<ChangesPane>>,
@@ -180,6 +184,12 @@ pub(crate) mod imp {
             let style = adw::StyleManager::default();
             for handler in self.style_handlers.take() {
                 style.disconnect(handler);
+            }
+            if let Some(css) = self.text_css.get() {
+                gtk::style_context_remove_provider_for_display(
+                    &WidgetExt::display(&*self.obj()),
+                    css,
+                );
             }
         }
 
@@ -603,7 +613,25 @@ impl Window {
                 window.apply_editor_theme();
             }
         });
-        self.imp().style_handlers.replace(vec![on_dark, on_accent]);
+        // Fonts: the vault's, or the desktop's document and monospace fonts.
+        let css = gtk::CssProvider::new();
+        gtk::style_context_add_provider_for_display(
+            &WidgetExt::display(self),
+            &css,
+            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
+        self.imp().text_css.set(css).ok();
+        self.apply_text_style();
+        let mut handlers = vec![on_dark, on_accent];
+        for property in ["document-font-name", "monospace-font-name"] {
+            let weak = self.downgrade();
+            handlers.push(style.connect_notify_local(Some(property), move |_, _| {
+                if let Some(window) = weak.upgrade() {
+                    window.apply_text_style();
+                }
+            }));
+        }
+        self.imp().style_handlers.replace(handlers);
 
         self.restore_workspace();
         self.set_up_builtins();
@@ -636,10 +664,72 @@ impl Window {
             .collect()
     }
 
-    /// Colours a note that isn't a tab of its own (a base's source) like the
-    /// tabs.
+    /// Gives a note the vault's theme, fonts and text width.
     pub fn style_note(&self, note: &NotePage) {
         note.set_theme(&self.editor_theme(), adw::StyleManager::default().is_dark());
+        self.style_note_text(note);
+    }
+
+    fn style_note_text(&self, note: &NotePage) {
+        let style = self.imp().text_style.borrow().clone();
+        let view = note.view();
+        view.add_css_class(&self.text_class());
+        view.set_readable_line_length(self.readable_line_length());
+        view.set_readable_width(
+            style
+                .line_width
+                .map_or(igneous_editor::READABLE_WIDTH, |w| w as i32),
+        );
+        let monospace = style
+            .monospace
+            .clone()
+            .unwrap_or_else(|| desktop_font(false).0);
+        view.set_monospace_family(Some(&monospace));
+    }
+
+    /// The CSS class this window's notes get their fonts by.
+    fn text_class(&self) -> String {
+        format!("igneous-text-{:x}", self.as_ptr() as usize)
+    }
+
+    /// The vault's fonts and text width, from appearance.json.
+    pub fn text_style(&self) -> TextStyle {
+        self.imp().text_style.borrow().clone()
+    }
+
+    /// Uses `style` for every note (the caller saves it).
+    pub fn set_text_style(&self, style: TextStyle) {
+        self.imp().text_style.replace(style);
+        self.apply_text_style();
+    }
+
+    /// Writes the fonts into this window's CSS and restyles every note.
+    fn apply_text_style(&self) {
+        let Some(css) = self.imp().text_css.get() else {
+            return;
+        };
+        let style = self.text_style();
+        let (desktop_family, desktop_size) = desktop_font(true);
+        let family = style.family.clone().unwrap_or(desktop_family);
+        let size = style.size.unwrap_or(desktop_size);
+        css.load_from_string(&format!(
+            "textview.igneous-note.{} {{ font-family: {}; font-size: {size}pt; }}",
+            self.text_class(),
+            css_string(&family),
+        ));
+        for page in self.pages() {
+            let child = page.child();
+            let note = child.downcast_ref::<NotePage>().cloned().or_else(|| {
+                child
+                    .downcast_ref::<BasePage>()
+                    .and_then(BasePage::source_note)
+            });
+            if let Some(note) = note {
+                self.style_note_text(&note);
+                // Formulas are rendered at the text's size.
+                note.view().refresh_widgets();
+            }
+        }
     }
 
     pub(crate) fn notes(&self) -> Vec<NotePage> {
@@ -741,10 +831,8 @@ impl Window {
                 note,
                 move |_| window.schedule_problems(&note)
             ));
-            note.set_theme(&self.editor_theme(), adw::StyleManager::default().is_dark());
+            self.style_note(&note);
             note.set_mode(mode_from(self.ctx().settings.borrow().editor.default_mode));
-            note.view()
-                .set_readable_line_length(self.readable_line_length());
             if let Err(e) = note.load(path) {
                 self.toast(&format!("Couldn't open “{path}”: {e}"));
                 return;
@@ -1551,6 +1639,12 @@ impl Window {
         self.imp()
             .readable
             .set(appearance.as_ref().is_none_or(|a| a.readable_line_length));
+        self.imp().text_style.replace(
+            appearance
+                .as_ref()
+                .map(TextStyle::from_appearance)
+                .unwrap_or_default(),
+        );
         let id = appearance
             .and_then(|a| a.editor_theme)
             .unwrap_or_else(|| gsettings::settings().string("editor-theme").to_string());
@@ -1571,9 +1665,7 @@ impl Window {
 
     pub fn set_readable_line_length(&self, readable: bool) {
         self.imp().readable.set(readable);
-        for note in self.notes() {
-            note.view().set_readable_line_length(readable);
-        }
+        self.apply_text_style();
     }
 
     /// Applies changed editor settings to every open note.
@@ -2540,6 +2632,54 @@ fn name_dialog(heading: &str, accept: &str, entry: &gtk::Entry) -> adw::AlertDia
     dialog.add_responses(&[("cancel", "_Cancel"), ("ok", accept)]);
     dialog.set_response_appearance("ok", adw::ResponseAppearance::Suggested);
     dialog
+}
+
+/// The fonts and text width from a vault's appearance.json.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct TextStyle {
+    /// The text's family; None for the desktop's document font.
+    pub family: Option<String>,
+    /// The base size in points; None for the document font's size.
+    pub size: Option<f64>,
+    /// The family for code and tables; None for the desktop's monospace font.
+    pub monospace: Option<String>,
+    /// The text column's width with readable line length on, in pixels.
+    pub line_width: Option<u32>,
+}
+
+impl TextStyle {
+    pub fn from_appearance(appearance: &Appearance) -> Self {
+        Self {
+            family: appearance.text_font.clone().filter(|f| !f.is_empty()),
+            size: appearance.font_size.filter(|s| *s > 0.0),
+            monospace: appearance.monospace_font.clone().filter(|f| !f.is_empty()),
+            line_width: appearance.line_width.filter(|w| *w > 0),
+        }
+    }
+}
+
+/// The desktop's document (or monospace) font: its family and size in
+/// points.
+pub fn desktop_font(document: bool) -> (String, f64) {
+    let style = adw::StyleManager::default();
+    let name = if document {
+        style.document_font_name()
+    } else {
+        style.monospace_font_name()
+    };
+    let description = gtk::pango::FontDescription::from_string(&name);
+    let family = description
+        .family()
+        .map(|f| f.to_string())
+        .filter(|f| !f.is_empty())
+        .unwrap_or_else(|| if document { "sans-serif" } else { "monospace" }.to_owned());
+    let size = f64::from(description.size()) / f64::from(gtk::pango::SCALE);
+    (family, if size > 0.0 { size } else { 11.0 })
+}
+
+/// `text` as a quoted CSS string.
+fn css_string(text: &str) -> String {
+    format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 /// The mode the header bar's button switches a note to.

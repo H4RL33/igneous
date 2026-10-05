@@ -798,19 +798,33 @@ impl NoteView {
         )
     }
 
-    /// A rendered formula, cached by its TeX and colour.
+    /// A rendered formula, cached by its TeX, colour and size.
     fn math_widget(&self, tex: &str) -> gtk::Widget {
         let color = self.palette().map_or(gdk::RGBA::BLACK, |p| p.role("text"));
         let scale = self.scale_factor().max(1);
-        let key = (tex.to_owned(), crate::tags::rgba_hex(&color), scale);
+        // Display math is a little larger than the text around it.
+        let px = (self.em_pixels() * 1.5 * f64::from(scale)).round();
+        let key = (tex.to_owned(), crate::tags::rgba_hex(&color), px as i32);
         let texture = self
             .imp()
             .formulas
             .borrow_mut()
             .entry(key)
-            .or_insert_with(|| crate::math::render(tex, &color, 22.0 * f64::from(scale)))
+            .or_insert_with(|| crate::math::render(tex, &color, px))
             .clone();
         crate::math::widget(texture, scale, tex)
+    }
+
+    /// The text's font size in logical pixels.
+    fn em_pixels(&self) -> f64 {
+        let description = self.pango_context().font_description();
+        let size = description.as_ref().map_or(0, |d| d.size());
+        let px = if description.as_ref().is_some_and(|d| d.is_size_absolute()) {
+            f64::from(size) / f64::from(pango::SCALE)
+        } else {
+            f64::from(size) / f64::from(pango::SCALE) * 96.0 / 72.0
+        };
+        if px > 0.0 { px } else { 14.0 }
     }
 
     fn fold_toggle_widget(&self, start: usize, folded: bool) -> gtk::Widget {
@@ -1089,7 +1103,12 @@ impl NoteView {
         picture.set_content_fit(gtk::ContentFit::Contain);
         picture.set_halign(gtk::Align::Start);
         picture.set_alternative_text(Some(target));
-        let frame = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        // The frame rounds the picture's corners.
+        let frame = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .overflow(gtk::Overflow::Hidden)
+            .css_classes(["md-image"])
+            .build();
         frame.append(&picture);
         frame.upcast()
     }
@@ -1161,6 +1180,9 @@ impl NoteView {
         inner
             .source_buffer()
             .set_style_scheme(self.source_buffer().style_scheme().as_ref());
+        if let Some(family) = self.imp().monospace.borrow().as_deref() {
+            inner.set_monospace_family(Some(family));
+        }
         inner.set_top_margin(4);
         inner.set_bottom_margin(8);
         inner.add_css_class("embedded");
@@ -1215,7 +1237,10 @@ impl NoteView {
                     .collect()
             })
             .unwrap_or_default();
-        let grid = gtk::Grid::builder().css_classes(["md-table"]).build();
+        let grid = gtk::Grid::builder()
+            .css_classes(["md-table"])
+            .overflow(gtk::Overflow::Hidden)
+            .build();
         for (r, row) in rows.iter().enumerate().filter(|(r, _)| *r != 1) {
             let grid_row = if r == 0 { 0 } else { r as i32 - 1 };
             for (c, cell) in row.iter().enumerate() {
@@ -1492,22 +1517,36 @@ impl NoteView {
             .iter()
             .filter(|s| s.range.start <= on_screen.end && s.range.end >= on_screen.start);
         let bases = self.host().embeds_bases();
-        for span in spans {
+        let spans: Vec<&StyledSpan> = spans.collect();
+        // Math in a callout or quote sits on its background instead.
+        let quoted = |range: &Range<usize>| {
+            spans.iter().any(|s| {
+                matches!(s.style, Style::Callout { .. } | Style::Quote)
+                    && s.range.start <= range.start
+                    && range.end <= s.range.end
+            })
+        };
+        for span in spans.iter().copied() {
             match &span.style {
+                Style::Math { display: true } if quoted(&span.range) => {}
                 // A base block showing its results has its own card.
                 Style::CodeBlock { .. }
                     if bases && span.replace == Some(Replacement::Base) && !revealed(span) => {}
-                Style::CodeBlock { .. } => {
+                Style::CodeBlock { .. } | Style::Math { display: true } => {
                     if let Some(rect) = block(&span.range) {
-                        rounded(snapshot, &rect, 6.0, &palette.code_background);
+                        rounded(snapshot, &rect, BLOCK_RADIUS, &palette.code_background);
                     }
                 }
                 Style::Callout { kind } => {
                     if let Some(rect) = block(&span.range) {
                         let colour = palette.role(callout_role(kind));
-                        rounded(snapshot, &rect, 6.0, &Palette::with_alpha(&colour, 0.1));
+                        // The bar follows the block's rounded corners.
+                        let clip = gsk::RoundedRect::from_rect(rect, BLOCK_RADIUS);
+                        snapshot.push_rounded_clip(&clip);
+                        snapshot.append_color(&Palette::with_alpha(&colour, 0.1), &rect);
                         let bar = graphene::Rect::new(rect.x(), rect.y(), 3.0, rect.height());
                         snapshot.append_color(&colour, &bar);
+                        snapshot.pop();
                     }
                 }
                 Style::Quote => {
@@ -1682,6 +1721,10 @@ fn split_row(line: &str) -> Vec<String> {
     }
     cells
 }
+
+/// The corner radius of every block: code, math, callouts, tables, images
+/// and embeds (the widgets' radius is in `igneous.css`).
+const BLOCK_RADIUS: f32 = 8.0;
 
 fn rounded(snapshot: &gtk::Snapshot, rect: &graphene::Rect, radius: f32, color: &gdk::RGBA) {
     let clip = gsk::RoundedRect::from_rect(*rect, radius);

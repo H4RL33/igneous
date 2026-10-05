@@ -964,3 +964,55 @@ fn find_widget(
     }
     None
 }
+
+/// The vault's font, base size and text width reach every note.
+#[gtk::test]
+async fn text_style_applies_to_notes() {
+    let dir = vault(Some(100));
+    let window = open(&dir);
+    window.set_default_size(1280, 800);
+    window.open_path(&p("Home.md"), false);
+    let view = window.selected_note().unwrap().view();
+    window.set_text_style(igneous::TextStyle {
+        family: Some("Serif".to_owned()),
+        size: Some(20.0),
+        monospace: None,
+        line_width: Some(500),
+    });
+    // GTK hands Pango the size in pixels (at 96 dpi).
+    let points = |d: &gtk::pango::FontDescription| {
+        let size = f64::from(d.size()) / f64::from(gtk::pango::SCALE);
+        if d.is_size_absolute() {
+            size * 72.0 / 96.0
+        } else {
+            size
+        }
+    };
+    assert!(
+        until(3000, || {
+            view.pango_context()
+                .font_description()
+                .is_some_and(|d| (points(&d) - 20.0).abs() < 0.1)
+        })
+        .await,
+        "the base size wasn't applied"
+    );
+    let family = view
+        .pango_context()
+        .font_description()
+        .and_then(|d| d.family())
+        .unwrap();
+    assert_eq!(family.as_str(), "Serif");
+    // Readable line length keeps the text 500 pixels wide.
+    assert!(
+        until(3000, || (view.width()
+            - view.left_margin()
+            - view.right_margin()
+            - 500)
+            .abs()
+            <= 1)
+        .await,
+        "the text width wasn't applied"
+    );
+    window.close();
+}

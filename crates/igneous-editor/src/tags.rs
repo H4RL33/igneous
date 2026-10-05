@@ -283,6 +283,20 @@ impl Tags {
         &self.tags[&kind]
     }
 
+    /// The family for code, math source, tables and frontmatter.
+    pub fn set_monospace_family(&self, family: &str) {
+        for kind in [
+            TagKind::Frontmatter,
+            TagKind::CodeBlock,
+            TagKind::Table,
+            TagKind::Html,
+            TagKind::InlineCode,
+            TagKind::Math,
+        ] {
+            self.get(kind).set_family(Some(family));
+        }
+    }
+
     /// Colours every tag from `palette`.
     pub fn set_palette(&self, palette: &Palette) {
         self.diagnostic

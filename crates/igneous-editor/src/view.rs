@@ -26,8 +26,9 @@ use crate::rangeset::RangeSet;
 use crate::tags::{Palette, Tags};
 use crate::theme::Theme;
 
-/// Widest the text column gets before margins grow, in pixels.
-pub(crate) const READABLE_WIDTH: i32 = 720;
+/// Widest the text column gets before margins grow, in pixels, unless the
+/// vault sets its own width.
+pub const READABLE_WIDTH: i32 = 720;
 pub(crate) const MIN_MARGIN: i32 = 24;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -101,11 +102,15 @@ mod imp {
         pub(crate) spelling: RefCell<Option<libspelling::TextBufferAdapter>>,
         /// Whether wide windows keep the text column narrow.
         pub(crate) wide: Cell<bool>,
+        /// The text column's width when it's kept narrow; 0 for the default.
+        pub(crate) readable_width: Cell<i32>,
+        /// The family code, math source and tables use; None for monospace.
+        pub(crate) monospace: RefCell<Option<String>>,
         /// Whether headings fold (callouts with a fold sign always do).
         pub(crate) fold_headings: Cell<bool>,
         /// Laid-out widths of leading whitespace (see `live.rs`).
         pub(crate) indents: RefCell<HashMap<String, i32>>,
-        /// Rendered formulas by TeX, colour and scale.
+        /// Rendered formulas by TeX, colour and size in device pixels.
         pub(crate) formulas: RefCell<HashMap<(String, String, i32), Formula>>,
     }
 
@@ -279,6 +284,34 @@ impl NoteView {
         self.update_margins();
     }
 
+    /// The text column's width, in pixels, with readable line length on.
+    pub fn set_readable_width(&self, width: i32) {
+        if self.imp().readable_width.replace(width) != width {
+            self.imp().last_width.set(-1);
+            self.update_margins();
+        }
+    }
+
+    /// The font family for code, math source and tables; None uses the
+    /// desktop's monospace font. Nested embeds follow.
+    pub fn set_monospace_family(&self, family: Option<&str>) {
+        let family = family.map(str::to_owned);
+        if *self.imp().monospace.borrow() == family {
+            return;
+        }
+        self.tags()
+            .set_monospace_family(family.as_deref().unwrap_or("monospace"));
+        self.imp().monospace.replace(family);
+        self.refresh_widgets();
+    }
+
+    /// Rebuilds the widgets over the text, e.g. after the font changed: a
+    /// formula is rendered at the text's size.
+    pub fn refresh_widgets(&self) {
+        self.rebuild_overlays();
+        self.restyle_all();
+    }
+
     /// Vim keybindings (GtkSourceView's emulation).
     pub fn set_vim_mode(&self, enabled: bool) {
         let imp = self.imp();
@@ -330,8 +363,7 @@ impl NoteView {
     /// and reloads images and embeds.
     pub fn refresh_links(&self) {
         self.imp().textures.borrow_mut().clear();
-        self.rebuild_overlays();
-        self.restyle_all();
+        self.refresh_widgets();
     }
 
     /// The text as Live Preview last saw it.
@@ -388,7 +420,11 @@ impl NoteView {
         let margin = if self.imp().wide.get() {
             MIN_MARGIN
         } else {
-            ((width - READABLE_WIDTH) / 2).max(MIN_MARGIN)
+            let readable = match self.imp().readable_width.get() {
+                0 => READABLE_WIDTH,
+                width => width,
+            };
+            ((width - readable) / 2).max(MIN_MARGIN)
         };
         if self.left_margin() != margin {
             self.set_left_margin(margin);

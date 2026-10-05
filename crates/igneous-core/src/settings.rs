@@ -402,12 +402,19 @@ pub struct Appearance {
     #[serde(default = "one")]
     pub version: u32,
     pub color_scheme: ColorScheme,
-    /// Overrides the system document font.
+    /// Overrides the system document font's family.
     pub text_font: Option<String>,
-    /// Overrides the system monospace font.
+    /// Overrides the system monospace font's family.
     pub monospace_font: Option<String>,
     pub font_scale: f64,
+    /// The editor's base size in points, overriding the document font's.
+    /// Headings and other sized text scale from it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub font_size: Option<f64>,
     pub readable_line_length: bool,
+    /// The text column's width in pixels with readable line length on.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line_width: Option<u32>,
     /// The editor theme's id. When unset, the app-wide default is used.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub editor_theme: Option<String>,
@@ -424,7 +431,9 @@ impl Default for Appearance {
             text_font: None,
             monospace_font: None,
             font_scale: 1.0,
+            font_size: None,
             readable_line_length: true,
+            line_width: None,
             editor_theme: None,
             extra: Map::new(),
         }

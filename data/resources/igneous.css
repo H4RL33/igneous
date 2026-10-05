@@ -1,8 +1,6 @@
 /* Igneous's own styling. Colours come only from libadwaita's variables. */
 
-textview.igneous-note {
-  font-size: 1.05em;
-}
+/* Note fonts come from the vault's settings: see Window::apply_text_style. */
 
 /* The file type of anything that isn't a note: a small pill, centred in the row. */
 .file-row .file-badge {
@@ -39,10 +37,19 @@ textview.igneous-note {
   border-bottom: 1px solid var(--border-color);
 }
 
-/* Live Preview widgets. */
+/* Live Preview widgets. Blocks share one corner radius: 8px here and
+   BLOCK_RADIUS for what live.rs draws (code, math and callouts). */
 .md-table {
   border: 1px solid var(--border-color);
-  border-radius: 6px;
+  border-radius: 8px;
+}
+
+.md-image {
+  border-radius: 8px;
+}
+
+textview.igneous-note .card {
+  border-radius: 8px;
 }
 
 .md-table-cell {
@@ -94,4 +101,44 @@ textview .fold-toggle {
 textview .fold-toggle:hover,
 textview .fold-toggle.folded {
   opacity: 0.9;
+}
+
+/* Theme cards in Preferences, after Ptyxis's palettes. Each card's colours
+   come from its theme (see preferences.rs). */
+.theme-cards > flowboxchild {
+  padding: 0;
+  border-radius: 14px;
+}
+
+.theme-card {
+  padding: 12px 12px 14px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  box-shadow: inset 0 0 0 1px alpha(currentColor, 0.08);
+}
+
+.theme-cards > flowboxchild:hover .theme-card {
+  box-shadow: inset 0 0 0 1px alpha(currentColor, 0.25);
+}
+
+.theme-card.selected {
+  border-color: var(--accent-bg-color);
+}
+
+.theme-card-title {
+  font-weight: bold;
+}
+
+.theme-swatch {
+  min-width: 18px;
+  min-height: 18px;
+  border-radius: 5px;
+}
+
+.theme-card-check {
+  padding: 3px;
+  border-radius: 999px;
+  background-color: var(--accent-bg-color);
+  color: var(--accent-fg-color);
+  -gtk-icon-size: 12px;
 }
