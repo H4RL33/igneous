@@ -916,3 +916,51 @@ fn copy_visible(from: &Path, to: &Path) {
         }
     }
 }
+
+/// The header bar's mode button cycles Live Preview, Source and Reading, and
+/// says which mode a click switches to.
+#[gtk::test]
+async fn mode_button_cycles_modes() {
+    use igneous_editor::Mode;
+    let dir = vault(Some(100));
+    let window = open(&dir);
+    window.open_path(&p("Home.md"), false);
+    let note = window.selected_note().unwrap();
+    let button = find_widget(window.upcast_ref(), &|w| {
+        w.downcast_ref::<gtk::Button>()
+            .is_some_and(|b| b.action_name().as_deref() == Some("win.cycle-mode"))
+    })
+    .and_downcast::<gtk::Button>()
+    .unwrap();
+    assert!(button.is_visible());
+    assert_eq!(note.mode(), Mode::Live);
+    assert_eq!(button.tooltip_text().as_deref(), Some("Switch to Source"));
+    for (mode, next) in [
+        (Mode::Source, "Switch to Reading"),
+        (Mode::Reading, "Switch to Live Preview"),
+        (Mode::Live, "Switch to Source"),
+    ] {
+        button.emit_clicked();
+        assert_eq!(note.mode(), mode);
+        assert_eq!(button.tooltip_text().as_deref(), Some(next));
+    }
+    window.close();
+}
+
+/// The first widget under `widget` that `matches`.
+fn find_widget(
+    widget: &gtk::Widget,
+    matches: &dyn Fn(&gtk::Widget) -> bool,
+) -> Option<gtk::Widget> {
+    if matches(widget) {
+        return Some(widget.clone());
+    }
+    let mut child = widget.first_child();
+    while let Some(c) = child {
+        if let Some(found) = find_widget(&c, matches) {
+            return Some(found);
+        }
+        child = c.next_sibling();
+    }
+    None
+}

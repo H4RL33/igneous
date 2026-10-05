@@ -32,7 +32,6 @@ template $IgneousWindow: Adw.ApplicationWindow {
     setters {
       split_view.collapsed: true;
       inspector_split.collapsed: true;
-      mode_slot.visible: false;
       inspector_button.visible: false;
       tab_bar.visible: false;
       tab_button.visible: true;
@@ -75,13 +74,10 @@ template $IgneousWindow: Adw.ApplicationWindow {
         Adw.InlineViewSwitcher sidebar_switcher {
           stack: sidebar_stack;
           display-mode: icons;
-          margin-start: 12;
-          margin-end: 12;
+          homogeneous: true;
+          margin-start: 6;
+          margin-end: 6;
           margin-bottom: 6;
-
-          styles [
-            "flat",
-          ]
         }
 
         content: Adw.ViewStack sidebar_stack {
@@ -189,32 +185,10 @@ template $IgneousWindow: Adw.ApplicationWindow {
 
           [end]
           Adw.Bin mode_slot {
-          child: Adw.ToggleGroup mode_toggle {
-            visible: false;
-            active-name: "live";
-
-            Adw.Toggle {
-              name: "live";
-              icon-name: "format-text-rich-symbolic";
-              tooltip: _("Live Preview");
-            }
-
-            Adw.Toggle {
-              name: "source";
-              icon-name: "text-x-generic-symbolic";
-              tooltip: _("Source");
-            }
-
-            Adw.Toggle {
-              name: "reading";
-              icon-name: "view-reveal-symbolic";
-              tooltip: _("Reading");
-            }
-
-            styles [
-              "flat",
-            ]
-          };
+            child: Button mode_button {
+              visible: false;
+              action-name: "win.cycle-mode";
+            };
           }
         }
 

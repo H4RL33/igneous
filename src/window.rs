@@ -78,7 +78,7 @@ pub(crate) mod imp {
         #[template_child]
         pub sync_banner: TemplateChild<adw::Banner>,
         #[template_child]
-        pub mode_toggle: TemplateChild<adw::ToggleGroup>,
+        pub mode_button: TemplateChild<gtk::Button>,
         #[template_child]
         pub tab_button: TemplateChild<adw::TabButton>,
         #[template_child]
@@ -112,8 +112,6 @@ pub(crate) mod imp {
         /// The sidebar pane to show once it exists (Changes appears only
         /// after Git has been found).
         pub wanted_pane: Cell<Option<SidebarPane>>,
-        /// Set while the mode toggle is being updated to match a tab.
-        pub updating_mode: Cell<bool>,
         pub index: OnceCell<Rc<IndexService>>,
         /// Set once the template is built; property actions are queried
         /// before that.
@@ -248,6 +246,14 @@ fn install_actions(klass: &mut <imp::Window as ObjectSubclass>::Class) {
     klass.install_action("win.reopen-tab", None, |w, _, _| w.reopen_tab());
     klass.install_action("win.go-back", None, |w, _, _| w.go(false));
     klass.install_action("win.search", None, |w, _, _| w.show_search());
+    klass.install_action("win.cycle-mode", None, |w, _, _| {
+        if let Some(note) = w.selected_note() {
+            note.set_mode(next_mode(note.mode()));
+            note.focus_editor();
+            w.sync_mode_toggle();
+            w.schedule_workspace_save();
+        }
+    });
     klass.install_action("win.toggle-reading", None, |w, _, _| {
         if let Some(note) = w.selected_note() {
             note.toggle_reading();
@@ -549,11 +555,6 @@ impl Window {
             #[weak(rename_to = window)]
             self,
             move |_| window.imp().tab_overview.set_open(true)
-        ));
-        imp.mode_toggle.connect_active_name_notify(glib::clone!(
-            #[weak(rename_to = window)]
-            self,
-            move |_| window.on_mode_toggled()
         ));
 
         // Save when the window loses focus; check Git when it comes back.
@@ -877,39 +878,22 @@ impl Window {
         self.schedule_workspace_save();
     }
 
-    /// Shows the selected note's mode in the header bar's toggle.
+    /// Points the header bar's mode button at the next mode, as Nautilus's
+    /// view button does: its icon and tooltip say what a click switches to.
     fn sync_mode_toggle(&self) {
         let imp = self.imp();
         let note = self.selected_note();
         self.action_set_enabled("win.mode", note.is_some());
         self.notify("note-mode");
-        imp.mode_toggle.set_visible(note.is_some());
+        imp.mode_button.set_visible(note.is_some());
         if let Some(note) = note {
-            imp.updating_mode.set(true);
-            imp.mode_toggle.set_active_name(Some(match note.mode() {
-                Mode::Live => "live",
-                Mode::Source => "source",
-                Mode::Reading => "reading",
-            }));
-            imp.updating_mode.set(false);
-        }
-    }
-
-    fn on_mode_toggled(&self) {
-        let imp = self.imp();
-        if imp.updating_mode.get() {
-            return;
-        }
-        let mode = match imp.mode_toggle.active_name().as_deref() {
-            Some("source") => Mode::Source,
-            Some("reading") => Mode::Reading,
-            _ => Mode::Live,
-        };
-        if let Some(note) = self.selected_note() {
-            note.set_mode(mode);
-            note.focus_editor();
-            self.notify("note-mode");
-            self.schedule_workspace_save();
+            let (icon, tooltip) = match next_mode(note.mode()) {
+                Mode::Live => ("format-text-rich-symbolic", "Switch to Live Preview"),
+                Mode::Source => ("text-x-generic-symbolic", "Switch to Source"),
+                Mode::Reading => ("view-reveal-symbolic", "Switch to Reading"),
+            };
+            imp.mode_button.set_icon_name(icon);
+            imp.mode_button.set_tooltip_text(Some(tooltip));
         }
     }
 
@@ -2556,6 +2540,15 @@ fn name_dialog(heading: &str, accept: &str, entry: &gtk::Entry) -> adw::AlertDia
     dialog.add_responses(&[("cancel", "_Cancel"), ("ok", accept)]);
     dialog.set_response_appearance("ok", adw::ResponseAppearance::Suggested);
     dialog
+}
+
+/// The mode the header bar's button switches a note to.
+fn next_mode(mode: Mode) -> Mode {
+    match mode {
+        Mode::Live => Mode::Source,
+        Mode::Source => Mode::Reading,
+        Mode::Reading => Mode::Live,
+    }
 }
 
 fn mode_from(mode: igneous_core::settings::EditorMode) -> Mode {

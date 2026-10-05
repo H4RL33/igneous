@@ -72,10 +72,10 @@ impl Inspector {
         let switcher = adw::InlineViewSwitcher::builder()
             .stack(&stack)
             .display_mode(adw::InlineViewSwitcherDisplayMode::Icons)
-            .margin_start(12)
-            .margin_end(12)
+            .homogeneous(true)
+            .margin_start(6)
+            .margin_end(6)
             .margin_bottom(6)
-            .css_classes(["flat"])
             .build();
         let header = adw::HeaderBar::builder()
             .show_title(false)

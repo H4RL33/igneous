@@ -33,7 +33,7 @@ Notes save themselves a moment after you stop typing, and whenever you switch aw
 
 ### Live Preview, Source and Reading
 
-The three buttons in the header bar switch modes (on narrow windows they're in the main menu); Ctrl+E toggles Reading.
+The mode button in the header bar switches to the next mode in turn, and its icon shows which one that is; **Show Note As** in the main menu picks one directly, and Ctrl+E toggles Reading.
 
 - **Live Preview** formats the note as you type and hides Markdown syntax except around the cursor.
 - **Source** shows plain Markdown with syntax highlighting.
