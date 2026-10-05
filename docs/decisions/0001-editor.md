@@ -1,7 +1,7 @@
 # 0001: Live Preview on GtkSourceView
 
 - **Status:** Accepted, 2026-10-04. Two manual checks are still open: IME and Orca (see [below](#still-to-check-by-hand)).
-- **Decides:** PROJECT.md D2 and the M0 gate.
+- **Decides:** how Live Preview is built, and the M0 gate.
 
 ## Context
 
@@ -60,7 +60,7 @@ Test setup:
 | Positions skipped moving right (logical) | **0** | 519 (e.g. ` **`, ` [[Wiki Link\|`) |
 | Positions skipped moving left (visual) | **0** | 425 (e.g. ` ``` `, `](Note%2046.md),`) |
 | Down arrow through all 861 display lines | reaches the end | reaches the end |
-| Width of a hidden `**` | 0 px | — |
+| Width of a hidden `**` | 0 px | n/a |
 | Crashes | none | **aborts** (below) |
 
 **The `invisible` crash.** The benchmark aborts with `Gtk-ERROR: Byte index N is off the end of the line`. The backtrace runs:

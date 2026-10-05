@@ -1,5 +1,5 @@
 //! Git sync for Igneous, in the style of obsidian-git, built on the `git`
-//! command rather than a library (PROJECT.md D6). Running `git` itself means
+//! command rather than a library. Running `git` itself means
 //! clean/smudge filters, hooks, signing, SSH configuration and credential
 //! helpers all behave exactly as they do in a terminal.
 //!

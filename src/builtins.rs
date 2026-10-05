@@ -1,4 +1,4 @@
-//! The smaller built-ins (PROJECT.md §8.9): daily notes, templates, the
+//! The smaller built-ins: daily notes, templates, the
 //! startup note, bookmarks and file recovery. This wires their actions and
 //! sidebar pieces into the window; each lives in its own module.
 

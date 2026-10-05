@@ -188,7 +188,7 @@ mod tests {
     #[test]
     fn unknown_text_passes_through() {
         let t = at("2026-10-04T09:05:07+00:00[UTC]");
-        assert_eq!(format(&t, "YYYY/MM/DD — ✓"), "2026/10/04 — ✓");
+        assert_eq!(format(&t, "YYYY/MM/DD · é"), "2026/10/04 · é");
         assert_eq!(format(&t, "[unclosed"), "unclosed");
     }
 }

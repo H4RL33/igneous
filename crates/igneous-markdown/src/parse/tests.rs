@@ -368,7 +368,7 @@ fn markdownish() -> impl Strategy<Value = String> {
         // Fragments of the input that crashes pulldown-cmark 0.13.4.
         Just("![[]".to_owned()),
         Just(" ]()]]".to_owned()),
-        "[a-zé漢😀]{1,4}",
+        "[a-zé漢𐍈]{1,4}",
     ];
     proptest::collection::vec(pieces, 0..40).prop_map(|v| v.concat())
 }

@@ -1,6 +1,6 @@
 //! Finding the file a link points to.
 //!
-//! A target is tried, in order (PROJECT.md §8.4):
+//! A target is tried, in order, as Obsidian does:
 //!
 //! 1. as a path from the vault root, with or without `.md`;
 //! 2. as a path from the linking note's folder (`../` included);

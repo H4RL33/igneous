@@ -18,7 +18,7 @@ const HEIGHT: i32 = 800;
 const NOTES: &[(&str, &str)] = &[
     (
         "Home.md",
-        "# Rock notes\n\nNotes from the volcanic geology course.\n\n- [[Rock cycle]] — how rocks turn into each other\n- [[Magma]] and [[Lava]]\n- Igneous rocks: [[Basalt]], [[Granite]], [[Obsidian]], [[Pumice]], [[Gabbro]], [[Rhyolite]], [[Andesite]]\n- Minerals: [[Quartz]], [[Feldspar]], [[Olivine]], [[Pyroxene]], [[Mica]]\n- [[Reading list]]\n",
+        "# Rock notes\n\nNotes from the volcanic geology course.\n\n- [[Rock cycle]]: how rocks turn into each other\n- [[Magma]] and [[Lava]]\n- Igneous rocks: [[Basalt]], [[Granite]], [[Obsidian]], [[Pumice]], [[Gabbro]], [[Rhyolite]], [[Andesite]]\n- Minerals: [[Quartz]], [[Feldspar]], [[Olivine]], [[Pyroxene]], [[Mica]]\n- [[Reading list]]\n",
     ),
     (
         "Rocks/Basalt.md",
@@ -90,7 +90,7 @@ const NOTES: &[(&str, &str)] = &[
     ),
     (
         "Reading list.md",
-        "# Reading list\n\n- *Volcanoes* — chapter on [[Lava]] flows\n- Field guide to [[Minerals/Quartz|quartz]] varieties\n- An article on knapping Obsidian into blades\n",
+        "# Reading list\n\n- *Volcanoes*, the chapter on [[Lava]] flows\n- Field guide to [[Minerals/Quartz|quartz]] varieties\n- An article on knapping Obsidian into blades\n",
     ),
     (
         "Rocks.base",

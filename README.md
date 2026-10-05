@@ -2,7 +2,7 @@
 
 A GNOME app for reading and editing Markdown vaults, including Obsidian vaults.
 
-Igneous is approaching its first release: Live Preview editing, links and backlinks, properties, search, Bases, the graph, Git sync and the linter all work. [`docs/user-guide.md`](docs/user-guide.md) explains how to use it. [`PROJECT.md`](PROJECT.md) describes what it's for and the plan, and [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) how it's built.
+Igneous is approaching its first release: Live Preview editing, links and backlinks, properties, search, Bases, the graph, Git sync and the linter all work. [`docs/user-guide.md`](docs/user-guide.md) explains how to use it.
 
 ## Building
 

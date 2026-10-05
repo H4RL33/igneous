@@ -183,7 +183,7 @@ impl NoteView {
         let row: gtk::Widget = match (kind, value) {
             (_, Value::Map(_)) => adw::ActionRow::builder()
                 .title(glib::markup_escape_text(key))
-                .subtitle("A nested map — edit it in Source mode")
+                .subtitle("A nested map, editable in Source mode")
                 .build()
                 .upcast(),
             (PropertyKind::Checkbox, _) => {

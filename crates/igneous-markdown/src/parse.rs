@@ -817,7 +817,9 @@ impl Builder<'_> {
 fn is_tag_char(c: char) -> bool {
     c.is_alphanumeric()
         || matches!(c, '_' | '-' | '/')
-        || (!c.is_ascii() && !c.is_whitespace() && !"，。、；：？！…“”‘’«»–—（）【】".contains(c))
+        || (!c.is_ascii()
+            && !c.is_whitespace()
+            && !"，。、；：？！…“”‘’«»\u{2013}\u{2014}（）【】".contains(c))
 }
 
 /// `n`-byte delimiters at both ends, if the source really has them there.

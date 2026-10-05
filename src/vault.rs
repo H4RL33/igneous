@@ -102,9 +102,9 @@ impl VaultContext {
         files
     }
 
-    /// The file a link points to, resolved as Obsidian does (PROJECT.md
-    /// §8.4). `from` is the linking note; without one, paths are taken from
-    /// the vault's root.
+    /// The file a link points to, resolved as Obsidian does (see
+    /// `igneous_index::resolve`). `from` is the linking note; without one,
+    /// paths are taken from the vault's root.
     pub fn resolve(&self, link: &LinkRef, from: Option<&VaultPath>) -> Option<VaultPath> {
         let root = VaultPath::new("_.md").ok()?;
         self.files.borrow().resolve(link, from.unwrap_or(&root))
