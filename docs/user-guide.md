@@ -24,6 +24,7 @@ When Igneous starts, it shows your recent vaults and an **Open Folder…** butto
   - what the note links to;
   - its outline;
   - its local graph.
+- **Resizing:** drag the edge of the sidebar or the inspector to make it wider or narrower; the vault remembers each width.
 - **Find Note (Ctrl+O):** type part of a name or alias. `note#heading` jumps to a heading; Shift+Enter creates the note you typed.
 - **Command palette (Ctrl+P):** every command, with its shortcut.
 

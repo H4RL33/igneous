@@ -217,3 +217,87 @@ async fn rows_in_the_panes_open_what_they_show() {
     list.emit_by_name::<()>("row-activated", &[&row]);
     window.close();
 }
+
+/// The sidebar's resize handle: the widget with the resize cursor nearest
+/// the start (`end`: the end) of the window.
+fn resize_handle(root: &gtk::Widget, label: &str) -> gtk::Widget {
+    fn all(w: &gtk::Widget, out: &mut Vec<gtk::Widget>) {
+        out.push(w.clone());
+        let mut c = w.first_child();
+        while let Some(x) = c {
+            all(&x, out);
+            c = x.next_sibling();
+        }
+    }
+    let mut widgets = Vec::new();
+    all(root, &mut widgets);
+    widgets
+        .into_iter()
+        .filter(|w| w.cursor().and_then(|c| c.name()).as_deref() == Some("col-resize"))
+        .find(|w| {
+            w.observe_controllers()
+                .into_iter()
+                .any(|c| c.is_ok_and(|c| c.is::<gtk::GestureDrag>()))
+                && w.halign()
+                    == if label == "end" {
+                        gtk::Align::End
+                    } else {
+                        gtk::Align::Start
+                    }
+        })
+        .expect("a resize handle")
+}
+
+/// Both sidebars keep the width they're dragged to, within limits, and it's
+/// saved with the vault's workspace.
+#[gtk::test]
+async fn sidebars_resize_and_remember_their_width() {
+    let dir = vault(None);
+    std::fs::create_dir_all(dir.path().join(".igneous")).unwrap();
+    std::fs::write(
+        dir.path().join(".igneous/workspace.json"),
+        r#"{"version":1,"sidebar":{"visible":true,"width":360},"inspector":{"visible":true,"width":50}}"#,
+    )
+    .unwrap();
+    let window = open(&dir);
+    window.set_default_size(1400, 900);
+    wait(500).await;
+    let workspace = window.workspace();
+    assert_eq!(workspace.sidebar.width, 360);
+    // Too narrow is held at the inspector's narrowest.
+    assert_eq!(workspace.inspector.width, 240);
+
+    // Dragging the sidebar's handle 100 pixels outwards widens it.
+    let handle = resize_handle(window.upcast_ref(), "start");
+    let drag = handle
+        .observe_controllers()
+        .into_iter()
+        .find_map(|c| c.ok().and_downcast::<gtk::GestureDrag>())
+        .unwrap();
+    drag.emit_by_name::<()>("drag-begin", &[&0.0f64, &0.0f64]);
+    drag.emit_by_name::<()>("drag-update", &[&100.0f64, &0.0f64]);
+    drag.emit_by_name::<()>("drag-end", &[&100.0f64, &0.0f64]);
+    assert_eq!(window.workspace().sidebar.width, 460);
+    // And the inspector's, dragged left, widens it too.
+    let handle = resize_handle(window.upcast_ref(), "end");
+    let drag = handle
+        .observe_controllers()
+        .into_iter()
+        .find_map(|c| c.ok().and_downcast::<gtk::GestureDrag>())
+        .unwrap();
+    drag.emit_by_name::<()>("drag-begin", &[&0.0f64, &0.0f64]);
+    drag.emit_by_name::<()>("drag-update", &[&-60.0f64, &0.0f64]);
+    drag.emit_by_name::<()>("drag-end", &[&-60.0f64, &0.0f64]);
+    assert_eq!(window.workspace().inspector.width, 300);
+    // The sidebar is laid out at that width.
+    assert!(until(2000, || handle.margin_end() == 300 - 3).await);
+
+    window.save_workspace();
+    let saved: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(dir.path().join(".igneous/workspace.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(saved["sidebar"]["width"], 460);
+    assert_eq!(saved["inspector"]["width"], 300);
+    window.close();
+}

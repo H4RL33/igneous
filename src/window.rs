@@ -86,6 +86,10 @@ pub(crate) mod imp {
         #[template_child]
         pub inspector_split: TemplateChild<adw::OverlaySplitView>,
         #[template_child]
+        pub sidebar_overlay: TemplateChild<gtk::Overlay>,
+        #[template_child]
+        pub inspector_overlay: TemplateChild<gtk::Overlay>,
+        #[template_child]
         pub inspector_bin: TemplateChild<adw::Bin>,
         #[template_child]
         pub note_title: TemplateChild<adw::WindowTitle>,
@@ -653,6 +657,8 @@ impl Window {
             self.imp().interface_font_handler.replace(Some(handler));
         }
 
+        self.add_resize_handle(false);
+        self.add_resize_handle(true);
         self.restore_workspace();
         self.set_up_builtins();
     }
@@ -1782,6 +1788,92 @@ impl Window {
         self.apply_editor_theme();
     }
 
+    // --- sidebar widths ----------------------------------------------------------
+
+    /// A strip over the sidebar's (or with `end`, the inspector's) inner
+    /// edge that resizes it by dragging. AdwOverlaySplitView has none of its
+    /// own; the width is fixed by making its minimum and maximum the same.
+    fn add_resize_handle(&self, end: bool) {
+        let imp = self.imp();
+        let (overlay, split, bounds) = if end {
+            (
+                &*imp.inspector_overlay,
+                imp.inspector_split.get(),
+                INSPECTOR_WIDTHS,
+            )
+        } else {
+            (&*imp.sidebar_overlay, imp.split_view.get(), SIDEBAR_WIDTHS)
+        };
+        let handle = gtk::Box::builder()
+            .width_request(HANDLE_WIDTH)
+            .halign(if end {
+                gtk::Align::End
+            } else {
+                gtk::Align::Start
+            })
+            .build();
+        handle.set_cursor_from_name(Some("col-resize"));
+        handle.update_property(&[gtk::accessible::Property::Label(if end {
+            "Resize Inspector"
+        } else {
+            "Resize Sidebar"
+        })]);
+        overlay.add_overlay(&handle);
+        // Straddle the sidebar's edge, and only catch the pointer while the
+        // sidebar is beside the content (not hidden, nor over it).
+        handle.add_tick_callback(glib::clone!(
+            #[weak]
+            split,
+            #[upgrade_or]
+            glib::ControlFlow::Break,
+            move |handle, _| {
+                let width = split.sidebar().map_or(0, |s| s.width());
+                let shown = split.shows_sidebar() && !split.is_collapsed() && width > 0;
+                handle.set_can_target(shown);
+                let margin = (width - HANDLE_WIDTH / 2).max(0);
+                if end {
+                    if handle.margin_end() != margin {
+                        handle.set_margin_end(margin);
+                    }
+                } else if handle.margin_start() != margin {
+                    handle.set_margin_start(margin);
+                }
+                glib::ControlFlow::Continue
+            }
+        ));
+        let drag = gtk::GestureDrag::new();
+        let start = Rc::new(Cell::new(0));
+        drag.connect_drag_begin(glib::clone!(
+            #[weak]
+            split,
+            #[strong]
+            start,
+            move |_, _, _| start.set(split.min_sidebar_width() as i32)
+        ));
+        drag.connect_drag_update(glib::clone!(
+            #[weak]
+            split,
+            #[strong]
+            start,
+            move |_, dx, _| {
+                let dx = dx.round() as i32;
+                let wanted = start.get() + if end { -dx } else { dx };
+                // Never so wide that the content can't fit beside it.
+                let content = split
+                    .content()
+                    .map_or(0, |c| c.measure(gtk::Orientation::Horizontal, -1).0);
+                let room = (split.width() - content).max(bounds.0);
+                set_sidebar_width(&split, wanted.min(room), bounds);
+            }
+        ));
+        drag.connect_drag_end(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |_, _, _| window.schedule_workspace_save()
+        ));
+        handle.add_controller(drag);
+    }
+
     // --- workspace -------------------------------------------------------------
 
     fn schedule_workspace_save(&self) {
@@ -1827,6 +1919,8 @@ impl Window {
                 _ => InspectorView::Backlinks,
             };
         }
+        workspace.sidebar.width = imp.split_view.min_sidebar_width() as u32;
+        workspace.inspector.width = imp.inspector_split.min_sidebar_width() as u32;
         workspace.recently_closed = imp.recently_closed.borrow().clone();
         workspace.recent_files = imp.recent_files.borrow().clone();
         workspace
@@ -1869,6 +1963,16 @@ impl Window {
             SidebarPane::Bookmarks => imp.sidebar_stack.set_visible_child_name("bookmarks"),
             pane => imp.wanted_pane.set(Some(pane)),
         }
+        set_sidebar_width(
+            &imp.split_view,
+            workspace.sidebar.width as i32,
+            SIDEBAR_WIDTHS,
+        );
+        set_sidebar_width(
+            &imp.inspector_split,
+            workspace.inspector.width as i32,
+            INSPECTOR_WIDTHS,
+        );
         imp.recently_closed
             .replace(workspace.recently_closed.clone());
         imp.recent_files.replace(workspace.recent_files.clone());
@@ -2673,6 +2777,23 @@ fn name_dialog(heading: &str, accept: &str, entry: &gtk::Entry) -> adw::AlertDia
     dialog.add_responses(&[("cancel", "_Cancel"), ("ok", accept)]);
     dialog.set_response_appearance("ok", adw::ResponseAppearance::Suggested);
     dialog
+}
+
+/// How narrow and wide the sidebar and the inspector can be dragged.
+const SIDEBAR_WIDTHS: (i32, i32) = (200, 600);
+const INSPECTOR_WIDTHS: (i32, i32) = (240, 600);
+
+/// The width of a sidebar's resize handle, half each side of its edge.
+const HANDLE_WIDTH: i32 = 6;
+
+/// Fixes a split view's sidebar at `width` pixels, within `bounds`.
+fn set_sidebar_width(split: &adw::OverlaySplitView, width: i32, bounds: (i32, i32)) {
+    let width = f64::from(width.clamp(bounds.0, bounds.1));
+    split.set_sidebar_width_unit(adw::LengthUnit::Px);
+    if split.min_sidebar_width() != width || split.max_sidebar_width() != width {
+        split.set_min_sidebar_width(width);
+        split.set_max_sidebar_width(width);
+    }
 }
 
 /// The fonts and text width from a vault's appearance.json.

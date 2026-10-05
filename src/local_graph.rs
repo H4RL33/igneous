@@ -33,25 +33,52 @@ fn local_forces() -> Forces {
     }
 }
 
+/// How many links away from the note the graph can reach.
+const MIN_DEPTH: i8 = 1;
+const MAX_DEPTH: i8 = 3;
+
 impl LocalGraph {
     pub fn new(on_activate: impl Fn(&VaultPath, bool) + 'static) -> Rc<Self> {
         let view = GraphView::new();
         view.set_size_request(-1, 280);
         view.connect_activate(on_activate);
-        let depth = gtk::SpinButton::with_range(1.0, 3.0, 1.0);
-        depth.set_value(1.0);
-        depth.set_valign(gtk::Align::Center);
-        depth.update_property(&[gtk::accessible::Property::Label("Depth")]);
+        // − 1 +: the buttons either side of the number.
+        let fewer = gtk::Button::builder()
+            .icon_name("list-remove-symbolic")
+            .tooltip_text("Fewer Links Away")
+            .valign(gtk::Align::Center)
+            .sensitive(false)
+            .css_classes(["flat", "circular"])
+            .build();
+        let level = gtk::Label::builder()
+            .label("1")
+            .width_chars(2)
+            .css_classes(["numeric"])
+            .build();
+        let more = gtk::Button::builder()
+            .icon_name("list-add-symbolic")
+            .tooltip_text("More Links Away")
+            .valign(gtk::Align::Center)
+            .css_classes(["flat", "circular"])
+            .build();
+        let stepper = gtk::Box::builder()
+            .spacing(4)
+            .valign(gtk::Align::Center)
+            .build();
+        stepper.append(&fewer);
+        stepper.append(&level);
+        stepper.append(&more);
         let header = adw::ActionRow::builder()
             .title("Depth")
             .tooltip_text("How many links away from the note to show")
             .build();
-        header.add_suffix(&depth);
+        header.add_suffix(&stepper);
         let list = gtk::ListBox::builder()
             .css_classes(["boxed-list"])
             .selection_mode(gtk::SelectionMode::None)
-            .margin_start(12)
-            .margin_end(12)
+            // Level with the page switcher above.
+            .margin_start(6)
+            .margin_end(6)
             .margin_top(6)
             .build();
         list.append(&header);
@@ -79,13 +106,25 @@ impl LocalGraph {
             path: RefCell::default(),
             empty,
         });
-        let weak = Rc::downgrade(&this);
-        depth.connect_value_changed(move |spin| {
-            if let Some(this) = weak.upgrade() {
-                this.depth.set(spin.value() as u8);
+        let step = {
+            let weak = Rc::downgrade(&this);
+            let (fewer, more) = (fewer.clone(), more.clone());
+            move |by: i8| {
+                let Some(this) = weak.upgrade() else {
+                    return;
+                };
+                let depth = (this.depth.get() as i8 + by).clamp(MIN_DEPTH, MAX_DEPTH);
+                this.depth.set(depth as u8);
+                level.set_label(&depth.to_string());
+                fewer.set_sensitive(depth > MIN_DEPTH);
+                more.set_sensitive(depth < MAX_DEPTH);
                 this.refresh();
             }
-        });
+        };
+        let step = Rc::new(step);
+        let down = step.clone();
+        fewer.connect_clicked(move |_| down(-1));
+        more.connect_clicked(move |_| step(1));
         this
     }
 

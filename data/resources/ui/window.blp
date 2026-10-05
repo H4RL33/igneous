@@ -39,6 +39,8 @@ template $IgneousWindow: Adw.ApplicationWindow {
   }
 
   content: Adw.ToastOverlay toast_overlay {
+    // The overlays hold the sidebars' resize handles (see window.rs).
+    child: Overlay sidebar_overlay {
     child: Adw.OverlaySplitView split_view {
       min-sidebar-width: 220;
       max-sidebar-width: 340;
@@ -135,7 +137,8 @@ template $IgneousWindow: Adw.ApplicationWindow {
         };
       };
 
-      content: Adw.OverlaySplitView inspector_split {
+      content: Overlay inspector_overlay {
+      child: Adw.OverlaySplitView inspector_split {
         sidebar-position: end;
         show-sidebar: false;
         min-sidebar-width: 240;
@@ -227,6 +230,8 @@ template $IgneousWindow: Adw.ApplicationWindow {
         };
       };
       };
+      };
+    };
     };
   };
 }
