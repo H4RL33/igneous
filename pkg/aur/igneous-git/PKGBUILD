@@ -1,0 +1,65 @@
+# Maintainer: Harley Welsh <git@harleywelsh.com>
+
+# PLACEHOLDER: the repository's URL, once Igneous is published.
+_repo='https://igneous.invalid/igneous.git'
+
+pkgname=igneous-git
+_pkgname=igneous
+pkgver=0.1.0.r0.g0000000
+pkgrel=1
+pkgdesc='Read and edit Markdown vaults, including Obsidian vaults, on GNOME (development version)'
+arch=('x86_64' 'aarch64')
+url="${_repo%.git}"
+license=('BSD-3-Clause')
+depends=(
+  'gcc-libs'
+  'git'
+  'glib2'
+  'glibc'
+  'gtk4'
+  'gtksourceview5'
+  'hicolor-icon-theme'
+  'libadwaita'
+  'libspelling'
+)
+makedepends=('blueprint-compiler' 'cargo' 'meson')
+checkdepends=('appstream' 'desktop-file-utils')
+optdepends=('git-crypt: sync vaults encrypted with git-crypt')
+provides=('igneous')
+conflicts=('igneous')
+# Bundled C (SQLite) compiled for LTO doesn't link into Rust binaries.
+options=('!lto')
+source=("$_pkgname::git+$_repo")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$_pkgname"
+  (
+    set -o pipefail
+    git describe --long --tags --abbrev=7 2>/dev/null |
+      sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g'
+  ) || printf '0.1.0.r%s.g%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+}
+
+prepare() {
+  cd "$_pkgname"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  export RUSTUP_TOOLCHAIN=stable
+  # Everything was fetched in prepare(); build() must not use the network.
+  export CARGO_NET_OFFLINE=true
+  arch-meson "$_pkgname" build --wrap-mode=nodownload
+  meson compile -C build
+}
+
+check() {
+  meson test -C build --no-rebuild --print-errorlogs
+}
+
+package() {
+  meson install -C build --no-rebuild --skip-subprojects --destdir "$pkgdir"
+  install -Dm644 "$_pkgname/LICENSE" -t "$pkgdir/usr/share/licenses/$pkgname"
+}
