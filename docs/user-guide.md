@@ -75,7 +75,7 @@ The fields at the top of a note are its YAML frontmatter:
 - text, lists (tags and aliases too), numbers, checkboxes, and dates with a calendar;
 - each field's menu changes its type for the whole vault, or removes it;
 - **Add Property** adds one. It's there on every note in Live Preview, including notes without properties yet; adding one creates the frontmatter. Click it for the property names used across the vault (less any the note has already), or **New Property…** to type a new name, then Enter. Typing `---` and Enter on a note's first line starts the properties too, as in Obsidian.
-- The menu is made once and shared by every note, and gains names as notes gain properties, in Igneous or elsewhere. The names are saved in `.igneous/properties.json` when you make a new property, so the menu is complete as soon as the vault opens; just opening a vault never writes it. Names are only ever added until you choose **Refresh Property Names** at the bottom of the menu, which re-reads every note in the vault and remakes the list from the names they use now.
+- The menu is made once and shared by every note, and gains names as notes gain properties, in Igneous or elsewhere. The names are saved in `.igneous/properties.json` when you make a new property, so the menu is complete as soon as the vault opens; just opening a vault never writes it. Names are only ever added until you click the refresh button at the bottom of the menu (**Refresh Property Names**), which re-reads every note in the vault and remakes the list from the names they use now.
 
 Igneous changes only the property you edit, leaving the rest of the frontmatter, comments included, exactly as written.
 

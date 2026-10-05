@@ -1185,7 +1185,7 @@ async fn add_property_offers_the_vaults_names_and_new_ones() {
     assert!(
         names.ends_with(&[
             "_New Property…".to_owned(),
-            "_Refresh Property Names".to_owned()
+            "Refresh Property Names".to_owned()
         ]),
         "{names:?}"
     );

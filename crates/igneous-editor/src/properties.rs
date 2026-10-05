@@ -533,14 +533,19 @@ impl NoteView {
     fn add_property_menu(&self) -> gio::Menu {
         let new = gio::Menu::new();
         new.append(Some("_New Property…"), Some("property.new"));
-        let refresh = gio::Menu::new();
-        refresh.append(Some("_Refresh Property Names"), Some("property.refresh"));
+        // Refresh is an icon; its label is the tooltip.
+        let refresh = gio::MenuItem::new(Some("Refresh Property Names"), Some("property.refresh"));
+        refresh.set_attribute_value("verb-icon", Some(&"view-refresh-symbolic".to_variant()));
+        let buttons = gio::Menu::new();
+        buttons.append_item(&refresh);
+        let buttons = gio::MenuItem::new_section(None, &buttons);
+        buttons.set_attribute_value("display-hint", Some(&"horizontal-buttons".to_variant()));
         let menu = gio::Menu::new();
         if let Some(names) = self.host().property_names() {
             menu.append_section(None, &names);
         }
         menu.append_section(None, &new);
-        menu.append_section(None, &refresh);
+        menu.append_item(&buttons);
         menu
     }
 
