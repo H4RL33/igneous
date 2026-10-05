@@ -600,6 +600,305 @@ async fn corpus_round_trip() {
     }
 }
 
+/// Opt-in: opens every note of copies of real vaults in Live Preview,
+/// scrolls through it and types in it, and reports stalls (main-loop gaps
+/// longer than they should be) and GTK warnings. Prints only numbers and
+/// widget types, never names or text.
+/// `IGNEOUS_CORPUS=/vault/one:/vault/two build-aux/run-ui-tests.sh -p igneous --test ui -- --ignored live_preview_stress --nocapture`
+#[gtk::test]
+#[ignore = "needs IGNEOUS_CORPUS"]
+async fn live_preview_stress() {
+    use std::collections::BTreeMap;
+    use std::sync::Mutex;
+    use std::time::{Duration, Instant};
+
+    let Ok(corpus) = std::env::var("IGNEOUS_CORPUS") else {
+        return;
+    };
+    // GTK warnings, with numbers and addresses taken out.
+    static WARNINGS: Mutex<BTreeMap<String, (usize, String)>> = Mutex::new(BTreeMap::new());
+    gtk::glib::log_set_writer_func(|level, fields| {
+        if matches!(
+            level,
+            gtk::glib::LogLevel::Warning | gtk::glib::LogLevel::Critical
+        ) {
+            let message = fields
+                .iter()
+                .find(|f| f.key() == "MESSAGE")
+                .and_then(|f| f.value_str())
+                .unwrap_or_default();
+            let domain = fields
+                .iter()
+                .find(|f| f.key() == "GLIB_DOMAIN")
+                .and_then(|f| f.value_str())
+                .unwrap_or_default();
+            if domain != "libenchant" {
+                let raw = message.to_owned();
+                let message: String = message
+                    .split_whitespace()
+                    .map(|w| {
+                        if w.starts_with("0x") || w.trim_matches(',').parse::<i64>().is_ok() {
+                            "#"
+                        } else {
+                            w
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                WARNINGS
+                    .lock()
+                    .unwrap()
+                    .entry(format!("{domain}: {message}"))
+                    .or_insert((0, raw))
+                    .0 += 1;
+            }
+        }
+        gtk::glib::LogWriterOutput::Handled
+    });
+    let warnings = || {
+        WARNINGS
+            .lock()
+            .unwrap()
+            .values()
+            .map(|v| v.0)
+            .sum::<usize>()
+    };
+
+    // A watchdog: the main loop should get back to it every few
+    // milliseconds. Longer gaps are stalls, attributed to whatever the test
+    // was doing when they started.
+    let phase = std::rc::Rc::new(std::cell::RefCell::new(String::from("startup")));
+    let stalls = std::rc::Rc::new(std::cell::RefCell::new(Vec::<(String, Duration)>::new()));
+    {
+        let (phase, stalls) = (phase.clone(), stalls.clone());
+        let last = std::cell::Cell::new((Instant::now(), String::new()));
+        // Under gdb (`handle SIGUSR1 stop nopass`), interrupt stalls as
+        // they happen, to see what the main thread is doing.
+        static BEAT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let start = Instant::now();
+        if std::env::var("IGNEOUS_STALL_SIGNAL").is_ok() {
+            std::thread::spawn(move || {
+                let mut signalled = 0;
+                loop {
+                    std::thread::sleep(Duration::from_millis(40));
+                    let beat = BEAT.load(std::sync::atomic::Ordering::Relaxed);
+                    let now = start.elapsed().as_millis() as u64;
+                    if beat > 0 && now - beat > 150 && beat != signalled {
+                        signalled = beat;
+                        std::process::Command::new("kill")
+                            .args(["-USR1", &std::process::id().to_string()])
+                            .status()
+                            .ok();
+                    }
+                }
+            });
+        }
+        gtk::glib::timeout_add_local(Duration::from_millis(5), move || {
+            BEAT.store(
+                start.elapsed().as_millis() as u64,
+                std::sync::atomic::Ordering::Relaxed,
+            );
+            let (at, during) = last.replace((Instant::now(), phase.borrow().clone()));
+            let gap = at.elapsed();
+            if gap > Duration::from_millis(100) {
+                stalls.borrow_mut().push((during, gap));
+            }
+            gtk::glib::ControlFlow::Continue
+        });
+    }
+    let set_phase = |name: String| *phase.borrow_mut() = name;
+    let report = |label: &str| {
+        for (during, gap) in stalls.borrow_mut().drain(..) {
+            eprintln!("stall {gap:?} ({label}; started during {during})");
+        }
+    };
+
+    let mut worst_overall = Duration::ZERO;
+    let pages = ["backlinks", "outgoing", "outline", "graph"];
+    for (v, source) in corpus.split(':').filter(|s| !s.is_empty()).enumerate() {
+        let dir = tempfile::tempdir().unwrap();
+        copy_visible(Path::new(source), dir.path());
+        // With the vault's own settings and history, but nowhere to push to.
+        for state in [".igneous", ".git"] {
+            if Path::new(source).join(state).is_dir() {
+                copy_all(&Path::new(source).join(state), &dir.path().join(state));
+            }
+        }
+        if dir.path().join(".git").is_dir() {
+            for remote in git(dir.path(), &["remote"]).lines() {
+                git(dir.path(), &["remote", "remove", remote]);
+            }
+            let _ = std::fs::remove_dir_all(dir.path().join(".git/hooks"));
+        }
+        let limit = std::env::var("IGNEOUS_CORPUS_LIMIT")
+            .ok()
+            .and_then(|l| l.parse().ok())
+            .unwrap_or(usize::MAX);
+        let notes: Vec<VaultPath> = walk(dir.path())
+            .into_iter()
+            .filter(|p| p.extension().is_some_and(|e| e == "md"))
+            .filter_map(|p| VaultPath::from_fs(dir.path(), &p).ok())
+            .take(limit)
+            .collect();
+        set_phase(format!("vault {v} opening"));
+        let started = Instant::now();
+        let window = open(&dir);
+        window.set_default_size(1400, 900);
+        window.show_inspector("backlinks");
+        eprintln!("vault {v}: opened in {:?}", started.elapsed());
+        set_phase(format!("vault {v} settling"));
+        wait(2000).await;
+        report(&format!("vault {v} startup"));
+        for (n, note_path) in notes.iter().enumerate() {
+            let before = warnings();
+            set_phase(format!("note {n} opening"));
+            let started = Instant::now();
+            window.open_path(note_path, false);
+            let opening = started.elapsed();
+            let Some(note) = window.selected_note() else {
+                continue;
+            };
+            window.show_inspector(pages[n % pages.len()]);
+            if let Ok(mode) = std::env::var("IGNEOUS_STRESS_MODE") {
+                WidgetExt::activate_action(&window, "win.mode", Some(&mode.to_variant())).unwrap();
+            }
+            let view = note.view();
+            let size = note.text().len();
+            // Every pause should take ~16 ms; anything much longer means the
+            // main loop was busy.
+            let mut worst = opening;
+            let mut tick = |started: Instant| worst = worst.max(started.elapsed());
+            set_phase(format!("note {n} settling"));
+            for _ in 0..5 {
+                let t = Instant::now();
+                wait(16).await;
+                tick(t);
+            }
+            // Scroll through.
+            set_phase(format!("note {n} scrolling"));
+            if let Some(adj) = view.vadjustment() {
+                let steps = 12;
+                for i in 0..=steps {
+                    adj.set_value(adj.upper() * f64::from(i) / f64::from(steps));
+                    let t = Instant::now();
+                    wait(16).await;
+                    tick(t);
+                }
+            }
+            // Type in the middle and at the end.
+            set_phase(format!("note {n} typing"));
+            let buffer = view.buffer();
+            for at in [buffer.char_count() / 2, buffer.char_count()] {
+                buffer.place_cursor(&buffer.iter_at_offset(at));
+                for _ in 0..5 {
+                    let t = Instant::now();
+                    buffer.insert_at_cursor("x");
+                    wait(16).await;
+                    tick(t);
+                }
+            }
+            let frames = |count: usize| async move {
+                for _ in 0..count {
+                    wait(16).await;
+                }
+            };
+            // Let it autosave, and the index and Git catch up.
+            set_phase(format!("note {n} saving"));
+            frames(90).await;
+            // Hide and show the inspector and the sidebar, which animates
+            // the text column's width, then shrink and grow the window.
+            if n % 10 == 0 {
+                let inspector = find_end_split(window.upcast_ref()).unwrap();
+                set_phase(format!("note {n} toggling inspector"));
+                inspector.set_show_sidebar(false);
+                frames(25).await;
+                inspector.set_show_sidebar(true);
+                frames(25).await;
+                set_phase(format!("note {n} toggling sidebar"));
+                WidgetExt::activate_action(&window, "win.toggle-sidebar", None).unwrap();
+                frames(25).await;
+                WidgetExt::activate_action(&window, "win.toggle-sidebar", None).unwrap();
+                frames(25).await;
+                set_phase(format!("note {n} resizing"));
+                for width in (1000..=1400)
+                    .rev()
+                    .step_by(40)
+                    .chain((1000..=1400).step_by(40))
+                {
+                    window.set_default_size(width, 900);
+                    frames(1).await;
+                }
+            }
+            // Idle for a while: nothing should keep happening.
+            set_phase(format!("note {n} idle"));
+            let idle = warnings();
+            for _ in 0..10 {
+                let t = Instant::now();
+                wait(16).await;
+                tick(t);
+            }
+            let idle = warnings() - idle;
+            set_phase(format!("note {n} closing"));
+            note.discard();
+            let warned = warnings() - before;
+            if worst > Duration::from_millis(80) || warned > 0 {
+                let mut kinds = BTreeMap::<String, usize>::new();
+                for kind in view.overlay_kinds() {
+                    let kind = kind.split(':').next().unwrap_or_default().to_owned();
+                    *kinds.entry(kind).or_default() += 1;
+                }
+                eprintln!(
+                    "vault {v} note {n}: {size} bytes, opened in {opening:?}, worst gap \
+                     {worst:?}, {warned} warnings ({idle} while idle), widgets {kinds:?}"
+                );
+            }
+            report(&format!("vault {v} note {n}"));
+            worst_overall = worst_overall.max(worst);
+        }
+        set_phase(format!("vault {v} closing"));
+        window.close();
+        wait(200).await;
+        report(&format!("vault {v} closing"));
+        eprintln!("vault {v}: {} notes", notes.len());
+    }
+    eprintln!("worst gap overall: {worst_overall:?}");
+    for (count, first) in WARNINGS.lock().unwrap().values() {
+        eprintln!("{count:6} like {first}");
+    }
+}
+
+/// The inspector's split view.
+fn find_end_split(widget: &gtk::Widget) -> Option<adw::OverlaySplitView> {
+    if let Some(split) = widget.downcast_ref::<adw::OverlaySplitView>()
+        && split.sidebar_position() == gtk::PackType::End
+    {
+        return Some(split.clone());
+    }
+    let mut child = widget.first_child();
+    while let Some(c) = child {
+        if let Some(found) = find_end_split(&c) {
+            return Some(found);
+        }
+        child = c.next_sibling();
+    }
+    None
+}
+
+/// Copies a folder and everything in it.
+fn copy_all(from: &Path, to: &Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for entry in std::fs::read_dir(from).unwrap() {
+        let entry = entry.unwrap();
+        let dest = to.join(entry.file_name());
+        let kind = entry.file_type().unwrap();
+        if kind.is_dir() {
+            copy_all(&entry.path(), &dest);
+        } else if kind.is_file() {
+            std::fs::copy(entry.path(), dest).unwrap();
+        }
+    }
+}
+
 /// Copies a vault without its dot-folders (`.git`, `.obsidian`, …).
 fn copy_visible(from: &Path, to: &Path) {
     std::fs::create_dir_all(to).unwrap();

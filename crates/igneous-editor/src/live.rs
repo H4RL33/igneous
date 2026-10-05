@@ -134,7 +134,9 @@ impl NoteView {
         ));
         self.add_tick_callback(|view, _| {
             let view = view.downcast_ref::<NoteView>().unwrap();
-            view.update_margins();
+            if view.width() != view.imp().last_width.get() {
+                view.schedule_relayout();
+            }
             view.place_overlays();
             glib::ControlFlow::Continue
         });
@@ -532,13 +534,13 @@ impl NoteView {
     }
 
     /// Shows `widget` over the text, in a free slot or a new one.
-    fn take_slot(&self, widget: &gtk::Widget) -> crate::slot::Slot {
+    fn take_slot(&self, widget: &gtk::Widget, fit: bool) -> crate::slot::Slot {
         let slot = self.imp().free_slots.borrow_mut().pop().unwrap_or_else(|| {
             let slot = crate::slot::Slot::new();
             self.add_overlay(&slot, 0, 0);
             slot
         });
-        slot.set_child(Some(widget));
+        slot.set_child(Some(widget), fit);
         slot.set_visible(true);
         slot
     }
@@ -546,7 +548,7 @@ impl NoteView {
     /// Takes an overlay's widget off the view, keeping its slot for reuse.
     fn release_slot(&self, overlay: &Overlay) {
         if let Some(slot) = overlay.slot.take() {
-            slot.set_child(None::<&gtk::Widget>);
+            slot.set_child(None::<&gtk::Widget>, false);
             slot.set_natural_width(0);
             slot.set_visible(false);
             self.imp().free_slots.borrow_mut().push(slot);
@@ -763,17 +765,27 @@ impl NoteView {
         self.apply(st, spacing, &keys);
     }
 
-    /// The height a block widget needs. Most span the text column; images
-    /// keep their own width.
+    /// The height a block widget needs, laid out as its slot will.
     fn measure_height(&self, kind: &OverlayKind, widget: &gtk::Widget) -> i32 {
-        if matches!(kind, OverlayKind::Image(_)) {
-            return widget.measure(gtk::Orientation::Vertical, -1).1;
+        let width =
+            crate::slot::layout_width(widget, self.slot_width(kind), Self::fits_content(kind));
+        widget.measure(gtk::Orientation::Vertical, width).1
+    }
+
+    /// The width a block widget's slot is given: the text column's for most,
+    /// none (the widget's own) for the rest.
+    fn slot_width(&self, kind: &OverlayKind) -> i32 {
+        if Self::spans_text_column(kind) {
+            self.text_width()
+        } else {
+            0
         }
-        let width = self.text_width();
-        let (min_w, _, _, _) = widget.measure(gtk::Orientation::Horizontal, -1);
-        widget
-            .measure(gtk::Orientation::Vertical, width.max(min_w))
-            .1
+    }
+
+    /// Block widgets that are only as wide as their content, up to the text
+    /// column's width.
+    fn fits_content(kind: &OverlayKind) -> bool {
+        matches!(kind, OverlayKind::Table | OverlayKind::Image(_))
     }
 
     fn spans_text_column(kind: &OverlayKind) -> bool {
@@ -1076,7 +1088,6 @@ impl NoteView {
         picture.set_alternative_text(Some(target));
         let frame = gtk::Box::new(gtk::Orientation::Vertical, 0);
         frame.append(&picture);
-        frame.set_halign(gtk::Align::Start);
         frame.upcast()
     }
 
@@ -1201,10 +1212,7 @@ impl NoteView {
                     .collect()
             })
             .unwrap_or_default();
-        let grid = gtk::Grid::builder()
-            .css_classes(["md-table"])
-            .halign(gtk::Align::Start)
-            .build();
+        let grid = gtk::Grid::builder().css_classes(["md-table"]).build();
         for (r, row) in rows.iter().enumerate().filter(|(r, _)| *r != 1) {
             let grid_row = if r == 0 { 0 } else { r as i32 - 1 };
             for (c, cell) in row.iter().enumerate() {
@@ -1293,11 +1301,38 @@ impl NoteView {
     fn place_overlays(&self) {
         if self.place_overlays_inner() {
             // A widget's height changed (text views lay out lazily): move the
-            // text below it.
-            if let Ok(mut st) = self.imp().state.try_borrow_mut() {
-                self.reserve_space(&mut st);
-            }
+            // text below it, between frames.
+            self.schedule_relayout();
         }
+    }
+
+    /// Updates the margins and the space reserved for block widgets before
+    /// the next frame. Doing either during a frame changes the text's
+    /// layout while GTK is laying the window out, and GTK then skips
+    /// drawing the note for that frame.
+    fn schedule_relayout(&self) {
+        if self.imp().relayout_pending.replace(true) {
+            return;
+        }
+        // Before GTK's own text validation (GTK_PRIORITY_RESIZE - 2) and the
+        // next frame.
+        glib::idle_add_local_full(
+            glib::Priority::HIGH_IDLE,
+            glib::clone!(
+                #[weak(rename_to = view)]
+                self,
+                #[upgrade_or]
+                glib::ControlFlow::Break,
+                move || {
+                    view.imp().relayout_pending.set(false);
+                    view.update_margins();
+                    if let Ok(mut st) = view.imp().state.try_borrow_mut() {
+                        view.reserve_space(&mut st);
+                    }
+                    glib::ControlFlow::Break
+                }
+            ),
+        );
     }
 
     /// Returns whether any block widget's height changed.
@@ -1336,7 +1371,9 @@ impl NoteView {
                     .borrow_mut()
                     .get_or_insert_with(|| self.make_widget(overlay, &st))
                     .clone();
-                overlay.slot.replace(Some(self.take_slot(&widget)));
+                overlay.slot.replace(Some(
+                    self.take_slot(&widget, Self::fits_content(&overlay.kind)),
+                ));
                 overlay.last_pos.set((-1, -1));
             } else if !near && attached {
                 self.release_slot(overlay);
@@ -1358,16 +1395,10 @@ impl NoteView {
                 OverlayKind::Checkbox
                     | OverlayKind::CalloutIcon { .. }
                     | OverlayKind::FoldToggle { .. }
-            ) && let Some(widget) = overlay.widget.borrow().as_ref()
+            ) && let Some(slot) = overlay.slot.borrow().as_ref()
             {
-                let height = if Self::spans_text_column(&overlay.kind) {
-                    let (min_w, _, _, _) = widget.measure(gtk::Orientation::Horizontal, -1);
-                    widget
-                        .measure(gtk::Orientation::Vertical, self.text_width().max(min_w))
-                        .1
-                } else {
-                    widget.measure(gtk::Orientation::Vertical, -1).1
-                };
+                slot.set_natural_width(self.slot_width(&overlay.kind));
+                let height = slot.measure(gtk::Orientation::Vertical, -1).1;
                 if height != overlay.height.get() {
                     overlay.height.set(height);
                     overlay.last_pos.set((-1, -1));
@@ -1416,9 +1447,6 @@ impl NoteView {
             if overlay.last_pos.get() != pos
                 && let Some(slot) = overlay.slot.borrow().as_ref()
             {
-                if Self::spans_text_column(&overlay.kind) {
-                    slot.set_natural_width(self.text_width());
-                }
                 self.move_overlay(slot, pos.0, pos.1);
                 overlay.last_pos.set(pos);
             }

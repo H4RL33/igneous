@@ -6,6 +6,10 @@
 //! almost no width but lays its child out at the text column's width,
 //! overflowing itself (GTK doesn't clip overflowing children unless asked).
 //!
+//! The slot also does the child's aligning. GTK aligning a child itself
+//! (any `halign` but `Fill`) measures the child's width for its height, and
+//! a table of wrapping labels can't answer that sensibly.
+//!
 //! It's a plain GtkWidget: a widget with a layout manager (like AdwBin)
 //! never has its own `measure` called.
 
@@ -20,6 +24,8 @@ mod imp {
     pub struct Slot {
         /// The width to lay the child out at; 0 uses the child's own.
         pub natural_width: Cell<i32>,
+        /// Whether the child keeps its own width when that's narrower.
+        pub fit: Cell<bool>,
         pub child: RefCell<Option<gtk::Widget>>,
     }
 
@@ -47,8 +53,10 @@ mod imp {
             match orientation {
                 gtk::Orientation::Horizontal => (1, width, -1, -1),
                 _ => {
-                    let (min, natural, _, _) = child.measure(orientation, width);
-                    (min, natural, -1, -1)
+                    // GtkTextView allocates its minimum: make that the
+                    // height the space under the widget was reserved for.
+                    let (_, natural, _, _) = child.measure(orientation, width);
+                    (natural, natural, -1, -1)
                 }
             }
         }
@@ -61,12 +69,8 @@ mod imp {
     }
 
     impl Slot {
-        /// The width the child is laid out at: the text column's, or its
-        /// own natural width, and never below its minimum.
         pub fn child_width(&self, child: &gtk::Widget) -> i32 {
-            let (min, natural, _, _) = child.measure(gtk::Orientation::Horizontal, -1);
-            let wanted = self.natural_width.get();
-            (if wanted > 0 { wanted } else { natural }).max(min)
+            super::layout_width(child, self.natural_width.get(), self.fit.get())
         }
     }
 }
@@ -88,8 +92,11 @@ impl Slot {
         glib::Object::new()
     }
 
-    pub fn set_child(&self, child: Option<&impl IsA<gtk::Widget>>) {
+    /// Shows `child`, filling the slot's width or, with `fit`, only as wide
+    /// as it wants to be.
+    pub fn set_child(&self, child: Option<&impl IsA<gtk::Widget>>, fit: bool) {
         let imp = self.imp();
+        imp.fit.set(fit);
         if let Some(old) = imp.child.take() {
             old.unparent();
         }
@@ -99,6 +106,8 @@ impl Slot {
             if child.parent().is_some() {
                 child.unparent();
             }
+            child.set_halign(gtk::Align::Fill);
+            child.set_valign(gtk::Align::Fill);
             child.set_parent(self);
             imp.child.replace(Some(child));
         }
@@ -110,4 +119,17 @@ impl Slot {
             self.queue_resize();
         }
     }
+}
+
+/// The width a slot lays `child` out at: `wanted` (the text column's), or
+/// with `fit` the child's natural width if that's narrower, or with no
+/// `wanted` the child's natural width; never below its minimum.
+pub fn layout_width(child: &gtk::Widget, wanted: i32, fit: bool) -> i32 {
+    let (min, natural, _, _) = child.measure(gtk::Orientation::Horizontal, -1);
+    let width = match wanted {
+        ..=0 => natural,
+        _ if fit => natural.min(wanted),
+        _ => wanted,
+    };
+    width.max(min)
 }

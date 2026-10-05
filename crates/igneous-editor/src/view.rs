@@ -78,6 +78,8 @@ mod imp {
     #[derive(Default)]
     pub struct NoteView {
         pub(crate) last_width: Cell<i32>,
+        /// A relayout is scheduled (see `schedule_relayout`).
+        pub(crate) relayout_pending: Cell<bool>,
         pub(crate) tags: OnceCell<Tags>,
         pub(crate) state: RefCell<State>,
         pub(crate) host: RefCell<Option<Rc<dyn Host>>>,
