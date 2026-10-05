@@ -570,6 +570,7 @@ pub enum SidebarPane {
     Search,
     Tags,
     Changes,
+    Bookmarks,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -1673,6 +1673,7 @@ impl Window {
             Some("changes") => SidebarPane::Changes,
             Some("search") => SidebarPane::Search,
             Some("tags") => SidebarPane::Tags,
+            Some("bookmarks") => SidebarPane::Bookmarks,
             _ => SidebarPane::Files,
         };
         workspace.sidebar.expanded = self.tree().expanded_folders();
@@ -1723,6 +1724,7 @@ impl Window {
         match workspace.sidebar.pane {
             SidebarPane::Search => imp.sidebar_stack.set_visible_child_name("search"),
             SidebarPane::Tags => imp.sidebar_stack.set_visible_child_name("tags"),
+            SidebarPane::Bookmarks => imp.sidebar_stack.set_visible_child_name("bookmarks"),
             pane => imp.wanted_pane.set(Some(pane)),
         }
         imp.recently_closed
