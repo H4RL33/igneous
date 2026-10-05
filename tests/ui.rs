@@ -1003,6 +1003,21 @@ async fn text_style_applies_to_notes() {
         .and_then(|d| d.family())
         .unwrap();
     assert_eq!(family.as_str(), "Serif");
+    // Properties keep the interface font.
+    let properties = find_widget(view.upcast_ref(), &|w| w.has_css_class("properties"))
+        .expect("Home.md shows its properties");
+    let interface = gtk::Settings::default()
+        .and_then(|s| s.gtk_font_name())
+        .map(|n| gtk::pango::FontDescription::from_string(&n))
+        .and_then(|d| d.family())
+        .unwrap();
+    let properties_family = properties
+        .pango_context()
+        .font_description()
+        .and_then(|d| d.family())
+        .unwrap();
+    assert_eq!(properties_family, interface);
+    assert_ne!(properties_family.as_str(), "Serif");
     // Readable line length keeps the text 500 pixels wide.
     assert!(
         until(3000, || (view.width()

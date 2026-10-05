@@ -110,6 +110,8 @@ pub(crate) mod imp {
         pub text_style: RefCell<TextStyle>,
         /// The fonts as CSS for this window's notes (see `apply_text_style`).
         pub text_css: OnceCell<gtk::CssProvider>,
+        /// Follows the desktop's interface font, which properties use.
+        pub interface_font_handler: RefCell<Option<glib::SignalHandlerId>>,
         pub sync: OnceCell<Rc<SyncService>>,
         pub sync_button: OnceCell<Rc<SyncButton>>,
         pub changes: OnceCell<Rc<ChangesPane>>,
@@ -190,6 +192,11 @@ pub(crate) mod imp {
                     &WidgetExt::display(&*self.obj()),
                     css,
                 );
+            }
+            if let (Some(handler), Some(settings)) =
+                (self.interface_font_handler.take(), gtk::Settings::default())
+            {
+                settings.disconnect(handler);
             }
         }
 
@@ -636,6 +643,15 @@ impl Window {
             }));
         }
         self.imp().style_handlers.replace(handlers);
+        if let Some(settings) = gtk::Settings::default() {
+            let weak = self.downgrade();
+            let handler = settings.connect_gtk_font_name_notify(move |_| {
+                if let Some(window) = weak.upgrade() {
+                    window.apply_text_style();
+                }
+            });
+            self.imp().interface_font_handler.replace(Some(handler));
+        }
 
         self.restore_workspace();
         self.set_up_builtins();
@@ -716,10 +732,15 @@ impl Window {
         let (desktop_family, desktop_size) = desktop_font(true);
         let family = style.family.clone().unwrap_or(desktop_family);
         let size = style.size.unwrap_or(desktop_size);
+        // Properties are part of the interface, so they keep its font.
+        let (interface_family, interface_size) = interface_font();
         css.load_from_string(&format!(
-            "textview.igneous-note.{} {{ font-family: {}; font-size: {size}pt; }}",
-            self.text_class(),
+            "textview.igneous-note.{class} {{ font-family: {}; font-size: {size}pt; }}\n\
+             textview.igneous-note.{class} .properties {{ font-family: {}; \
+             font-size: {interface_size}pt; }}",
             css_string(&family),
+            css_string(&interface_family),
+            class = self.text_class(),
         ));
         for page in self.pages() {
             let child = page.child();
@@ -2676,6 +2697,23 @@ impl TextStyle {
             line_width: appearance.line_width.filter(|w| *w > 0),
         }
     }
+}
+
+/// The desktop's interface font (GTK's gtk-font-name): its family and size
+/// in points.
+pub fn interface_font() -> (String, f64) {
+    let name = gtk::Settings::default()
+        .and_then(|s| s.gtk_font_name())
+        .map(|n| n.to_string())
+        .unwrap_or_default();
+    let description = gtk::pango::FontDescription::from_string(&name);
+    let family = description
+        .family()
+        .map(|f| f.to_string())
+        .filter(|f| !f.is_empty())
+        .unwrap_or_else(|| "sans-serif".to_owned());
+    let size = f64::from(description.size()) / f64::from(gtk::pango::SCALE);
+    (family, if size > 0.0 { size } else { 11.0 })
 }
 
 /// The desktop's document (or monospace) font: its family and size in
