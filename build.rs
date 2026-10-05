@@ -1,7 +1,7 @@
 //! Generates `config.rs`, compiles the Blueprint UI files and bundles them with
 //! the other resources, and compiles the GSettings schema so the app runs
-//! straight from `cargo run`. Meson sets the IGNEOUS_* variables for installed
-//! builds.
+//! straight from `cargo run`. Meson sets the IGNEOUS_* variables (app ID,
+//! profile, version, locale directory) for installed builds.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -22,6 +22,7 @@ fn main() {
         .unwrap_or_else(|| if debug { "Devel".into() } else { String::new() });
     let version =
         env("IGNEOUS_VERSION").unwrap_or_else(|| std::env::var("CARGO_PKG_VERSION").unwrap());
+    let localedir = env("IGNEOUS_LOCALEDIR").unwrap_or_else(|| "/usr/share/locale".to_owned());
 
     std::fs::write(
         out.join("config.rs"),
@@ -29,6 +30,9 @@ fn main() {
             "pub const APP_ID: &str = {app_id:?};\n\
              pub const PROFILE: &str = {profile:?};\n\
              pub const VERSION: &str = {version:?};\n\
+             pub const GETTEXT_PACKAGE: &str = \"igneous\";\n\
+             /// Where compiled translations are installed.\n\
+             pub const LOCALEDIR: &str = {localedir:?};\n\
              pub const RESOURCE_BASE: &str = \"/dev/h4rl3y/igneous\";\n\
              /// Compiled schema for runs that aren't installed.\n\
              pub const SCHEMA_DIR: &str = {:?};\n",
@@ -54,6 +58,7 @@ fn main() {
         "IGNEOUS_APP_ID",
         "IGNEOUS_PROFILE",
         "IGNEOUS_VERSION",
+        "IGNEOUS_LOCALEDIR",
         "BLUEPRINT_COMPILER",
     ] {
         println!("cargo:rerun-if-env-changed={var}");

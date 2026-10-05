@@ -80,7 +80,16 @@ pub fn run() -> glib::ExitCode {
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
     glib::set_application_name("Igneous");
+    // Sets the locale from the environment, too.
     gtk::init().expect("GTK can start");
+    // Translations (po/README.md), before any UI is built: GtkBuilder looks up
+    // the Blueprint files' `_()` strings in the default domain set here.
+    if let Err(e) = gettextrs::bindtextdomain(config::GETTEXT_PACKAGE, config::LOCALEDIR)
+        .and_then(|_| gettextrs::bind_textdomain_codeset(config::GETTEXT_PACKAGE, "UTF-8"))
+        .and_then(|_| gettextrs::textdomain(config::GETTEXT_PACKAGE))
+    {
+        tracing::warn!(%e, "translations unavailable");
+    }
     init();
     Application::new().run()
 }

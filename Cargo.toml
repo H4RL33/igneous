@@ -10,6 +10,7 @@ publish = false
 
 [dependencies]
 adw.workspace = true
+gettext-rs.workspace = true
 async-channel.workspace = true
 gtk.workspace = true
 igneous-core.workspace = true
@@ -65,6 +66,7 @@ igneous-markdown = { path = "crates/igneous-markdown" }
 igneous-query = { path = "crates/igneous-query" }
 
 anyhow = "1"
+gettext-rs = { version = "0.8", features = ["gettext-system"] }
 async-channel = "2"
 blake3 = "1.8"
 glib-build-tools = "0.22"

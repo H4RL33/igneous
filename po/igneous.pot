@@ -1,0 +1,453 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the igneous package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: igneous\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-05 00:54+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: data/dev.h4rl3y.igneous.desktop.in:2
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:6
+#: data/resources/ui/vault-picker.blp:5 data/resources/ui/window.blp:133
+msgid "Igneous"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.desktop.in:3
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:7
+msgid "Read and edit Markdown vaults"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.desktop.in:9
+msgid "notes;markdown;obsidian;vault;wiki;knowledge;"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.gschema.xml.in:6
+msgid "Window width"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.gschema.xml.in:10
+msgid "Window height"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.gschema.xml.in:14
+msgid "Whether the window is maximized"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.gschema.xml.in:18
+msgid "Editor theme for vaults that haven't chosen one"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.gschema.xml.in:19
+msgid "Set to the theme most recently picked in any vault."
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.gschema.xml.in:23
+msgid "Recently opened vaults, most recent first"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.gschema.xml.in:27
+msgid "Vaults that were open when Igneous last quit"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.gschema.xml.in:28
+msgid "These are reopened when Igneous starts."
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:9
+msgid ""
+"Igneous opens any folder of Markdown notes, including Obsidian vaults, and "
+"edits it in place. Notes stay plain files that work in other apps, and "
+"everything Igneous keeps for a vault lives in its own folder inside it."
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:15
+msgid ""
+"Live Preview: formatted as you type, with the Markdown shown again around "
+"the cursor; Source and Reading modes too"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:16
+msgid ""
+"Wikilinks, embeds, callouts, tasks, tables, highlights, tags, footnotes and "
+"display math"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:17
+msgid ""
+"Backlinks, unlinked mentions, an outline and a graph of how notes connect"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:18
+msgid "Renaming a note updates every link to it"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:19
+msgid ""
+"Properties edited in place, searched with Obsidian’s search syntax and "
+"listed in Bases tables"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:20
+msgid ""
+"Git sync built in: commit, pull and push on a schedule, with conflicts "
+"resolved in the editor"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:21
+msgid "A linter with the rules of obsidian-linter"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:22
+msgid "Editor themes, including Catppuccin, Dracula, Gruvbox, Nord and more"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:38
+msgid "Notes formatted as you type"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:42
+msgid "Backlinks and editor themes"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:46
+msgid "The graph of linked notes"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:50
+msgid "Properties as tables with Bases"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:54
+msgid "Changes ready to commit and sync"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:73
+msgid "Markdown"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:74
+#: data/resources/ui/shortcuts-dialog.blp:55
+msgid "Notes"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:75
+msgid "Obsidian"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:76
+msgid "Vault"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:77
+msgid "Wiki"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:78
+msgid "Zettelkasten"
+msgstr ""
+
+#: data/dev.h4rl3y.igneous.metainfo.xml.in:83
+msgid ""
+"The first release, with Live Preview, links and backlinks, search, Bases, "
+"Git sync, the linter and the graph."
+msgstr ""
+
+#: data/resources/ui/note-page.blp:33
+msgid "Keep _Mine"
+msgstr ""
+
+#: data/resources/ui/note-page.blp:35
+msgid "Keep this computer’s version of the conflict at the cursor"
+msgstr ""
+
+#: data/resources/ui/note-page.blp:40
+msgid "Keep _Theirs"
+msgstr ""
+
+#: data/resources/ui/note-page.blp:42
+msgid "Keep the remote version of the conflict at the cursor"
+msgstr ""
+
+#: data/resources/ui/note-page.blp:47
+msgid "Keep _Both"
+msgstr ""
+
+#: data/resources/ui/note-page.blp:49
+msgid "Keep both versions, this computer’s first"
+msgstr ""
+
+#: data/resources/ui/note-page.blp:55
+msgid "Previous Conflict"
+msgstr ""
+
+#: data/resources/ui/note-page.blp:65
+msgid "Next Conflict"
+msgstr ""
+
+#: data/resources/ui/preferences.blp:6
+msgid "Appearance"
+msgstr ""
+
+#: data/resources/ui/preferences.blp:10
+msgid "Editor Theme"
+msgstr ""
+
+#: data/resources/ui/preferences.blp:11
+msgid ""
+"Saved with this vault. Vaults that haven't chosen a theme use the one picked "
+"most recently."
+msgstr ""
+
+#: data/resources/ui/preferences.blp:16
+msgid "Open Themes Folder"
+msgstr ""
+
+#: data/resources/ui/preferences.blp:36
+msgid "Themes That Couldn’t Be Loaded"
+msgstr ""
+
+#: data/resources/ui/quick-switcher.blp:5
+msgid "Find Note"
+msgstr ""
+
+#: data/resources/ui/quick-switcher.blp:17
+msgid "Find or create a note"
+msgstr ""
+
+#: data/resources/ui/quick-switcher.blp:44
+msgid "No Matching Notes"
+msgstr ""
+
+#: data/resources/ui/quick-switcher.blp:55
+msgid "Enter to open · Ctrl+Enter for a new tab · Shift+Enter to create"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:6
+msgid "General"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:9
+msgid "Find note"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:14
+msgid "Command palette"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:19
+msgid "Search vault"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:24
+msgid "Graph view"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:29
+msgid "Open another vault"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:34
+msgid "Toggle sidebar"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:39
+msgid "Preferences"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:44
+msgid "Keyboard shortcuts"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:49
+msgid "Quit"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:58
+msgid "New note"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:63
+msgid "Rename note"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:68
+msgid "Save now"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:73
+msgid "Go back"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:78
+msgid "Go forward"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:83
+msgid "Toggle Reading view"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:88
+msgid "Lint note"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:94
+msgid "Git"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:97
+msgid "Sync now"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:103
+msgid "Tabs"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:106
+msgid "Close tab"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:111
+msgid "Reopen closed tab"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:116
+msgid "Next tab"
+msgstr ""
+
+#: data/resources/ui/shortcuts-dialog.blp:121
+msgid "Previous tab"
+msgstr ""
+
+#: data/resources/ui/vault-picker.blp:30
+msgid "Open a Vault"
+msgstr ""
+
+#: data/resources/ui/vault-picker.blp:31
+msgid ""
+"Igneous works with any folder of Markdown notes, including Obsidian vaults"
+msgstr ""
+
+#: data/resources/ui/vault-picker.blp:34
+msgid "_Open Folder…"
+msgstr ""
+
+#: data/resources/ui/vault-picker.blp:47
+msgid "Recent Vaults"
+msgstr ""
+
+#: data/resources/ui/window.blp:41
+msgid "New Note"
+msgstr ""
+
+#: data/resources/ui/window.blp:48
+msgid "New Folder"
+msgstr ""
+
+#: data/resources/ui/window.blp:69
+msgid "Files"
+msgstr ""
+
+#: data/resources/ui/window.blp:88
+msgid "Search"
+msgstr ""
+
+#: data/resources/ui/window.blp:96
+msgid "Tags"
+msgstr ""
+
+#: data/resources/ui/window.blp:104
+msgid "Changes"
+msgstr ""
+
+#: data/resources/ui/window.blp:127
+msgid "Toggle Sidebar"
+msgstr ""
+
+#: data/resources/ui/window.blp:140
+msgid "Main Menu"
+msgstr ""
+
+#: data/resources/ui/window.blp:147
+msgid "Toggle Inspector"
+msgstr ""
+
+#: data/resources/ui/window.blp:162
+msgid "Live Preview"
+msgstr ""
+
+#: data/resources/ui/window.blp:168
+msgid "Source"
+msgstr ""
+
+#: data/resources/ui/window.blp:174
+msgid "Reading"
+msgstr ""
+
+#: data/resources/ui/window.blp:185
+msgid "_Resolve"
+msgstr ""
+
+#: data/resources/ui/window.blp:201
+msgid "No Note Open"
+msgstr ""
+
+#: data/resources/ui/window.blp:202
+msgid ""
+"Pick a note in the sidebar, press Ctrl+O to find one, or Ctrl+N to start a "
+"new one"
+msgstr ""
+
+#: data/resources/ui/window.blp:220
+msgid "_New Note"
+msgstr ""
+
+#: data/resources/ui/window.blp:225
+msgid "New _Folder"
+msgstr ""
+
+#: data/resources/ui/window.blp:230
+msgid "_Find Note…"
+msgstr ""
+
+#: data/resources/ui/window.blp:235
+msgid "_Command Palette…"
+msgstr ""
+
+#: data/resources/ui/window.blp:240
+msgid "_Graph View"
+msgstr ""
+
+#: data/resources/ui/window.blp:247
+msgid "_Sync Now"
+msgstr ""
+
+#: data/resources/ui/window.blp:253
+msgid "Note _History"
+msgstr ""
+
+#: data/resources/ui/window.blp:261
+msgid "_Open Vault…"
+msgstr ""
+
+#: data/resources/ui/window.blp:268
+msgid "_Preferences"
+msgstr ""
+
+#: data/resources/ui/window.blp:273
+msgid "_Keyboard Shortcuts"
+msgstr ""
+
+#: data/resources/ui/window.blp:278
+msgid "_About Igneous"
+msgstr ""
