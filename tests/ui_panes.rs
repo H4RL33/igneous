@@ -106,3 +106,34 @@ async fn linked_mentions_at_the_end_of_notes() {
     note.view().check_invariants().unwrap();
     window.close();
 }
+
+#[gtk::test]
+async fn opening_a_note_focuses_its_text() {
+    let dir = vault(None);
+    // As when the vault opens with this tab restored.
+    std::fs::create_dir_all(dir.path().join(".igneous")).unwrap();
+    std::fs::write(
+        dir.path().join(".igneous/workspace.json"),
+        r#"{"version":1,"tabs":[{"kind":"note","path":"Projects/Ideas.md"},{"kind":"note","path":"Home.md"}],"activeTab":1,"inspector":{"visible":true}}"#,
+    )
+    .unwrap();
+    let window = open(&dir);
+    wait(600).await;
+    let focus = gtk::prelude::GtkWindowExt::focus(&window).map(|w| {
+        let mut chain = Vec::new();
+        let mut at = Some(w);
+        while let Some(widget) = at {
+            chain.push(widget.type_().name().to_string());
+            at = widget.parent();
+        }
+        chain.join(" < ")
+    });
+    let note = window.selected_note().unwrap();
+    let view = note.view();
+    let focused = gtk::prelude::GtkWindowExt::focus(&window);
+    assert!(
+        focused.as_ref() == Some(view.upcast_ref::<gtk::Widget>()),
+        "focus is on {focus:?}"
+    );
+    window.close();
+}

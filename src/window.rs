@@ -818,7 +818,32 @@ impl Window {
         self.tree().select(path.as_ref());
         self.sync_mode_toggle();
         self.update_inspector();
+        self.focus_selected_note();
         self.schedule_workspace_save();
+    }
+
+    /// Puts the focus in the selected note's text once the tab view has
+    /// switched pages (it focuses a page's first focusable widget, which in
+    /// a note is the properties header). Focus elsewhere, such as in the
+    /// sidebar, is left alone.
+    fn focus_selected_note(&self) {
+        glib::idle_add_local_once(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move || {
+                let Some(note) = window.selected_note() else {
+                    return;
+                };
+                let focus = gtk::prelude::GtkWindowExt::focus(&window);
+                let view = note.view();
+                let in_tabs = focus.as_ref().is_none_or(|f| {
+                    f.is_ancestor(&*window.imp().tab_view) && f != view.upcast_ref::<gtk::Widget>()
+                });
+                if in_tabs {
+                    note.focus_editor();
+                }
+            }
+        ));
     }
 
     fn note_mode(&self) -> Option<String> {
