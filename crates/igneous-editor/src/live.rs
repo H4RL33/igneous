@@ -1024,6 +1024,7 @@ impl NoteView {
         if !mentions.is_empty() {
             content.append(&list);
         }
+        keep_clicks(&content);
         content.upcast()
     }
 
@@ -1134,6 +1135,7 @@ impl NoteView {
     /// A base's results in a card, or a note saying they can't be shown.
     fn base_widget(&self, base: crate::BaseEmbed<'_>) -> gtk::Widget {
         let card = gtk::Box::new(gtk::Orientation::Vertical, 4);
+        keep_clicks(&card);
         card.add_css_class("card");
         card.add_css_class("base-embed-card");
         match self.host().base_widget(base) {
@@ -1352,7 +1354,7 @@ impl NoteView {
         }
     }
 
-    /// Focuses the properties' Add Property entry, once they show.
+    /// Opens the properties' Add Property menu, once they show.
     fn focus_new_property(&self) {
         let widget = {
             let Ok(st) = self.imp().state.try_borrow() else {
@@ -1367,13 +1369,18 @@ impl NoteView {
             return;
         };
         // Until it's on screen it can't take the focus: try again next frame.
-        if let Some(entry) = find_descendant(&widget, &|w| {
-            w.downcast_ref::<adw::EntryRow>()
+        if let Some(row) = find_descendant(&widget, &|w| {
+            w.downcast_ref::<adw::ActionRow>()
                 .is_some_and(|row| adw::prelude::PreferencesRowExt::title(row) == "Add Property")
-        }) && entry.is_mapped()
-            && entry.grab_focus()
+        }) && row.is_mapped()
+            && row.grab_focus()
         {
             self.imp().focus_new_property.set(false);
+            if let Some(button) = find_descendant(&row, &|w| w.is::<gtk::MenuButton>())
+                .and_downcast::<gtk::MenuButton>()
+            {
+                button.popup();
+            }
         }
     }
 
@@ -1764,6 +1771,27 @@ fn split_row(line: &str) -> Vec<String> {
         }
     }
     cells
+}
+
+/// Keeps clicks on `widget` (a block of controls over the text: the
+/// properties, Linked Mentions, a base) from reaching the note under it,
+/// once the widgets inside have had them. GtkTextView's own click handler
+/// would otherwise take them, put the cursor in the text and keep rows from
+/// activating.
+pub(crate) fn keep_clicks(widget: &impl IsA<gtk::Widget>) {
+    let legacy = gtk::EventControllerLegacy::new();
+    legacy.connect_event(|_, event| {
+        use gdk::EventType::{ButtonPress, ButtonRelease, TouchBegin, TouchEnd, TouchUpdate};
+        if matches!(
+            event.event_type(),
+            ButtonPress | ButtonRelease | TouchBegin | TouchUpdate | TouchEnd
+        ) {
+            glib::Propagation::Stop
+        } else {
+            glib::Propagation::Proceed
+        }
+    });
+    widget.add_controller(legacy);
 }
 
 /// The first widget under `widget` that `matches`, depth first.

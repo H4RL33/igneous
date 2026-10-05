@@ -28,6 +28,7 @@ mod local_graph;
 mod note_page;
 mod notes_prefs;
 mod preferences;
+mod property_names;
 mod query_data;
 mod quick_switcher;
 mod rows;

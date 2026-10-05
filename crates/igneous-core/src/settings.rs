@@ -1019,6 +1019,47 @@ fn rebased(path: &VaultPath, from: &VaultPath, to: &VaultPath) -> Option<VaultPa
     to.join(rest).ok()
 }
 
+// --- properties.json -------------------------------------------------------
+
+/// Every property name used in the vault, for Add Property's menu, so it
+/// needn't wait on the index. Names are only ever added, when a property is
+/// made in Igneous (along with any the index found since).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct PropertyNames {
+    #[serde(default = "one")]
+    pub version: u32,
+    pub names: Vec<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+settings_file!(PropertyNames, "properties.json", 1);
+
+impl Default for PropertyNames {
+    fn default() -> Self {
+        Self {
+            version: 1,
+            names: Vec::new(),
+            extra: Map::new(),
+        }
+    }
+}
+
+impl PropertyNames {
+    /// Appends the names not already listed, returning them.
+    pub fn add<'a>(&mut self, names: impl IntoIterator<Item = &'a str>) -> Vec<String> {
+        let mut added = Vec::new();
+        for name in names {
+            let name = name.trim();
+            if !name.is_empty() && !self.names.iter().any(|n| n == name) {
+                self.names.push(name.to_owned());
+                added.push(name.to_owned());
+            }
+        }
+        added
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1065,6 +1106,18 @@ mod tests {
         check::<GraphSettings>();
         check::<Bookmarks>();
         check::<Icons>();
+        check::<PropertyNames>();
+    }
+
+    #[test]
+    fn property_names_are_only_added() {
+        let mut names = PropertyNames::default();
+        assert_eq!(
+            names.add(["tags", "status", "tags", " ", "status "]),
+            ["tags", "status"]
+        );
+        assert_eq!(names.add(["created", "tags"]), ["created"]);
+        assert_eq!(names.names, ["tags", "status", "created"]);
     }
 
     #[test]

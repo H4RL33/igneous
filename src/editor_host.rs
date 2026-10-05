@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use gtk::{glib, prelude::*};
+use gtk::{gio, glib, prelude::*};
 use igneous_core::VaultPath;
 use igneous_core::fs::read_text;
 use igneous_core::settings::{self as vault_settings, PropertyType, VaultSettings};
@@ -212,16 +212,14 @@ impl Host for NoteHost {
         self.write_attachment(&path, &bytes)
     }
 
-    fn property_keys(&self) -> Vec<String> {
-        self.window()
-            .map(|w| {
-                w.index()
-                    .properties()
-                    .iter()
-                    .map(|p| p.key.clone())
-                    .collect()
-            })
-            .unwrap_or_default()
+    fn property_names(&self) -> Option<gio::MenuModel> {
+        Some(self.window()?.property_names().menu())
+    }
+
+    fn add_property_name(&self, key: &str) {
+        if let Some(window) = self.window() {
+            window.property_names().add(key);
+        }
     }
 }
 

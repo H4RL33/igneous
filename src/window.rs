@@ -133,6 +133,7 @@ pub(crate) mod imp {
         pub readable: Cell<bool>,
         pub tags: OnceCell<Rc<TagsPane>>,
         pub lint: OnceCell<Rc<crate::lint::LintConfig>>,
+        pub property_names: OnceCell<crate::property_names::PropertyNames>,
         pub graph_timer: RefCell<Option<glib::SourceId>>,
         pub bookmarks: OnceCell<Rc<crate::bookmarks::BookmarksPane>>,
     }
@@ -534,11 +535,21 @@ impl Window {
         // The index, and the inspector that shows what it knows.
         let index = IndexService::new(&ctx.vault);
         index.set_overrides(ctx.settings.borrow().properties.types.clone());
+        imp.property_names
+            .set(crate::property_names::PropertyNames::load(
+                ctx.vault.igneous_dir(),
+            ))
+            .ok()
+            .unwrap();
         let weak = self.downgrade();
         index.connect_changed(move || {
             if let Some(window) = weak.upgrade() {
                 window.update_inspector();
                 let imp = window.imp();
+                let properties = window.index().properties();
+                window
+                    .property_names()
+                    .learn(properties.iter().map(|p| p.key.as_str()));
                 if let Some(tags) = imp.tags.get() {
                     tags.set_tags(&window.index().tags());
                 }
@@ -2237,6 +2248,11 @@ impl Window {
 
     pub fn lint(&self) -> &Rc<crate::lint::LintConfig> {
         self.imp().lint.get().unwrap()
+    }
+
+    /// The vault's property names, for Add Property.
+    pub fn property_names(&self) -> &crate::property_names::PropertyNames {
+        self.imp().property_names.get().unwrap()
     }
 
     fn schedule_inspector_update(&self) {

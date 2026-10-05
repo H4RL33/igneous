@@ -105,6 +105,8 @@ mod imp {
         /// The theme in use and whether the desktop is dark.
         pub(crate) theme: RefCell<Option<(Theme, bool)>>,
         pub(crate) vim: RefCell<Option<gtk::EventControllerKey>>,
+        /// Hands keys to widgets inside the note (see `forward_child_keys`).
+        pub(crate) child_keys: RefCell<Option<gtk::EventControllerKey>>,
         pub(crate) vim_context: RefCell<Option<sourceview::VimIMContext>>,
         pub(crate) spelling: RefCell<Option<libspelling::TextBufferAdapter>>,
         /// Whether wide windows keep the text column narrow.
@@ -164,6 +166,8 @@ mod imp {
                 .add_provider(&crate::hover::LinkPreview::new(&view));
             view.hover()
                 .add_provider(&crate::diagnostics::ProblemHover::new(&view));
+            // Last, so it runs before every other key handler on the view.
+            view.forward_child_keys();
         }
     }
 
@@ -348,6 +352,8 @@ impl NoteView {
         context.set_client_widget(Some(self));
         imp.vim.replace(Some(keys));
         imp.vim_context.replace(Some(context));
+        // Vim's handler is newer; widgets in the note still come first.
+        self.forward_child_keys();
     }
 
     /// The Vim emulation, while it's on (for its command bar and `:w`).

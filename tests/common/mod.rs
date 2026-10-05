@@ -129,3 +129,138 @@ pub fn save_png(window: &gtk::Window, out: &str) {
         .render_texture(snapshot.to_node().unwrap(), None);
     texture.save_to_png(out).unwrap();
 }
+
+/// Real pointer and keyboard input, through the remote desktop API of the
+/// sealed session's mutter. Events then go through GTK as a person's would,
+/// which `emit_by_name` can't imitate. Windows used with it must be
+/// maximized, so their coordinates are the screen's.
+#[allow(dead_code)]
+pub struct RemoteInput {
+    bus: gtk::gio::DBusConnection,
+    session: String,
+}
+
+#[allow(dead_code)]
+impl RemoteInput {
+    const SESSION: &str = "org.gnome.Mutter.RemoteDesktop.Session";
+
+    pub async fn new() -> Self {
+        let bus = gtk::gio::bus_get_future(gtk::gio::BusType::Session)
+            .await
+            .expect("the session bus");
+        let reply = bus
+            .call_future(
+                Some("org.gnome.Mutter.RemoteDesktop"),
+                "/org/gnome/Mutter/RemoteDesktop",
+                "org.gnome.Mutter.RemoteDesktop",
+                "CreateSession",
+                None,
+                None,
+                gtk::gio::DBusCallFlags::NONE,
+                5000,
+            )
+            .await
+            .expect("mutter's remote desktop (run in build-aux/headless-session.sh)");
+        let session = reply.child_value(0).str().unwrap().to_owned();
+        let input = Self { bus, session };
+        input.call("Start", None).await;
+        // The first key after starting is lost while the keymap is set up.
+        input.key(0xffe1).await;
+        input
+    }
+
+    async fn call(&self, method: &str, args: Option<&glib::Variant>) {
+        self.bus
+            .call_future(
+                Some("org.gnome.Mutter.RemoteDesktop"),
+                &self.session,
+                Self::SESSION,
+                method,
+                args,
+                None,
+                gtk::gio::DBusCallFlags::NONE,
+                5000,
+            )
+            .await
+            .unwrap_or_else(|e| panic!("{method}: {e}"));
+    }
+
+    /// Clicks the middle of `widget` (or `x` pixels in from its start).
+    pub async fn click(&self, widget: &gtk::Widget, x: Option<f32>) {
+        let root = widget.root().expect("a widget on screen");
+        // Only a maximized window's coordinates are the screen's, and
+        // maximizing takes a moment.
+        let window = root.clone().downcast::<gtk::Window>().unwrap();
+        assert!(
+            until(3000, || window.is_maximized()).await,
+            "maximize the window first"
+        );
+        wait(200).await;
+        let bounds = widget.compute_bounds(&root).unwrap();
+        let (x, y) = (
+            f64::from(bounds.x() + x.unwrap_or(bounds.width() / 2.0)),
+            f64::from(bounds.y() + bounds.height() / 2.0),
+        );
+        // Relative moves are accelerated, so steer: move, see where GTK says
+        // the pointer is, and correct until it's there.
+        let at = std::rc::Rc::new(std::cell::Cell::new(None::<(f64, f64)>));
+        let motion = gtk::EventControllerMotion::new();
+        motion.set_propagation_phase(gtk::PropagationPhase::Capture);
+        {
+            let at = at.clone();
+            motion.connect_motion(move |_, x, y| at.set(Some((x, y))));
+        }
+        window.add_controller(motion.clone());
+        self.call(
+            "NotifyPointerMotionRelative",
+            Some(&(-5000.0f64, -5000.0f64).to_variant()),
+        )
+        .await;
+        let (mut dx, mut dy) = (x, y);
+        for _ in 0..20 {
+            self.call("NotifyPointerMotionRelative", Some(&(dx, dy).to_variant()))
+                .await;
+            wait(30).await;
+            let Some((px, py)) = at.get() else {
+                continue;
+            };
+            if (x - px).abs() < 1.5 && (y - py).abs() < 1.5 {
+                break;
+            }
+            (dx, dy) = ((x - px) / 2.0, (y - py) / 2.0);
+        }
+        window.remove_controller(&motion);
+        wait(50).await;
+        for pressed in [true, false] {
+            self.call("NotifyPointerButton", Some(&(272i32, pressed).to_variant()))
+                .await;
+        }
+        wait(150).await;
+    }
+
+    /// Presses and releases the key with X keysym `keysym`.
+    pub async fn key(&self, keysym: u32) {
+        for pressed in [true, false] {
+            self.call(
+                "NotifyKeyboardKeysym",
+                Some(&(keysym, pressed).to_variant()),
+            )
+            .await;
+        }
+        wait(30).await;
+    }
+
+    /// Types lower-case ASCII text.
+    pub async fn type_text(&self, text: &str) {
+        for c in text.chars() {
+            self.key(c as u32).await;
+        }
+        wait(100).await;
+    }
+
+    /// Presses Enter.
+    pub async fn enter(&self) {
+        self.key(0xff0d).await;
+        wait(100).await;
+    }
+}

@@ -98,10 +98,15 @@ pub trait Host {
     /// Makes `key` a property of this kind throughout the vault.
     fn set_property_kind(&self, _key: &str, _kind: PropertyKind) {}
 
-    /// Property keys used in the vault, most common first.
-    fn property_keys(&self) -> Vec<String> {
-        Vec::new()
+    /// The property names used in the vault, as a menu of
+    /// [`property_name_item`](crate::property_name_item)s that every note's
+    /// Add Property shares. The host appends to it as names come into use.
+    fn property_names(&self) -> Option<gtk::gio::MenuModel> {
+        None
     }
+
+    /// `key` has just been made a property of a note.
+    fn add_property_name(&self, _key: &str) {}
 
     /// Saves pasted data (an image) as an attachment named like `name`,
     /// returning the embed to insert, e.g. `![[Pasted image 1.png]]`.

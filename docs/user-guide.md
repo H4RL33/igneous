@@ -74,7 +74,8 @@ The fields at the top of a note are its YAML frontmatter:
 
 - text, lists (tags and aliases too), numbers, checkboxes, and dates with a calendar;
 - each field's menu changes its type for the whole vault, or removes it;
-- **Add Property** adds one. It's there on every note in Live Preview, including notes without properties yet; adding one creates the frontmatter. Typing `---` and Enter on a note's first line does the same, as in Obsidian.
+- **Add Property** adds one. It's there on every note in Live Preview, including notes without properties yet; adding one creates the frontmatter. Click it for the property names used across the vault (less any the note has already), or **New Property…** to type a new name, then Enter. Typing `---` and Enter on a note's first line starts the properties too, as in Obsidian.
+- The menu is made once and shared by every note, and gains names as notes gain properties, in Igneous or elsewhere. The names are saved in `.igneous/properties.json` when you make a new property, so the menu is complete as soon as the vault opens; just opening a vault never writes it. Names are only ever added: delete one from the file to take it out of the menu (it comes back while a note still uses it).
 
 Igneous changes only the property you edit, leaving the rest of the frontmatter, comments included, exactly as written.
 
@@ -196,7 +197,7 @@ Start typing in Preferences to search every setting.
 
 | Where | What |
 |---|---|
-| `<vault>/.igneous/` | the vault's settings, open tabs, appearance and fonts, Git, linter, graph, bookmarks, icons and colours (`icons.json`) and its own themes |
+| `<vault>/.igneous/` | the vault's settings, open tabs, appearance and fonts, Git, linter, graph, bookmarks, icons and colours (`icons.json`), property names (`properties.json`) and its own themes |
 | `~/.cache/igneous/` | the index and generated style schemes; safe to delete |
 | `~/.local/share/igneous/themes/` | your own editor themes |
 | `~/.local/share/igneous/snapshots/` | file recovery snapshots |

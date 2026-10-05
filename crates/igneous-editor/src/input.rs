@@ -121,8 +121,76 @@ impl NoteView {
         self.imp().input.borrow().clone()
     }
 
+    /// Keys meant for a widget inside the note, such as a property's field,
+    /// go to that widget. The view's capture-phase handlers (GtkSourceView's
+    /// own, which types the key into the note, Vim's and ours) see every key
+    /// pressed in its children; this one, the newest, runs before them.
+    pub(crate) fn forward_child_keys(&self) {
+        let imp = self.imp();
+        if let Some(old) = imp.child_keys.take() {
+            self.remove_controller(&old);
+        }
+        let keys = gtk::EventControllerKey::new();
+        keys.set_name(Some("igneous-child-keys"));
+        keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+        keys.connect_key_pressed(glib::clone!(
+            #[weak(rename_to = view)]
+            self,
+            #[upgrade_or]
+            glib::Propagation::Proceed,
+            move |keys, key, _, _| view.forward_to_child(keys, Some(key))
+        ));
+        keys.connect_key_released(glib::clone!(
+            #[weak(rename_to = view)]
+            self,
+            move |keys, _, _, _| {
+                view.forward_to_child(keys, None);
+            }
+        ));
+        self.add_controller(keys.clone());
+        imp.child_keys.replace(Some(keys));
+    }
+
+    /// Gives the current key to the focused widget inside the note, then to
+    /// its parents up to the note, and keeps it from the note itself.
+    fn forward_to_child(
+        &self,
+        keys: &gtk::EventControllerKey,
+        key: Option<gdk::Key>,
+    ) -> glib::Propagation {
+        let view: &gtk::Widget = self.upcast_ref();
+        let Some(focus) = self.root().and_then(|root| root.focus()) else {
+            return glib::Propagation::Proceed;
+        };
+        if keys.current_event().is_none() {
+            return glib::Propagation::Proceed;
+        }
+        if focus == *view || !focus.is_ancestor(view) {
+            return glib::Propagation::Proceed;
+        }
+        let mut target = Some(focus);
+        while let Some(widget) = target.filter(|w| w != view) {
+            if keys.forward(&widget) {
+                return glib::Propagation::Stop;
+            }
+            target = widget.parent();
+        }
+        // Tab moves the focus on, as it does outside the note.
+        if let Some(key @ (gdk::Key::Tab | gdk::Key::ISO_Left_Tab)) = key
+            && let Some(root) = self.root()
+        {
+            root.child_focus(if key == gdk::Key::Tab {
+                gtk::DirectionType::TabForward
+            } else {
+                gtk::DirectionType::TabBackward
+            });
+        }
+        glib::Propagation::Stop
+    }
+
     pub(crate) fn connect_input(&self) {
         let keys = gtk::EventControllerKey::new();
+        keys.set_name(Some("igneous-input"));
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);
         keys.connect_key_pressed(glib::clone!(
             #[weak(rename_to = view)]

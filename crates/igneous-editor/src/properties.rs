@@ -4,7 +4,7 @@
 //! the frontmatter, comments included, is left as it is.
 
 use adw::prelude::*;
-use gtk::glib;
+use gtk::{gdk, gio, glib};
 use igneous_markdown::TextEdit;
 use igneous_markdown::frontmatter::{self, Frontmatter, Value};
 
@@ -145,16 +145,25 @@ impl NoteView {
             .unwrap_or_else(|| PropertyKind::infer(key, value))
     }
 
-    /// The properties header for `fm`.
     /// The properties, or with no frontmatter just Add Property.
     pub(crate) fn properties_widget_for(&self, fm: Option<&Frontmatter>) -> gtk::Widget {
+        let list = self.properties_list(fm);
+        // Its own box, so the list's rows have had a click before it's kept
+        // from the note.
+        let block = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        block.append(&list);
+        crate::live::keep_clicks(&block);
+        block.upcast()
+    }
+
+    fn properties_list(&self, fm: Option<&Frontmatter>) -> gtk::ListBox {
         let list = gtk::ListBox::builder()
             .selection_mode(gtk::SelectionMode::None)
             .css_classes(["boxed-list", "properties"])
             .build();
         let Some(fm) = fm else {
-            list.append(&self.add_property_row());
-            return list.upcast();
+            list.append(&self.add_property_row(&[]));
+            return list;
         };
         if let Some(error) = &fm.error {
             let row = adw::ActionRow::builder()
@@ -174,14 +183,15 @@ impl NoteView {
             ));
             row.add_suffix(&source);
             list.append(&row);
-            return list.upcast();
+            return list;
         }
         for entry in &fm.entries {
             let kind = self.property_kind(&entry.key, &entry.value);
             list.append(&self.property_row(&entry.key, &entry.value, kind));
         }
-        list.append(&self.add_property_row());
-        list.upcast()
+        let keys: Vec<&str> = fm.entries.iter().map(|e| e.key.as_str()).collect();
+        list.append(&self.add_property_row(&keys));
+        list
     }
 
     fn property_row(&self, key: &str, value: &Value, kind: PropertyKind) -> gtk::Widget {
@@ -483,31 +493,244 @@ impl NoteView {
             .upcast()
     }
 
-    fn add_property_row(&self) -> gtk::Widget {
-        let row = adw::EntryRow::builder()
+    /// Add Property: a menu of the property names the vault uses (but this
+    /// note doesn't), then New Property…, which turns the row into a field
+    /// for a new name.
+    fn add_property_row(&self, existing: &[&str]) -> gtk::Widget {
+        let row = adw::ActionRow::builder()
             .title("Add Property")
-            .show_apply_button(true)
+            .activatable(true)
             .build();
         row.add_prefix(&gtk::Image::from_icon_name("list-add-symbolic"));
-        // Mention keys the vault already uses.
-        let keys = self.host().property_keys();
-        if !keys.is_empty() {
-            row.set_tooltip_text(Some(&format!(
-                "Keys in this vault: {}",
-                keys.iter().take(12).cloned().collect::<Vec<_>>().join(", ")
-            )));
-        }
-        row.connect_apply(glib::clone!(
+        let actions = AddPropertyActions::new(self, &row, existing);
+        row.insert_action_group("property", Some(&actions));
+
+        // The menu button owns the menu; activating the row opens it. The
+        // vault's names are one menu that every note shares, so the menu is
+        // only set up the first time it opens.
+        let button = gtk::MenuButton::builder()
+            .icon_name("pan-down-symbolic")
+            .valign(gtk::Align::Center)
+            .tooltip_text("Add Property")
+            .css_classes(["flat"])
+            .build();
+        button.set_create_popup_func(glib::clone!(
             #[weak(rename_to = view)]
             self,
-            move |row| {
-                let key = row.text().trim().trim_end_matches(':').to_owned();
-                if !key.is_empty() {
-                    view.set_property(&key, &Value::Null);
+            move |button| {
+                if button.menu_model().is_none() {
+                    button.set_menu_model(Some(&view.add_property_menu()));
                 }
             }
         ));
+        row.add_suffix(&button);
+        row.set_activatable_widget(Some(&button));
         row.upcast()
+    }
+
+    /// The vault's property names (those the note has are hidden), then New
+    /// Property….
+    fn add_property_menu(&self) -> gio::Menu {
+        let new = gio::Menu::new();
+        new.append(Some("_New Property…"), Some("property.new"));
+        let menu = gio::Menu::new();
+        if let Some(names) = self.host().property_names() {
+            menu.append_section(None, &names);
+        }
+        menu.append_section(None, &new);
+        menu
+    }
+
+    /// Swaps Add Property for a field to name a new property: Enter adds
+    /// it, Escape (or leaving it empty) goes back.
+    fn name_new_property(&self, row: &adw::ActionRow) {
+        let Some(list) = row.parent().and_downcast::<gtk::ListBox>() else {
+            return;
+        };
+        let entry = adw::EntryRow::builder()
+            .title("Property Name")
+            .show_apply_button(true)
+            .build();
+        list.insert(&entry, row.index());
+        row.set_visible(false);
+        let back = {
+            let (row, entry) = (row.downgrade(), entry.downgrade());
+            move || {
+                if let Some(entry) = entry.upgrade() {
+                    if let Some(list) = entry.parent().and_downcast::<gtk::ListBox>() {
+                        list.remove(&entry);
+                    }
+                }
+                if let Some(row) = row.upgrade() {
+                    row.set_visible(true);
+                    row.grab_focus();
+                }
+            }
+        };
+        let back = std::rc::Rc::new(back);
+        entry.connect_apply(glib::clone!(
+            #[weak(rename_to = view)]
+            self,
+            #[strong]
+            back,
+            move |entry| {
+                let key = entry.text().trim().trim_end_matches(':').to_owned();
+                if key.is_empty() {
+                    back();
+                } else {
+                    view.set_property(&key, &Value::Null);
+                    view.host().add_property_name(&key);
+                }
+            }
+        ));
+        entry.connect_entry_activated(|entry| entry.emit_by_name::<()>("apply", &[]));
+        let keys = gtk::EventControllerKey::new();
+        keys.connect_key_pressed(glib::clone!(
+            #[strong]
+            back,
+            move |_, key, _, _| {
+                if key == gdk::Key::Escape {
+                    back();
+                    glib::Propagation::Stop
+                } else {
+                    glib::Propagation::Proceed
+                }
+            }
+        ));
+        entry.add_controller(keys);
+        entry.grab_focus();
+    }
+}
+
+/// An item for the vault's property names menu (see
+/// [`Host::property_names`](crate::Host::property_names)): it adds `key` to
+/// the note, and is hidden in notes that already have it.
+pub fn property_name_item(key: &str) -> gio::MenuItem {
+    let item = gio::MenuItem::new(
+        Some(&key.replace('_', "__")),
+        Some(&format!("property.{}", add_action(key))),
+    );
+    item.set_attribute_value("hidden-when", Some(&"action-missing".to_variant()));
+    item
+}
+
+/// The action that adds `key`: its bytes in hex, as an action's name can't
+/// hold every character a key can.
+fn add_action(key: &str) -> String {
+    use std::fmt::Write;
+    key.bytes().fold(String::from("add-"), |mut name, b| {
+        let _ = write!(name, "{b:02x}");
+        name
+    })
+}
+
+fn key_of_action(name: &str) -> Option<String> {
+    let hex = name.strip_prefix("add-")?;
+    let bytes = (0..hex.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(hex.get(i..i + 2)?, 16).ok())
+        .collect::<Option<Vec<u8>>>()?;
+    String::from_utf8(bytes).ok()
+}
+
+glib::wrapper! {
+    /// Add Property's actions for one note: `new`, and `add-…` for each of
+    /// the vault's names the note doesn't have. They're answered from the
+    /// name, so nothing is made per name.
+    pub struct AddPropertyActions(ObjectSubclass<imp::AddPropertyActions>)
+        @implements gio::ActionGroup;
+}
+
+impl AddPropertyActions {
+    pub(crate) fn new(view: &NoteView, row: &adw::ActionRow, existing: &[&str]) -> Self {
+        use glib::subclass::prelude::ObjectSubclassIsExt;
+        let actions: Self = glib::Object::new();
+        let imp = actions.imp();
+        imp.view.set(Some(view));
+        imp.row.set(Some(row));
+        imp.existing
+            .replace(existing.iter().map(|k| k.to_string()).collect());
+        actions
+    }
+}
+
+mod imp {
+    use std::cell::RefCell;
+
+    use gtk::subclass::prelude::*;
+
+    use super::*;
+
+    #[derive(Default)]
+    pub struct AddPropertyActions {
+        pub view: glib::WeakRef<NoteView>,
+        pub row: glib::WeakRef<adw::ActionRow>,
+        /// The note's keys.
+        pub existing: RefCell<Vec<String>>,
+    }
+
+    #[glib::object_subclass]
+    impl ObjectSubclass for AddPropertyActions {
+        const NAME: &'static str = "IgneousAddPropertyActions";
+        type Type = super::AddPropertyActions;
+        type Interfaces = (gio::ActionGroup,);
+    }
+
+    impl ObjectImpl for AddPropertyActions {}
+
+    impl AddPropertyActions {
+        /// The key `name` adds, if the note doesn't have it yet.
+        fn key(&self, name: &str) -> Option<String> {
+            key_of_action(name).filter(|key| !self.existing.borrow().contains(key))
+        }
+    }
+
+    impl ActionGroupImpl for AddPropertyActions {
+        fn list_actions(&self) -> Vec<String> {
+            let mut names = vec!["new".to_owned()];
+            let Some(model) = self.view.upgrade().and_then(|v| v.host().property_names()) else {
+                return names;
+            };
+            for i in 0..model.n_items() {
+                let action = model
+                    .item_attribute_value(i, "action", Some(glib::VariantTy::STRING))
+                    .and_then(|a| a.get::<String>());
+                if let Some(name) = action.as_deref().and_then(|a| a.strip_prefix("property."))
+                    && self.key(name).is_some()
+                {
+                    names.push(name.to_owned());
+                }
+            }
+            names
+        }
+
+        fn query_action(
+            &self,
+            name: &str,
+        ) -> Option<(
+            bool,
+            Option<glib::VariantType>,
+            Option<glib::VariantType>,
+            Option<glib::Variant>,
+            Option<glib::Variant>,
+        )> {
+            (name == "new" || self.key(name).is_some()).then_some((true, None, None, None, None))
+        }
+
+        fn activate_action(&self, name: &str, _parameter: Option<&glib::Variant>) {
+            let Some(view) = self.view.upgrade() else {
+                return;
+            };
+            if name == "new" {
+                if let Some(row) = self.row.upgrade() {
+                    view.name_new_property(&row);
+                }
+            } else if let Some(key) = self.key(name) {
+                view.set_property(&key, &Value::Null);
+            }
+        }
+
+        fn change_action_state(&self, _name: &str, _value: &glib::Variant) {}
     }
 }
 
@@ -531,6 +754,17 @@ mod tests {
         );
         assert_eq!(k("x", &Value::List(vec![])), PropertyKind::List);
         assert_eq!(k("x", &Value::String("words".into())), PropertyKind::Text);
+    }
+
+    #[test]
+    fn add_actions_name_any_key() {
+        for key in ["tags", "due date", "naïve_key", "a.b-c"] {
+            let action = add_action(key);
+            assert!(gio::Action::name_is_valid(&action), "{action}");
+            assert_eq!(key_of_action(&action).as_deref(), Some(key));
+        }
+        assert_eq!(key_of_action("add-7"), None);
+        assert_eq!(key_of_action("new"), None);
     }
 
     fn view(text: &str) -> NoteView {

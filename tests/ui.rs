@@ -1035,20 +1035,27 @@ async fn text_style_applies_to_notes() {
 /// Presses Enter in a note's editor, through its key handler.
 fn press_enter(view: &igneous_editor::NoteView) -> bool {
     use gtk::glib::translate::IntoGlib;
-    let keys = view
-        .observe_controllers()
+    // Igneous's own handlers, as GTK would offer it to them (the first is
+    // the one for widgets inside the note).
+    view.observe_controllers()
         .into_iter()
         .filter_map(|c| c.ok().and_downcast::<gtk::EventControllerKey>())
-        .find(|k| k.propagation_phase() == gtk::PropagationPhase::Capture)
-        .expect("the editor's key handler");
-    keys.emit_by_name::<bool>(
-        "key-pressed",
-        &[
-            &gtk::gdk::Key::Return.into_glib(),
-            &36u32,
-            &gtk::gdk::ModifierType::empty(),
-        ],
-    )
+        .filter(|k| {
+            matches!(
+                k.name().as_deref(),
+                Some("igneous-child-keys" | "igneous-input")
+            )
+        })
+        .any(|keys| {
+            keys.emit_by_name::<bool>(
+                "key-pressed",
+                &[
+                    &gtk::gdk::Key::Return.into_glib(),
+                    &36u32,
+                    &gtk::gdk::ModifierType::empty(),
+                ],
+            )
+        })
 }
 
 /// `---` and Enter at the top of a note starts its properties, as in
@@ -1069,16 +1076,15 @@ async fn three_dashes_start_properties() {
     view.buffer().insert_at_cursor("---");
     assert!(press_enter(&view), "Enter was left to the text view");
     assert_eq!(note.text(), "---\n---\n");
-    // The properties show, with Add Property focused for a name.
+    // The properties show, with Add Property's menu open.
     assert!(
-        until(3000, || {
-            gtk::prelude::GtkWindowExt::focus(&window)
-                .and_then(|f| f.ancestor(adw::EntryRow::static_type()))
-                .and_downcast::<adw::EntryRow>()
-                .is_some_and(|row| row.title() == "Add Property")
+        until(3000, || find_widget(view.upcast_ref(), &|w| {
+            w.downcast_ref::<gtk::PopoverMenu>()
+                .is_some_and(|p| p.is_visible())
         })
+        .is_some())
         .await,
-        "Add Property didn't take the focus"
+        "Add Property's menu didn't open"
     );
     assert!(view.overlay_kinds().contains(&"properties".to_owned()));
     // One undo brings the dashes back.
@@ -1094,6 +1100,136 @@ async fn three_dashes_start_properties() {
     buffer.set_text("Text\n---");
     buffer.place_cursor(&buffer.end_iter());
     assert!(!view.start_properties_for_test());
+    note.discard();
+    window.close();
+}
+
+/// The Add Property row in a note, if it's showing.
+fn add_property_row(view: &igneous_editor::NoteView) -> Option<adw::ActionRow> {
+    find_widget(view.upcast_ref(), &|w| {
+        w.downcast_ref::<adw::ActionRow>()
+            .is_some_and(|row| row.title() == "Add Property")
+    })
+    .and_downcast()
+}
+
+/// Add Property, clicked: a menu of the vault's property names, then New
+/// Property… for a name typed in. Real clicks and keys go to the field,
+/// not the note around it.
+#[gtk::test]
+async fn add_property_offers_the_vaults_names_and_new_ones() {
+    let dir = vault(Some(100));
+    std::fs::write(dir.path().join("Plain.md"), "Some text.\n").unwrap();
+    let window = open(&dir);
+    window.maximize();
+    window.open_path(&p("Plain.md"), false);
+    let note = window.selected_note().unwrap();
+    let view = note.view();
+    assert!(
+        until(3000, || add_property_row(&view)
+            .is_some_and(|r| r.is_mapped()))
+        .await
+    );
+    // The menu has the names the index finds; opening writes nothing.
+    let names_file = dir.path().join(".igneous/properties.json");
+    let saved = || std::fs::read_to_string(&names_file).unwrap_or_default();
+    let menu_names = || {
+        let menu = window.property_names().menu();
+        (0..menu.n_items())
+            .filter_map(|i| {
+                menu.item_attribute_value(i, "label", Some(gtk::glib::VariantTy::STRING))
+                    .and_then(|v| v.get::<String>())
+            })
+            .collect::<Vec<_>>()
+    };
+    assert!(
+        until(5000, || menu_names().len() == 2).await,
+        "{:?}",
+        menu_names()
+    );
+    assert!(!names_file.exists());
+    let input = RemoteInput::new().await;
+
+    // Clicking opens the names the vault uses (Home.md has these).
+    input
+        .click(add_property_row(&view).unwrap().upcast_ref(), None)
+        .await;
+    let open_menu = || {
+        find_widget(view.upcast_ref(), &|w| {
+            w.downcast_ref::<gtk::PopoverMenu>()
+                .is_some_and(|p| p.is_visible())
+        })
+        .and_downcast::<gtk::PopoverMenu>()
+    };
+    assert!(
+        until(2000, || open_menu().is_some()).await,
+        "Add Property's menu"
+    );
+    let menu = open_menu().unwrap();
+    let model = menu.menu_model().unwrap();
+    let names: Vec<String> = (0..model.n_items())
+        .filter_map(|section| model.item_link(section, "section"))
+        .flat_map(|items| {
+            (0..items.n_items())
+                .filter_map(|i| {
+                    items
+                        .item_attribute_value(i, "label", Some(gtk::glib::VariantTy::STRING))
+                        .and_then(|v| v.get::<String>())
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    assert!(names.contains(&"tags".to_owned()), "{names:?}");
+    assert_eq!(names.last().map(String::as_str), Some("_New Property…"));
+    menu.popdown();
+
+    // New Property… asks for a name; typing goes there, and Enter adds it.
+    let row = add_property_row(&view).unwrap();
+    WidgetExt::activate_action(&row, "property.new", None).unwrap();
+    wait(200).await;
+    input.type_text("status").await;
+    assert_eq!(note.text(), "Some text.\n", "the typing reached the note");
+    input.enter().await;
+    assert!(
+        until(2000, || note.text().starts_with("---\nstatus:")).await,
+        "{:?}",
+        note.text()
+    );
+    assert!(note.text().ends_with("---\nSome text.\n"));
+    // A new name joins the menu, and every name is saved with the vault.
+    assert_eq!(menu_names().last().map(String::as_str), Some("status"));
+    let file: serde_json::Value = serde_json::from_str(&saved()).unwrap();
+    let mut names: Vec<&str> = file["names"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|n| n.as_str())
+        .collect();
+    names.sort_unstable();
+    assert_eq!(names, ["created", "status", "tags"]);
+
+    // An existing name is added straight from the menu, and from then on
+    // the note's menu leaves out the names it has.
+    let action = |key: &str| {
+        igneous_editor::property_name_item(key)
+            .attribute_value("action", Some(gtk::glib::VariantTy::STRING))
+            .and_then(|a| a.get::<String>())
+            .unwrap()
+    };
+    let old = add_property_row(&view).unwrap();
+    WidgetExt::activate_action(&old, &action("tags"), None).unwrap();
+    assert!(note.text().contains("\ntags:"), "{:?}", note.text());
+    // The properties are rebuilt for the new frontmatter.
+    assert!(
+        until(2000, || add_property_row(&view)
+            .is_some_and(|row| row != old && row.is_mapped()))
+        .await
+    );
+    let row = add_property_row(&view).unwrap();
+    assert!(WidgetExt::activate_action(&row, &action("tags"), None).is_err());
+    assert!(WidgetExt::activate_action(&row, &action("status"), None).is_err());
+    WidgetExt::activate_action(&row, &action("created"), None).unwrap();
+    assert!(note.text().contains("\ncreated:"), "{:?}", note.text());
     note.discard();
     window.close();
 }
