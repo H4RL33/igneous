@@ -169,7 +169,7 @@ impl Inspector {
         row.set_tooltip_text(Some(source.as_str()));
         let window = self.window.clone();
         let source = source.clone();
-        row.connect_activate(move |_| {
+        crate::rows::on_activate(&row, move || {
             if let Some(window) = window.upgrade() {
                 window.open_at(&source, at);
             }
@@ -197,7 +197,6 @@ impl Inspector {
             for hit in &links.backlinks {
                 list.append(&self.context_row(&hit.source, &hit.line_text, &[], hit.range.start));
             }
-            list.connect_row_activated(|_, row| row.emit_activate());
             self.backlinks.append(&list);
         }
 
@@ -239,7 +238,6 @@ impl Inspector {
                 });
                 list.append(&row);
             }
-            list.connect_row_activated(|_, row| row.emit_activate());
             self.backlinks.append(&list);
         }
 
@@ -319,7 +317,7 @@ impl Inspector {
             let row = gtk::ListBoxRow::builder().child(&label).build();
             let window = self.window.clone();
             let at = heading.range.start;
-            row.connect_activate(move |_| {
+            crate::rows::on_activate(&row, move || {
                 if let Some(note) = window.upgrade().and_then(|w| w.selected_note()) {
                     note.set_cursor_byte(at);
                     note.focus_editor();
@@ -327,7 +325,6 @@ impl Inspector {
             });
             list.append(&row);
         }
-        list.connect_row_activated(|_, row| row.emit_activate());
         self.outline.append(&list);
     }
 }

@@ -191,7 +191,7 @@ pub fn show(window: &Window) {
                 let row = gtk::ListBoxRow::builder().child(&row_box).build();
                 let action = command.action;
                 let run = run.clone();
-                row.connect_activate(move |_| run(action));
+                crate::rows::on_activate(&row, move || run(action));
                 list.append(&row);
             }
             if let Some(first) = list.row_at_index(0) {
@@ -205,9 +205,6 @@ pub fn show(window: &Window) {
         let fill = fill.clone();
         entry.connect_search_changed(move |entry| fill(&entry.text()));
     }
-    list.connect_row_activated(|_, row| {
-        row.emit_activate();
-    });
     {
         let list = list.clone();
         entry.connect_activate(move |_| {

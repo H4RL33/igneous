@@ -242,7 +242,7 @@ impl SearchPane {
                 .build();
             let window = self.window.clone();
             let path = item.path.clone();
-            header_row.connect_activate(move |_| {
+            crate::rows::on_activate(&header_row, move || {
                 if let Some(window) = window.upgrade() {
                     window.open_path(&path, false);
                 }
@@ -261,14 +261,13 @@ impl SearchPane {
                 let row = gtk::ListBoxRow::builder().child(&label).build();
                 let window = self.window.clone();
                 let path = item.path.clone();
-                row.connect_activate(move |_| {
+                crate::rows::on_activate(&row, move || {
                     if let Some(window) = window.upgrade() {
                         window.open_at(&path, at);
                     }
                 });
                 list.append(&row);
             }
-            list.connect_row_activated(|_, row| row.emit_activate());
             self.results.append(&list);
         }
     }

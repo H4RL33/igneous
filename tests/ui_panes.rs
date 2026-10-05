@@ -137,3 +137,83 @@ async fn opening_a_note_focuses_its_text() {
     );
     window.close();
 }
+
+/// Every row of a plain list in the panes, under `root`.
+fn list_rows(root: &gtk::Widget) -> Vec<(gtk::ListBox, gtk::ListBoxRow)> {
+    let mut out = Vec::new();
+    if let Some(list) = root.downcast_ref::<gtk::ListBox>() {
+        let mut i = 0;
+        while let Some(row) = list.row_at_index(i) {
+            out.push((list.clone(), row));
+            i += 1;
+        }
+    }
+    let mut child = root.first_child();
+    while let Some(c) = child {
+        out.extend(list_rows(&c));
+        child = c.next_sibling();
+    }
+    out
+}
+
+/// Clicking a row (the list's row-activated) or pressing Enter on it (the
+/// row's activate) opens what it shows. Re-emitting one from the other
+/// recursed until the stack overflowed.
+#[gtk::test]
+async fn rows_in_the_panes_open_what_they_show() {
+    let dir = vault(Some(100));
+    let window = open(&dir);
+    let roadmap = p("Projects/Igneous/Roadmap.md");
+
+    // A backlink in the inspector, clicked and then with Enter.
+    for click in [true, false] {
+        window.open_path(&p("Home.md"), false);
+        window.show_inspector("backlinks");
+        assert!(
+            until(3000, || list_rows(window.upcast_ref()).iter().any(
+                |(_, r)| r.tooltip_text().as_deref() == Some(roadmap.as_str())
+            ))
+            .await
+        );
+        let (list, row) = list_rows(window.upcast_ref())
+            .into_iter()
+            .find(|(_, r)| r.tooltip_text().as_deref() == Some(roadmap.as_str()))
+            .unwrap();
+        if click {
+            list.emit_by_name::<()>("row-activated", &[&row]);
+        } else {
+            row.emit_activate();
+        }
+        assert_eq!(window.selected_path(), Some(roadmap.clone()));
+    }
+
+    // A heading in the outline moves the cursor to it.
+    window.open_path(&p("Home.md"), false);
+    window.show_inspector("outline");
+    wait(300).await;
+    let note = window.selected_note().unwrap();
+    note.set_cursor_byte(note.text().len());
+    let heading = note.text().find("# Home").unwrap();
+    let (list, row) = list_rows(window.upcast_ref())
+        .into_iter()
+        .find(|(_, r)| {
+            r.child()
+                .and_downcast::<gtk::Label>()
+                .is_some_and(|l| l.label() == "Home")
+        })
+        .expect("the outline lists Home");
+    list.emit_by_name::<()>("row-activated", &[&row]);
+    let at = note.cursor_offset() as usize;
+    assert_eq!(
+        note.text().char_indices().nth(at).map(|(b, _)| b),
+        Some(heading)
+    );
+
+    // A tag searches for it.
+    let (list, row) = list_rows(window.upcast_ref())
+        .into_iter()
+        .find(|(_, r)| r.tooltip_text().as_deref() == Some("#home"))
+        .expect("the tags pane lists #home");
+    list.emit_by_name::<()>("row-activated", &[&row]);
+    window.close();
+}

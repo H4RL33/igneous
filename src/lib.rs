@@ -30,6 +30,7 @@ mod notes_prefs;
 mod preferences;
 mod query_data;
 mod quick_switcher;
+mod rows;
 mod search_pane;
 mod snapshots;
 mod sync;

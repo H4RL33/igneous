@@ -105,7 +105,6 @@ impl BookmarksPane {
             .css_classes(["navigation-sidebar"])
             .selection_mode(gtk::SelectionMode::None)
             .build();
-        list.connect_row_activated(|_, row| row.emit_activate());
         let empty = adw::StatusPage::builder()
             .icon_name("user-bookmarks-symbolic")
             .title("No Bookmarks")

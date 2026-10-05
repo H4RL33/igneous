@@ -58,7 +58,6 @@ impl TagsPane {
             .vexpand(true)
             .child(&list)
             .build();
-        list.connect_row_activated(|_, row| row.emit_activate());
         Rc::new(Self {
             widget,
             list,
@@ -186,7 +185,7 @@ impl TagsPane {
             .build();
         let window = self.window.clone();
         let tag = full.to_owned();
-        row.connect_activate(move |_| {
+        crate::rows::on_activate(&row, move || {
             if let Some(window) = window.upgrade() {
                 window.search_vault(&format!("tag:#{tag}"));
             }
