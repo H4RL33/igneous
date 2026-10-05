@@ -79,6 +79,7 @@ pub const COMMANDS: &[Command] = &[
     command("win.bookmark", "Bookmark note (or remove it)", Needs::Note),
     command("win.bookmark-heading", "Bookmark the heading", Needs::Note),
     command("win.bookmark-search", "Bookmark the search", Needs::Nothing),
+    command("win.set-icon", "Set note icon", Needs::Note),
     command("win.show-bookmarks", "Show bookmarks", Needs::Nothing),
     command("win.note-snapshots", "Show note snapshots", Needs::Note),
     command("win.preferences", "Open preferences", Needs::Nothing),

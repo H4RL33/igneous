@@ -350,6 +350,7 @@ fn install_actions(klass: &mut <imp::Window as ObjectSubclass>::Class) {
 
     // Daily notes, templates, bookmarks and file recovery.
     crate::builtins::install_actions(klass);
+    crate::icons::install_actions(klass);
 }
 
 impl Window {
@@ -395,6 +396,9 @@ impl Window {
             self.toast(&format!(
                 "Couldn't read vault settings, using defaults: {error}"
             ));
+        }
+        if let Some(error) = &ctx.icons_error {
+            self.toast(&format!("Couldn’t read the note icons: {error}"));
         }
 
         // File tree.
@@ -644,7 +648,7 @@ impl Window {
         (0..view.n_pages()).map(|i| view.nth_page(i)).collect()
     }
 
-    fn page_path(page: &adw::TabPage) -> Option<VaultPath> {
+    pub(crate) fn page_path(page: &adw::TabPage) -> Option<VaultPath> {
         let child = page.child();
         if let Some(note) = child.downcast_ref::<NotePage>() {
             note.path()
@@ -767,9 +771,17 @@ impl Window {
             .find(|p| Self::page_path(p).as_ref() == Some(path))
     }
 
-    fn update_tab(page: &adw::TabPage, path: &VaultPath) {
+    pub(crate) fn update_tab(&self, page: &adw::TabPage, path: &VaultPath) {
         page.set_title(&crate::files::display_name(path, false).0);
         page.set_tooltip(&glib::markup_escape_text(path.as_str()));
+        // Only notes with a custom icon have one.
+        let icon = self
+            .ctx()
+            .icons
+            .shown(path)
+            .as_deref()
+            .map(gio::ThemedIcon::new);
+        page.set_icon(icon.as_ref());
     }
 
     /// Opens a file: notes and images in a tab, anything else in its default
@@ -809,7 +821,7 @@ impl Window {
         {
             match note.navigate(path) {
                 Ok(()) => {
-                    Self::update_tab(page, path);
+                    self.update_tab(page, path);
                     self.on_selected_page();
                     note.focus_editor();
                 }
@@ -842,7 +854,7 @@ impl Window {
             ImagePage::new(path, &abs).upcast()
         };
         let page = imp.tab_view.add_page(&child, current.as_ref());
-        Self::update_tab(&page, path);
+        self.update_tab(&page, path);
         imp.tab_view.set_selected_page(&page);
         if let Ok(note) = child.downcast::<NotePage>() {
             note.focus_editor();
@@ -866,7 +878,7 @@ impl Window {
         if let Some(old) = replace {
             imp.tab_view.close_page(old);
         }
-        Self::update_tab(&tab, path);
+        self.update_tab(&tab, path);
         imp.tab_view.set_selected_page(&tab);
     }
 
@@ -1072,7 +1084,7 @@ impl Window {
             return;
         };
         if let Some(path) = note.go(forward) {
-            Self::update_tab(&page, &path);
+            self.update_tab(&page, &path);
             self.on_selected_page();
             note.focus_editor();
         }
@@ -1144,6 +1156,8 @@ impl Window {
 
     /// Points tabs and history at the new location of a renamed file or folder.
     fn follow_rename(&self, from: &VaultPath, to: &VaultPath) {
+        // First, so the tabs below pick up moved icons.
+        self.icons_follow_rename(from, to);
         let moved = |path: &VaultPath| -> Option<VaultPath> {
             if path == from {
                 return Some(to.clone());
@@ -1166,7 +1180,7 @@ impl Window {
             } else if let Some(base) = child.downcast_ref::<BasePage>() {
                 base.set_path(new.clone());
             }
-            Self::update_tab(&page, &new);
+            self.update_tab(&page, &new);
         }
         for path in self.imp().recent_files.borrow_mut().iter_mut() {
             if let Some(new) = moved(path) {
@@ -1505,6 +1519,7 @@ impl Window {
             TrashMode::System => match gio::File::for_path(&abs).trash(gio::Cancellable::NONE) {
                 Ok(()) => {
                     self.on_vault_events(vec![VaultEvent::Removed(path.clone())]);
+                    self.forget_icons(path);
                     self.toast(&format!("“{name}” moved to the Trash"));
                 }
                 Err(e) => self.toast(&format!("Couldn't move “{name}” to the Trash: {e}")),
@@ -1512,6 +1527,7 @@ impl Window {
             TrashMode::VaultFolder => match corefs::move_to_vault_trash(ctx.root(), &abs) {
                 Ok(dest) => {
                     self.on_vault_events(vec![VaultEvent::Removed(path.clone())]);
+                    let icons = self.forget_icons(path);
                     let toast = adw::Toast::builder()
                         .title(format!("“{name}” moved to .trash"))
                         .button_label("_Undo")
@@ -1523,8 +1539,12 @@ impl Window {
                         move |_| {
                             let abs = window.ctx().abs(&original);
                             match corefs::rename(&dest, &abs) {
-                                Ok(()) => window
-                                    .on_vault_events(vec![VaultEvent::Created(original.clone())]),
+                                Ok(()) => {
+                                    window.restore_icons(&icons);
+                                    window.on_vault_events(vec![VaultEvent::Created(
+                                        original.clone(),
+                                    )]);
+                                }
                                 Err(e) => window.toast(&format!("Couldn't restore: {e}")),
                             }
                         }

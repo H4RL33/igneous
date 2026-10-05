@@ -14,7 +14,7 @@ When Igneous starts, it shows your recent vaults and an **Open Folder…** butto
 ## The window
 
 - **Sidebar (F9):**
-  - **Files:** the vault's folders. Right-click for new notes and folders, renaming, moving to the Trash, history and linting; drag to move.
+  - **Files:** the vault's folders. Right-click for new notes and folders, renaming, moving to the Trash, history and linting; drag to move. **Set Icon…** (in a note's menu, or the main menu for the open note) gives a note any symbolic icon from your icon theme, shown in the file tree, on its tab and in bookmarks; it moves with the note when Igneous renames or moves it.
   - **Search** (Ctrl+Shift+F).
   - **Tags.**
   - **Changes**, when the vault is a Git repository.
@@ -195,7 +195,7 @@ Start typing in Preferences to search every setting.
 
 | Where | What |
 |---|---|
-| `<vault>/.igneous/` | the vault's settings, open tabs, appearance and fonts, Git, linter, graph, bookmarks and its own themes |
+| `<vault>/.igneous/` | the vault's settings, open tabs, appearance and fonts, Git, linter, graph, bookmarks, note icons (`icons.json`) and its own themes |
 | `~/.cache/igneous/` | the index and generated style schemes; safe to delete |
 | `~/.local/share/igneous/themes/` | your own editor themes |
 | `~/.local/share/igneous/snapshots/` | file recovery snapshots |

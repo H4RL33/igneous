@@ -13,6 +13,8 @@ use igneous_core::{Vault, VaultPath};
 use igneous_index::FileSet;
 use igneous_markdown::LinkRef;
 
+use crate::icons::IconStore;
+
 pub struct VaultContext {
     pub vault: Vault,
     /// `.igneous/vault.json`; Preferences can change it while the vault is
@@ -21,6 +23,10 @@ pub struct VaultContext {
     /// Set when `.igneous/vault.json` couldn't be read; defaults are in use and
     /// the file is never overwritten.
     pub settings_error: Option<String>,
+    /// Custom icons for notes, from `.igneous/icons.json`.
+    pub icons: IconStore,
+    /// Set when `.igneous/icons.json` couldn't be read.
+    pub icons_error: Option<String>,
     watcher: RefCell<Option<VaultWatcher>>,
     /// Every file in the vault (not folders), for the quick switcher and
     /// for resolving links as they're typed.
@@ -39,10 +45,13 @@ impl VaultContext {
             Ok(rules) => vault.set_ignore_rules(rules),
             Err(e) => tracing::warn!(%e, "invalid exclusion pattern"),
         }
+        let (icons, icons_error) = IconStore::load(vault.igneous_dir());
         Ok(Self {
             vault,
             settings: RefCell::new(settings),
             settings_error,
+            icons,
+            icons_error,
             watcher: RefCell::default(),
             files: RefCell::new(FileSet::new([])),
         })

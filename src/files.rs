@@ -18,10 +18,14 @@ use crate::vault::VaultContext;
 mod imp {
     use super::*;
 
-    #[derive(Default)]
+    #[derive(Default, glib::Properties)]
+    #[properties(wrapper_type = super::FileItem)]
     pub struct FileItem {
         pub path: RefCell<String>,
         pub folder: Cell<bool>,
+        /// The row's icon: a custom one, or the usual one for its kind.
+        #[property(get, set)]
+        pub icon_name: RefCell<String>,
     }
 
     #[glib::object_subclass]
@@ -30,6 +34,7 @@ mod imp {
         type Type = super::FileItem;
     }
 
+    #[glib::derived_properties]
     impl ObjectImpl for FileItem {}
 }
 
@@ -38,8 +43,8 @@ glib::wrapper! {
 }
 
 impl FileItem {
-    pub fn new(path: &VaultPath, folder: bool) -> Self {
-        let item: Self = glib::Object::new();
+    pub fn new(path: &VaultPath, folder: bool, icon: &str) -> Self {
+        let item: Self = glib::Object::builder().property("icon-name", icon).build();
         item.imp().path.replace(path.to_string());
         item.imp().folder.set(folder);
         item
@@ -147,11 +152,37 @@ impl FileTree {
         }
     }
 
+    fn item(&self, path: &VaultPath, folder: bool) -> FileItem {
+        FileItem::new(path, folder, &self.icon_of(path, folder))
+    }
+
+    /// A note's custom icon, or the usual one.
+    fn icon_of(&self, path: &VaultPath, folder: bool) -> String {
+        let custom = (!folder).then(|| self.ctx.icons.shown(path)).flatten();
+        custom.unwrap_or_else(|| icon_for(folder).to_owned())
+    }
+
+    /// Shows changed custom icons on every loaded row.
+    pub fn refresh_icons(&self) {
+        let stores: Vec<gio::ListStore> = self
+            .stores
+            .borrow()
+            .values()
+            .filter_map(|w| w.upgrade())
+            .collect();
+        for item in stores.iter().flat_map(|s| s.iter::<FileItem>().flatten()) {
+            let icon = self.icon_of(&item.path(), item.is_folder());
+            if item.icon_name() != icon {
+                item.set_icon_name(icon);
+            }
+        }
+    }
+
     fn fill(&self, store: &gio::ListStore, folder: Option<&VaultPath>) {
         let items: Vec<FileItem> = self
             .entries(folder)
             .iter()
-            .map(|(path, is_folder)| FileItem::new(path, *is_folder))
+            .map(|(path, is_folder)| self.item(path, *is_folder))
             .collect();
         store.splice(0, store.n_items(), &items);
     }
@@ -191,7 +222,7 @@ impl FileTree {
                 .and_downcast::<FileItem>()
                 .is_some_and(|item| item.path() == *path);
             if !present {
-                store.insert(j as u32, &FileItem::new(path, *is_folder));
+                store.insert(j as u32, &self.item(path, *is_folder));
             }
         }
     }
@@ -274,6 +305,12 @@ impl FileTree {
         factory.connect_setup(move |_, obj| {
             let list_item = obj.downcast_ref::<gtk::ListItem>().unwrap();
             let icon = gtk::Image::new();
+            // Follows the item, so a changed custom icon shows straight away.
+            list_item
+                .property_expression_weak("item")
+                .chain_property::<gtk::TreeListRow>("item")
+                .chain_property::<FileItem>("icon-name")
+                .bind(&icon, "icon-name", gtk::Widget::NONE);
             let label = gtk::Label::builder()
                 .xalign(0.0)
                 .ellipsize(pango::EllipsizeMode::End)
@@ -309,11 +346,10 @@ impl FileTree {
             let item = row.item().and_downcast::<FileItem>().unwrap();
             let path = item.path();
             let content = expander.child().and_downcast::<gtk::Box>().unwrap();
-            let icon = content.first_child().and_downcast::<gtk::Image>().unwrap();
+            let icon = content.first_child().unwrap();
             let label = icon.next_sibling().and_downcast::<gtk::Label>().unwrap();
             let extension = label.next_sibling().and_downcast::<gtk::Label>().unwrap();
             let (name, ext) = display_name(&path, item.is_folder());
-            icon.set_icon_name(Some(icon_for(item.is_folder())));
             label.set_label(&name);
             extension.set_visible(ext.is_some());
             extension.set_label(&ext.as_deref().unwrap_or("").to_uppercase());
@@ -330,7 +366,7 @@ impl FileTree {
 }
 
 /// Folders get a folder icon; every file gets the same file icon, with its
-/// type shown as a pill when it isn't a note.
+/// type shown as a pill when it isn't a note, unless it has a custom icon.
 fn icon_for(folder: bool) -> &'static str {
     if folder {
         "folder-symbolic"
@@ -449,6 +485,9 @@ pub fn show_context_menu(widget: &gtk::Widget, item: Option<&FileItem>, x: f64, 
     if let Some(p) = &path {
         let edit = gio::Menu::new();
         edit.append_item(&entry("_Rename…", "win.file-rename", p.as_str()));
+        if !folder {
+            edit.append_item(&entry("Set _Icon…", "win.file-set-icon", p.as_str()));
+        }
         edit.append_item(&entry("Move to _Trash", "win.file-trash", p.as_str()));
         menu.append_section(None, &edit);
         let show = gio::Menu::new();

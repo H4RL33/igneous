@@ -858,6 +858,100 @@ pub enum Bookmark {
     },
 }
 
+// --- icons.json ------------------------------------------------------------
+
+/// Custom icons for files, by path. Igneous moves an entry when it renames
+/// or moves the file (or a folder above it) and drops it when it deletes
+/// the file; changes made by other programs aren't followed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Icons {
+    #[serde(default = "one")]
+    pub version: u32,
+    /// File path → symbolic icon name, such as `starred-symbolic`.
+    pub icons: BTreeMap<VaultPath, String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+settings_file!(Icons, "icons.json", 1);
+
+impl Default for Icons {
+    fn default() -> Self {
+        Self {
+            version: 1,
+            icons: BTreeMap::new(),
+            extra: Map::new(),
+        }
+    }
+}
+
+impl Icons {
+    pub fn get(&self, path: &VaultPath) -> Option<&str> {
+        self.icons.get(path).map(String::as_str)
+    }
+
+    /// Sets the icon for `path`, or removes it with `None` (or an empty
+    /// name). Returns whether anything changed.
+    pub fn set(&mut self, path: &VaultPath, icon: Option<&str>) -> bool {
+        match icon.filter(|i| !i.is_empty()) {
+            Some(icon) if self.get(path) == Some(icon) => false,
+            Some(icon) => {
+                self.icons.insert(path.clone(), icon.to_owned());
+                true
+            }
+            None => self.icons.remove(path).is_some(),
+        }
+    }
+
+    /// Moves the icons of `from`, a file or a folder, and of everything
+    /// under it to `to`. Returns whether anything moved.
+    pub fn follow_rename(&mut self, from: &VaultPath, to: &VaultPath) -> bool {
+        let moved: Vec<(VaultPath, VaultPath)> = self
+            .icons
+            .keys()
+            .filter_map(|path| Some((path.clone(), rebased(path, from, to)?)))
+            .collect();
+        // Take every entry out before putting any back, so none overwrites
+        // another that hasn't moved yet.
+        let icons: Vec<(VaultPath, String)> = moved
+            .into_iter()
+            .filter_map(|(old, new)| Some((new, self.icons.remove(&old)?)))
+            .collect();
+        let changed = !icons.is_empty();
+        self.icons.extend(icons);
+        changed
+    }
+
+    /// Removes the icons of `path` and of everything under it, returning
+    /// them.
+    pub fn remove_under(&mut self, path: &VaultPath) -> Vec<(VaultPath, String)> {
+        let gone: Vec<VaultPath> = self
+            .icons
+            .keys()
+            .filter(|p| p.starts_with(path))
+            .cloned()
+            .collect();
+        gone.into_iter()
+            .filter_map(|p| {
+                let icon = self.icons.remove(&p)?;
+                Some((p, icon))
+            })
+            .collect()
+    }
+}
+
+/// `path` after `from` moved to `to`, if it's `from` or under it.
+fn rebased(path: &VaultPath, from: &VaultPath, to: &VaultPath) -> Option<VaultPath> {
+    if path == from {
+        return Some(to.clone());
+    }
+    let rest = path
+        .as_str()
+        .strip_prefix(from.as_str())?
+        .strip_prefix('/')?;
+    to.join(rest).ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -903,6 +997,7 @@ mod tests {
         check::<LintSettings>();
         check::<GraphSettings>();
         check::<Bookmarks>();
+        check::<Icons>();
     }
 
     #[test]
@@ -975,5 +1070,111 @@ mod tests {
         };
         let out = String::from_utf8(to_bytes(&bookmarks)).unwrap();
         assert!(out.contains("\"type\": \"search\""), "{out}");
+    }
+
+    fn p(s: &str) -> VaultPath {
+        VaultPath::new(s).unwrap()
+    }
+
+    #[test]
+    fn icons_load_save_and_keep_unknown_keys() {
+        let dir = tempfile::tempdir().unwrap();
+        let icons: Icons = load(dir.path()).unwrap();
+        assert_eq!(icons, Icons::default());
+
+        std::fs::write(
+            dir.path().join("icons.json"),
+            r#"{"version":1,"icons":{"Home.md":"go-home-symbolic"},"fromTheFuture":{"a":1}}"#,
+        )
+        .unwrap();
+        let mut icons: Icons = load(dir.path()).unwrap();
+        assert_eq!(icons.get(&p("Home.md")), Some("go-home-symbolic"));
+        assert!(icons.set(&p("Projects/Plan.md"), Some("starred-symbolic")));
+        assert!(save(dir.path(), &icons).unwrap());
+        let out = std::fs::read_to_string(dir.path().join("icons.json")).unwrap();
+        assert_eq!(
+            out,
+            "{\n  \"version\": 1,\n  \"icons\": {\n    \"Home.md\": \"go-home-symbolic\",\n    \
+             \"Projects/Plan.md\": \"starred-symbolic\"\n  },\n  \"fromTheFuture\": {\n    \
+             \"a\": 1\n  }\n}\n"
+        );
+        assert_eq!(load::<Icons>(dir.path()).unwrap(), icons);
+    }
+
+    #[test]
+    fn icons_set_and_reset() {
+        let mut icons = Icons::default();
+        assert!(icons.set(&p("a.md"), Some("starred-symbolic")));
+        assert!(!icons.set(&p("a.md"), Some("starred-symbolic")));
+        assert!(icons.set(&p("a.md"), Some("heart-symbolic")));
+        assert_eq!(icons.get(&p("a.md")), Some("heart-symbolic"));
+        assert!(icons.set(&p("a.md"), None));
+        assert!(!icons.set(&p("a.md"), None));
+        assert!(!icons.set(&p("b.md"), Some("")));
+        assert!(icons.icons.is_empty());
+    }
+
+    #[test]
+    fn icons_follow_renames() {
+        let mut icons = Icons::default();
+        for (path, icon) in [
+            ("Home.md", "go-home-symbolic"),
+            ("Projects/Plan.md", "starred-symbolic"),
+            ("Projects/Deep/Task.md", "check-plain-symbolic"),
+            ("Projects2/Other.md", "heart-symbolic"),
+        ] {
+            icons.set(&p(path), Some(icon));
+        }
+
+        assert!(icons.follow_rename(&p("Home.md"), &p("Start.md")));
+        assert_eq!(icons.get(&p("Start.md")), Some("go-home-symbolic"));
+        assert_eq!(icons.get(&p("Home.md")), None);
+
+        // A folder takes everything under it, but not a folder that only
+        // shares its name's start.
+        assert!(icons.follow_rename(&p("Projects"), &p("Work/Projects")));
+        assert_eq!(
+            icons
+                .icons
+                .keys()
+                .map(VaultPath::as_str)
+                .collect::<Vec<_>>(),
+            [
+                "Projects2/Other.md",
+                "Start.md",
+                "Work/Projects/Deep/Task.md",
+                "Work/Projects/Plan.md"
+            ]
+        );
+        assert!(!icons.follow_rename(&p("Elsewhere.md"), &p("Moved.md")));
+
+        // Only the case changes.
+        assert!(icons.follow_rename(&p("Start.md"), &p("start.md")));
+        assert_eq!(icons.get(&p("start.md")), Some("go-home-symbolic"));
+        assert_eq!(icons.get(&p("Start.md")), None);
+    }
+
+    #[test]
+    fn icons_are_removed_with_their_folder() {
+        let mut icons = Icons::default();
+        icons.set(&p("Projects/Plan.md"), Some("starred-symbolic"));
+        icons.set(&p("Projects/Deep/Task.md"), Some("heart-symbolic"));
+        icons.set(&p("Projects2/Other.md"), Some("heart-symbolic"));
+        assert_eq!(
+            icons.remove_under(&p("Projects/Plan.md")),
+            [(p("Projects/Plan.md"), "starred-symbolic".to_owned())]
+        );
+        icons.set(&p("Projects/Plan.md"), Some("starred-symbolic"));
+        let gone = icons.remove_under(&p("Projects"));
+        assert_eq!(gone.len(), 2);
+        assert_eq!(
+            icons
+                .icons
+                .keys()
+                .map(VaultPath::as_str)
+                .collect::<Vec<_>>(),
+            ["Projects2/Other.md"]
+        );
+        assert!(icons.remove_under(&p("Nothing")).is_empty());
     }
 }

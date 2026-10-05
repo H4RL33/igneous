@@ -168,7 +168,7 @@ impl BookmarksPane {
         self.rebuild();
     }
 
-    fn rebuild(self: &Rc<Self>) {
+    pub(crate) fn rebuild(self: &Rc<Self>) {
         self.list.remove_all();
         let items = self.items();
         self.widget
@@ -176,12 +176,19 @@ impl BookmarksPane {
         let count = items.len();
         for (i, bookmark) in items.into_iter().enumerate() {
             let (title, subtitle, icon) = describe(&bookmark);
+            // Bookmarked notes show their custom icon.
+            let custom = match (&bookmark, self.window.upgrade()) {
+                (Bookmark::File { path, .. }, Some(window)) => window.ctx().icons.shown(path),
+                _ => None,
+            };
             let row = adw::ActionRow::builder()
                 .title(glib::markup_escape_text(&title))
                 .subtitle(glib::markup_escape_text(&subtitle))
                 .activatable(true)
                 .build();
-            row.add_prefix(&gtk::Image::from_icon_name(icon));
+            row.add_prefix(&gtk::Image::from_icon_name(
+                custom.as_deref().unwrap_or(icon),
+            ));
             row.add_suffix(&self.row_menu(i, count));
             let window = self.window.clone();
             row.connect_activated(move |_| {

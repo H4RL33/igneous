@@ -135,6 +135,110 @@ async fn bookmarks_toggle_persist_and_follow_renames() {
     window.close();
 }
 
+/// The icon names a picker's grid shows.
+fn grid_icons(grid: &gtk::GridView) -> Vec<String> {
+    let model = grid.model().unwrap();
+    (0..model.n_items())
+        .filter_map(|i| model.item(i).and_downcast::<gtk::StringObject>())
+        .map(|s| s.string().to_string())
+        .collect()
+}
+
+#[gtk::test]
+async fn note_icons_are_picked_saved_and_follow_renames() {
+    let dir = vault_with(r#"{"version":1,"files":{"trash":"vaultFolder","confirmDelete":false}}"#);
+    write(
+        dir.path(),
+        ".igneous/icons.json",
+        r#"{"version":1,"fromTheFuture":true}"#,
+    );
+    let window = open(&dir);
+    window.open_path(&p("Home.md"), false);
+    assert_eq!(window.tab_icon(&p("Home.md")), None);
+
+    // Search the picker, then choose the first match.
+    WidgetExt::activate_action(&window, "win.set-icon", None).unwrap();
+    let dialog = window.visible_dialog().unwrap();
+    let grid = find(dialog.upcast_ref(), &|w| w.is::<gtk::GridView>())
+        .and_downcast::<gtk::GridView>()
+        .unwrap();
+    let all = grid_icons(&grid);
+    assert!(all.iter().all(|name| name.ends_with("-symbolic")));
+    assert!(all.windows(2).all(|pair| pair[0] < pair[1]));
+    let entry = find(dialog.upcast_ref(), &|w| w.is::<gtk::SearchEntry>())
+        .and_downcast::<gtk::SearchEntry>()
+        .unwrap();
+    entry.set_text("folder");
+    assert!(until(2000, || grid_icons(&grid).len() < all.len()).await);
+    let found = grid_icons(&grid);
+    assert!(!found.is_empty());
+    assert!(
+        found.iter().all(|name| name.contains("folder")),
+        "{found:?}"
+    );
+    let icon = found[0].clone();
+    grid.emit_by_name::<()>("activate", &[&0u32]);
+    assert!(until(2000, || window.visible_dialog().is_none()).await);
+
+    assert_eq!(window.note_icon(&p("Home.md")), Some(icon.clone()));
+    let json = read(dir.path(), ".igneous/icons.json");
+    assert!(json.contains(&format!("\"Home.md\": \"{icon}\"")), "{json}");
+    assert!(json.contains("\"fromTheFuture\": true"), "{json}");
+    assert_eq!(window.sidebar_icon(&p("Home.md")), Some(icon.clone()));
+    assert_eq!(window.tab_icon(&p("Home.md")), Some(icon.clone()));
+
+    // Renaming the note moves its icon.
+    window.rename(&p("Home.md"), &p("Start.md"));
+    let json = read(dir.path(), ".igneous/icons.json");
+    assert!(
+        json.contains(&format!("\"Start.md\": \"{icon}\"")),
+        "{json}"
+    );
+    assert!(!json.contains("Home.md"), "{json}");
+    assert_eq!(window.sidebar_icon(&p("Start.md")), Some(icon.clone()));
+    assert_eq!(window.tab_icon(&p("Start.md")), Some(icon.clone()));
+
+    // So does renaming its folder; moving the folder to the trash drops it.
+    window.set_note_icon(&p("Projects/Ideas.md"), Some(&icon));
+    window.rename(&p("Projects"), &p("Work"));
+    assert_eq!(window.note_icon(&p("Projects/Ideas.md")), None);
+    assert_eq!(window.note_icon(&p("Work/Ideas.md")), Some(icon.clone()));
+    window.trash(p("Work"));
+    assert_eq!(window.note_icon(&p("Work/Ideas.md")), None);
+    assert!(!read(dir.path(), ".igneous/icons.json").contains("Ideas.md"));
+
+    // Reset to Default, from the file tree's menu.
+    WidgetExt::activate_action(&window, "win.file-set-icon", Some(&"Start.md".to_variant()))
+        .unwrap();
+    let dialog = window.visible_dialog().unwrap();
+    let reset = find(dialog.upcast_ref(), &|w| {
+        w.downcast_ref::<gtk::Button>()
+            .is_some_and(|b| b.label().as_deref() == Some("_Reset to Default"))
+    })
+    .and_downcast::<gtk::Button>()
+    .unwrap();
+    reset.emit_clicked();
+    assert_eq!(window.note_icon(&p("Start.md")), None);
+    assert_eq!(
+        window.sidebar_icon(&p("Start.md")).as_deref(),
+        Some("text-x-generic-symbolic")
+    );
+    assert_eq!(window.tab_icon(&p("Start.md")), None);
+    assert!(!read(dir.path(), ".igneous/icons.json").contains("Start.md"));
+    window.close();
+}
+
+#[gtk::test]
+async fn unreadable_icons_are_never_overwritten() {
+    let dir = vault(None);
+    write(dir.path(), ".igneous/icons.json", "{ nope");
+    let window = open(&dir);
+    window.set_note_icon(&p("Home.md"), Some("folder-symbolic"));
+    assert_eq!(read(dir.path(), ".igneous/icons.json"), "{ nope");
+    assert_eq!(window.note_icon(&p("Home.md")), None);
+    window.close();
+}
+
 #[gtk::test]
 async fn snapshots_are_taken_listed_and_restored() {
     let dir = vault_with(r#"{"version":1,"recovery":{"intervalMinutes":0}}"#);
@@ -264,5 +368,37 @@ async fn screenshot() {
     }
     wait(800).await;
     save_png(window.upcast_ref(), &out.replace(".png", "-prefs.png"));
+    if let Some(dialog) = window.visible_dialog() {
+        dialog.close();
+    }
+
+    // Custom icons in bookmarks and on tabs, then in the file tree with the
+    // icon picker open.
+    window.set_note_icon(&p("Home.md"), Some("go-home-symbolic"));
+    window.set_note_icon(&p("2026-10-01.md"), Some("starred-symbolic"));
+    wait(800).await;
+    save_png(
+        window.upcast_ref(),
+        &out.replace(".png", "-icons-bookmarks.png"),
+    );
+    if let Some(stack) = find(&root, &|w| {
+        w.downcast_ref::<adw::ViewStack>()
+            .is_some_and(|s| s.child_by_name("files").is_some())
+    })
+    .and_downcast::<adw::ViewStack>()
+    {
+        stack.set_visible_child_name("files");
+    }
+    window.open_path(&p("Home.md"), false);
+    WidgetExt::activate_action(&window, "win.set-icon", None).unwrap();
+    if let Some(entry) = window
+        .visible_dialog()
+        .and_then(|d| find(d.upcast_ref(), &|w| w.is::<gtk::SearchEntry>()))
+        .and_downcast::<gtk::SearchEntry>()
+    {
+        entry.set_text("go");
+    }
+    wait(1000).await;
+    save_png(window.upcast_ref(), &out.replace(".png", "-icons.png"));
     window.close();
 }

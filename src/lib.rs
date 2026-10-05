@@ -18,6 +18,7 @@ mod graph_page;
 mod graph_view;
 mod gsettings;
 mod history;
+mod icons;
 mod image_page;
 mod index;
 mod inspector;
