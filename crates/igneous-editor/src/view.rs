@@ -62,6 +62,8 @@ pub(crate) struct State {
     /// Headings and callouts that can fold, and the starts of folded ones.
     pub foldables: Vec<crate::fold::Foldable>,
     pub folded: std::collections::BTreeSet<usize>,
+    /// Notes linking here, shown after the last line when set.
+    pub mentions: Option<Vec<crate::Mention>>,
     /// Set to keep folds through the next wholesale change (a mode switch
     /// or a restyle, rather than new text).
     pub fold_kept: bool,
@@ -239,6 +241,26 @@ impl NoteView {
             crate::scheme::live_style_scheme(&theme, dark)
         };
         self.source_buffer().set_style_scheme(scheme.as_ref());
+    }
+
+    /// Shows `mentions` in a Linked Mentions section after the last line
+    /// (Live Preview and Reading), or hides the section with `None`.
+    pub fn set_linked_mentions(&self, mentions: Option<Vec<crate::Mention>>) {
+        let changed = {
+            let mut st = self.imp().state.borrow_mut();
+            let changed = st.mentions != mentions;
+            st.mentions = mentions;
+            changed
+        };
+        if changed {
+            // The section's widget is rebuilt with the new list.
+            for overlay in &self.imp().state.borrow().overlays {
+                if overlay.is_mentions() {
+                    overlay.mark_stale();
+                }
+            }
+            self.sync_overlays_now();
+        }
     }
 
     /// Whether headings get fold arrows.

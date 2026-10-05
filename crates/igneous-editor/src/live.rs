@@ -51,6 +51,18 @@ pub(crate) enum OverlayKind {
     FoldToggle {
         folded: bool,
     },
+    /// The Linked Mentions section after the last line.
+    Mentions,
+}
+
+impl Overlay {
+    pub(crate) fn is_mentions(&self) -> bool {
+        self.kind == OverlayKind::Mentions
+    }
+
+    pub(crate) fn mark_stale(&self) {
+        self.stale.set(true);
+    }
 }
 
 /// A widget shown over the text. Widgets exist only while near the screen:
@@ -504,6 +516,11 @@ impl NoteView {
 
     // --- overlays ----------------------------------------------------------------
 
+    pub(crate) fn sync_overlays_now(&self) {
+        self.sync_overlays();
+        self.queue_draw();
+    }
+
     /// Throws away overlay widgets so they're built again (after a theme or
     /// host change).
     pub(crate) fn rebuild_overlays(&self) {
@@ -575,6 +592,11 @@ impl NoteView {
                         _ => continue,
                     };
                     desired.push((kind, start, span.range.end, false));
+                }
+                if st.mentions.is_some() {
+                    let end = st.text.len();
+                    let start = igneous_markdown::text::line_start(&st.text, end.saturating_sub(1));
+                    desired.push((OverlayKind::Mentions, start, end, false));
                 }
                 for fold in &st.foldables {
                     let folded = st.folded.contains(&fold.start);
@@ -701,6 +723,12 @@ impl NoteView {
                         .entry(format!("space:below-{}", height + 8))
                         .or_default()
                         .push(line_of(anchor));
+                }
+                OverlayKind::Mentions => {
+                    spacing
+                        .entry(format!("space:below-{}", height + 32))
+                        .or_default()
+                        .push(line_of(text_len.saturating_sub(1)));
                 }
                 OverlayKind::Table | OverlayKind::Math | OverlayKind::Base => {
                     let last = overlay.end.saturating_sub(1).max(anchor);
@@ -895,7 +923,61 @@ impl NoteView {
                 let anchor = byte_of(&st.lines, &self.buffer().iter_at_mark(&overlay.mark));
                 self.fold_toggle_widget(anchor, *folded)
             }
+            OverlayKind::Mentions => self.mentions_widget(st.mentions.as_deref().unwrap_or(&[])),
         }
+    }
+
+    fn mentions_widget(&self, mentions: &[crate::Mention]) -> gtk::Widget {
+        let content = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(6)
+            .css_classes(["linked-mentions"])
+            .build();
+        content.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
+        content.append(
+            &gtk::Label::builder()
+                .label(format!("Linked Mentions ({})", mentions.len()))
+                .xalign(0.0)
+                .margin_top(6)
+                .css_classes(["heading"])
+                .build(),
+        );
+        if mentions.is_empty() {
+            content.append(
+                &gtk::Label::builder()
+                    .label("No notes link here yet.")
+                    .xalign(0.0)
+                    .css_classes(["dim-label"])
+                    .build(),
+            );
+        }
+        let list = gtk::ListBox::builder()
+            .selection_mode(gtk::SelectionMode::None)
+            .css_classes(["boxed-list"])
+            .build();
+        for mention in mentions {
+            let row = adw::ActionRow::builder()
+                .title(glib::markup_escape_text(&mention.title))
+                .subtitle(glib::markup_escape_text(mention.line.trim()))
+                .subtitle_lines(2)
+                .activatable(true)
+                .tooltip_text(&mention.path)
+                .build();
+            let mention = mention.clone();
+            adw::prelude::ActionRowExt::connect_activated(
+                &row,
+                glib::clone!(
+                    #[weak(rename_to = view)]
+                    self,
+                    move |_| view.host().open_mention(&mention)
+                ),
+            );
+            list.append(&row);
+        }
+        if !mentions.is_empty() {
+            content.append(&list);
+        }
+        content.upcast()
     }
 
     fn checkbox_widget(&self, checked: bool) -> gtk::Widget {
@@ -1312,6 +1394,11 @@ impl NoteView {
                     let (y, h) = self.line_yrange(&iter);
                     (left + 14, y + (h - 16) / 2 - 1)
                 }
+                OverlayKind::Mentions => {
+                    // In the space reserved under the last line.
+                    let (y, h) = self.line_yrange(&iter);
+                    (left, y + h - overlay.height.get() - 8)
+                }
                 OverlayKind::FoldToggle { .. } => {
                     // In the margin, level with the line's text (below any
                     // space reserved above it).
@@ -1591,6 +1678,7 @@ impl NoteView {
                 OverlayKind::CalloutIcon { kind, .. } => format!("callout:{kind}"),
                 OverlayKind::Properties => "properties".to_owned(),
                 OverlayKind::FoldToggle { folded } => format!("fold:{folded}"),
+                OverlayKind::Mentions => "mentions".to_owned(),
             })
             .collect()
     }

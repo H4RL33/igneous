@@ -480,6 +480,13 @@ async fn screenshot() {
     if std::env::var("IGNEOUS_SCREENSHOT_DARK").is_ok() {
         adw::StyleManager::default().set_color_scheme(adw::ColorScheme::ForceDark);
     }
+    if std::env::var("IGNEOUS_SCREENSHOT_MENTIONS").is_ok() {
+        std::fs::write(
+            dir.path().join(".igneous/vault.json"),
+            r#"{"version":1,"editor":{"backlinksInDocument":true}}"#,
+        )
+        .unwrap();
+    }
     if let Ok(theme) = std::env::var("IGNEOUS_SCREENSHOT_THEME") {
         std::fs::write(
             dir.path().join(".igneous/appearance.json"),

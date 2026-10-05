@@ -71,6 +71,12 @@ impl Host for NoteHost {
         }
     }
 
+    fn open_mention(&self, mention: &igneous_editor::Mention) {
+        if let (Some(window), Ok(path)) = (self.window(), VaultPath::new(&mention.path)) {
+            window.open_at(&path, mention.at);
+        }
+    }
+
     fn note_names(&self) -> Vec<NoteName> {
         let Some(window) = self.window() else {
             return Vec::new();

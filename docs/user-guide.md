@@ -142,7 +142,8 @@ Code, math, frontmatter (except for YAML rules) and anything between `<!-- linte
   - line numbers in Source mode;
   - Vim keybindings (`:w` saves);
   - spell checking;
-  - list and pairing helpers, tabs, and the autosave delay.
+  - list and pairing helpers, tabs, and the autosave delay;
+  - a Linked Mentions section at the end of each note.
 - **Files & Links:**
   - where new notes and attachments go;
   - whether deleting uses the Trash or the vault's `.trash` folder;

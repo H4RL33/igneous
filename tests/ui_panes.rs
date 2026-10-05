@@ -82,3 +82,27 @@ async fn editor_settings_apply_to_open_notes() {
     wait(200).await;
     window.close();
 }
+
+#[gtk::test]
+async fn linked_mentions_at_the_end_of_notes() {
+    let dir = vault(None);
+    let window = open(&dir);
+    assert!(until(5000, || window.index().is_ready()).await);
+    window
+        .ctx_for_test()
+        .settings
+        .borrow_mut()
+        .editor
+        .backlinks_in_document = true;
+    window.open_path(&p("Projects/Igneous/Roadmap.md"), false);
+    let note = window.selected_note().unwrap();
+    assert!(
+        until(3000, || note
+            .view()
+            .overlay_kinds()
+            .contains(&"mentions".to_owned()))
+        .await
+    );
+    note.view().check_invariants().unwrap();
+    window.close();
+}

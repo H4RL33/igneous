@@ -1981,8 +1981,46 @@ impl Window {
         inspector.show_outline(note.and_then(|n| n.path()).as_ref(), &headings);
     }
 
+    /// Fills the selected note's Linked Mentions section, when the vault
+    /// shows one (Preferences → Editor).
+    pub fn update_linked_mentions(&self) {
+        let Some(note) = self.selected_note() else {
+            return;
+        };
+        if !self.ctx().settings.borrow().editor.backlinks_in_document {
+            note.view().set_linked_mentions(None);
+            return;
+        }
+        let Some(path) = note.path() else { return };
+        let index = self.index().clone();
+        let weak = note.downgrade();
+        glib::spawn_future_local(async move {
+            let query = path.clone();
+            let hits = index
+                .query(move |index| index.backlinks(&query))
+                .await
+                .and_then(Result::ok)
+                .unwrap_or_default();
+            let Some(note) = weak.upgrade() else { return };
+            if note.path().as_ref() != Some(&path) {
+                return;
+            }
+            let mentions = hits
+                .into_iter()
+                .map(|hit| igneous_editor::Mention {
+                    title: crate::files::display_name(&hit.source, false).0,
+                    path: hit.source.to_string(),
+                    line: hit.line_text,
+                    at: hit.range.start,
+                })
+                .collect();
+            note.view().set_linked_mentions(Some(mentions));
+        });
+    }
+
     /// Refreshes the inspector for the selected note, if it's showing.
     pub fn update_inspector(&self) {
+        self.update_linked_mentions();
         let imp = self.imp();
         if !imp.inspector_split.shows_sidebar() {
             return;

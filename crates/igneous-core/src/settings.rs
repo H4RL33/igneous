@@ -271,6 +271,8 @@ pub struct EditorSettings {
     pub fold_headings: bool,
     pub fold_indent: bool,
     pub autosave_delay_ms: u32,
+    /// Show the notes linking here at the end of each note.
+    pub backlinks_in_document: bool,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
@@ -291,6 +293,7 @@ impl Default for EditorSettings {
             fold_headings: true,
             fold_indent: true,
             autosave_delay_ms: 2000,
+            backlinks_in_document: false,
             extra: Map::new(),
         }
     }

@@ -22,7 +22,7 @@ mod view;
 
 pub use buffer::LANGUAGE_ID;
 pub use diagnostics::Diagnostic;
-pub use host::{BaseEmbed, Embed, Host, NoHost, NoteName};
+pub use host::{BaseEmbed, Embed, Host, Mention, NoHost, NoteName};
 pub use input::InputOptions;
 pub use properties::PropertyKind;
 pub use scheme::{style_scheme, system_accent};

@@ -14,6 +14,18 @@ pub struct Embed {
     pub text: String,
 }
 
+/// A line in another note that links here, for the Linked Mentions
+/// section at the end of a note.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Mention {
+    pub title: String,
+    /// The linking note's vault path.
+    pub path: String,
+    pub line: String,
+    /// Where in that note, as a byte offset.
+    pub at: usize,
+}
+
 /// A note offered when completing `[[`.
 pub struct NoteName {
     /// What goes in the link: the name, or the path if the name is shared.
@@ -53,6 +65,9 @@ pub trait Host {
 
     /// Follows a link (Ctrl+click, middle-click, or a click in Reading mode).
     fn open_link(&self, _link: &LinkRef, _new_tab: bool) {}
+
+    /// Opens another note at a byte offset (from Linked Mentions).
+    fn open_mention(&self, _mention: &Mention) {}
 
     /// Notes (and aliases) to offer after `[[`.
     fn note_names(&self) -> Vec<NoteName> {

@@ -48,9 +48,15 @@ pub fn page(window: &Window, dialog: &adw::PreferencesDialog) -> adw::Preference
         readable,
     );
     let numbers = switch("Line Numbers in Source Mode", "", editor.show_line_numbers);
+    let mentions = switch(
+        "Linked Mentions at the End",
+        "List the notes linking to a note below its text",
+        editor.backlinks_in_document,
+    );
     opening.add(&mode);
     opening.add(&readable_row);
     opening.add(&numbers);
+    opening.add(&mentions);
 
     let typing = adw::PreferencesGroup::builder().title("Typing").build();
     let vim = switch(
@@ -106,6 +112,7 @@ pub fn page(window: &Window, dialog: &adw::PreferencesDialog) -> adw::Preference
     let save = {
         let window = window.downgrade();
         let dialog = dialog.downgrade();
+        let mentions = mentions.clone();
         let (mode, numbers, vim, spellcheck, lists, brackets, markers, tabs, tab_width, delay) = (
             mode.clone(),
             numbers.clone(),
@@ -131,6 +138,7 @@ pub fn page(window: &Window, dialog: &adw::PreferencesDialog) -> adw::Preference
                     _ => EditorMode::Live,
                 };
                 e.show_line_numbers = numbers.is_active();
+                e.backlinks_in_document = mentions.is_active();
                 e.vim_mode = vim.is_active();
                 e.spellcheck = spellcheck.is_active();
                 e.smart_lists = lists.is_active();
@@ -145,6 +153,7 @@ pub fn page(window: &Window, dialog: &adw::PreferencesDialog) -> adw::Preference
                 Ok(settings) => {
                     window.ctx().settings.borrow_mut().editor = settings.editor;
                     window.apply_editor_settings();
+                    window.update_linked_mentions();
                 }
                 Err(e) => {
                     if let Some(dialog) = dialog.upgrade() {
@@ -156,6 +165,7 @@ pub fn page(window: &Window, dialog: &adw::PreferencesDialog) -> adw::Preference
     };
     for row in [
         &numbers,
+        &mentions,
         &vim,
         &spellcheck,
         &lists,
