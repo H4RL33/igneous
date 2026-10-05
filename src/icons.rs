@@ -507,8 +507,10 @@ impl Window {
                 })
             }
         });
+        // As far below the search as the search is below the dialog's top.
         let group = adw::ToggleGroup::builder()
             .homogeneous(true)
+            .margin_top(3)
             .margin_start(6)
             .margin_end(6)
             .margin_bottom(6)
