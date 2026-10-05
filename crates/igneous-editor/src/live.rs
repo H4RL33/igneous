@@ -919,8 +919,11 @@ impl NoteView {
             }
             OverlayKind::Math => {
                 let anchor = byte_of(&st.lines, &self.buffer().iter_at_mark(&overlay.mark));
-                let tex = crate::math::source(&st.text[anchor..overlay.end.min(st.text.len())]);
-                self.math_widget(tex)
+                let quoted = st.text[igneous_markdown::text::line_start(&st.text, anchor)..anchor]
+                    .contains('>');
+                let tex =
+                    crate::math::source(&st.text[anchor..overlay.end.min(st.text.len())], quoted);
+                self.math_widget(&tex)
             }
             OverlayKind::Base => {
                 let anchor = byte_of(&st.lines, &self.buffer().iter_at_mark(&overlay.mark));
@@ -2113,6 +2116,24 @@ mod tests {
         assert!(concealed_text(&view).iter().any(|c| c.contains("e^{i")));
         place(&view, text.find("e^").unwrap());
         assert!(!view.overlay_kinds().contains(&"math".to_owned()));
+        view.check_invariants().unwrap();
+    }
+
+    /// Obsidian's `$$` blocks may hold blank (or whitespace-only) lines, and
+    /// work inside callouts.
+    #[gtk::test]
+    fn display_math_blocks_with_blank_lines_are_rendered() {
+        let text = "Defined as:\n\n$$\n  \n\\mathrm{CIR}=1:1\n$$\n\n> [!note]\n> $$\n>\n> N \\geq 1\n> $$\n\nafter\n";
+        let view = view(text);
+        place(&view, text.len());
+        let math = view.overlay_kinds().iter().filter(|k| *k == "math").count();
+        assert_eq!(math, 2);
+        let st = view.imp().state.borrow();
+        for overlay in st.overlays.iter().filter(|o| o.kind == OverlayKind::Math) {
+            let widget = view.make_widget(overlay, &st);
+            assert!(widget.is::<gtk::Picture>(), "the formula didn't render");
+        }
+        drop(st);
         view.check_invariants().unwrap();
     }
 

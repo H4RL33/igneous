@@ -205,6 +205,15 @@ pub fn parse(text: &str) -> Document {
     };
     // A parser bug must never take the editor down with it.
     let body = &text[base..];
+    // `$$` blocks are hidden from pulldown-cmark (see `math_blocks`).
+    let math = math_blocks(body);
+    let masked;
+    let body = if math.is_empty() {
+        body
+    } else {
+        masked = mask(body, &math);
+        masked.as_str()
+    };
     let events = match collect_events(body, options) {
         Some(events) => events,
         None => {
@@ -214,6 +223,12 @@ pub fn parse(text: &str) -> Document {
     };
     for (event, range) in events {
         b.event(event, range.start + base..range.end + base);
+    }
+    for block in &math {
+        let range = block.range.start + base..block.range.end + base;
+        let markers = smallvec![range.start..range.start + 2, range.end - 2..range.end];
+        b.push_node(NodeKind::Math { display: true }, range.clone(), markers);
+        b.excluded.push(range);
     }
     b.scan_comments(base);
     b.scan_block_ids(base);
@@ -231,6 +246,122 @@ pub fn parse(text: &str) -> Document {
             .then(b.range.end.cmp(&a.range.end))
     });
     doc
+}
+
+/// A `$$` block found by [`math_blocks`].
+struct MathBlock {
+    /// From the opening `$$` to the end of the closing one.
+    range: Span,
+    /// What to hide from pulldown-cmark: each line's text after its quote
+    /// prefix.
+    masked: Vec<Span>,
+}
+
+/// Display math as Obsidian reads it: from a line starting with `$$` to the
+/// next line ending with `$$`, whatever lies between. CommonMark ends a
+/// paragraph at a blank line (or one of only spaces), so pulldown-cmark
+/// alone shows such a formula as text. Blocks in quotes and callouts work
+/// too, as long as every line keeps the same quote depth. `$$x$$` on one
+/// line is left to pulldown-cmark.
+fn math_blocks(body: &str) -> Vec<MathBlock> {
+    let mut lines = Vec::new();
+    let mut start = 0;
+    for line in body.split_inclusive('\n') {
+        let end = start + line.trim_end_matches(['\n', '\r']).len();
+        lines.push(start..end);
+        start += line.len();
+    }
+    let mut blocks = Vec::new();
+    let mut fence: Option<(char, usize)> = None;
+    let mut i = 0;
+    while i < lines.len() {
+        let line = &body[lines[i].clone()];
+        let (prefix, depth) = quote_prefix(line);
+        let content = &line[prefix..];
+        // `$$` inside fenced code is code.
+        let ticks = |c: char| content.chars().take_while(|&x| x == c).count();
+        if let Some((c, n)) = fence {
+            if ticks(c) >= n && content[ticks(c)..].trim().is_empty() {
+                fence = None;
+            }
+            i += 1;
+            continue;
+        }
+        if let Some(c) = ['`', '~'].into_iter().find(|&c| ticks(c) >= 3) {
+            fence = Some((c, ticks(c)));
+            i += 1;
+            continue;
+        }
+        let Some(after) = content.strip_prefix("$$") else {
+            i += 1;
+            continue;
+        };
+        if after.trim_end().ends_with("$$") {
+            i += 1;
+            continue;
+        }
+        let open = lines[i].start + prefix;
+        let mut masked = Vec::new();
+        masked.push(open..lines[i].end);
+        let mut close = None;
+        for (j, span) in lines.iter().enumerate().skip(i + 1) {
+            let line = &body[span.clone()];
+            let (prefix, line_depth) = quote_prefix(line);
+            if line_depth != depth {
+                break;
+            }
+            masked.push(span.start + prefix..span.end);
+            let content = line[prefix..].trim_end();
+            if content.ends_with("$$") {
+                close = Some((j, span.start + prefix + content.len()));
+                break;
+            }
+        }
+        match close {
+            Some((j, end)) => {
+                blocks.push(MathBlock {
+                    range: open..end,
+                    masked,
+                });
+                i = j + 1;
+            }
+            None => i += 1,
+        }
+    }
+    blocks
+}
+
+/// The length of a line's quote prefix (`> > ` and the indentation after
+/// it, up to three spaces) and how many quotes deep it is.
+fn quote_prefix(line: &str) -> (usize, usize) {
+    let bytes = line.as_bytes();
+    let mut at = 0;
+    let mut depth = 0;
+    loop {
+        let indent = bytes[at..].iter().take_while(|&&b| b == b' ').count();
+        if indent <= 3 && bytes.get(at + indent) == Some(&b'>') {
+            at += indent + 1;
+            if bytes.get(at) == Some(&b' ') {
+                at += 1;
+            }
+            depth += 1;
+        } else {
+            let indent = indent.min(3);
+            return (at + indent, depth);
+        }
+    }
+}
+
+/// `body` with the text of each math block turned into spaces: the same
+/// length, so offsets still match, but nothing for pulldown-cmark to read.
+fn mask(body: &str, blocks: &[MathBlock]) -> String {
+    let mut bytes = body.as_bytes().to_vec();
+    for span in blocks.iter().flat_map(|b| &b.masked) {
+        bytes[span.clone()].fill(b' ');
+    }
+    // Whole characters were replaced (spans start and end on boundaries, and
+    // every byte became ASCII), so this can't fail.
+    String::from_utf8(bytes).unwrap_or_else(|_| body.to_owned())
 }
 
 fn collect_events(body: &str, options: Options) -> Option<Vec<(Event<'_>, Span)>> {

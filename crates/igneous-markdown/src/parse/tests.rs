@@ -292,6 +292,63 @@ fn math() {
 }
 
 #[test]
+fn math_blocks_span_blank_lines() {
+    // Obsidian reads `$$` to `$$` as one block, blank lines and all.
+    let text = "Defined as:\n\n$$\n  \n\\mathrm{CIR}=1:1\n$$\n\nWhere:\n\n$$\nN \\geq 1\n\n$$\n";
+    assert_nodes!(
+        text,
+        [
+            "Paragraph \"Defined as:\"",
+            "Math(display) \"$$\\n  \\n\\\\mathrm{CIR}=1:1\\n$$\" [$$|$$]",
+            "Paragraph \"Where:\"",
+            "Math(display) \"$$\\nN \\\\geq 1\\n\\n$$\" [$$|$$]",
+        ]
+    );
+    // Nothing inside is Markdown.
+    let doc = parse("$$\n\na_1 * b * c_1 #tag\n$$\n");
+    assert!(doc.tags.is_empty());
+    assert_eq!(doc.nodes.len(), 1);
+}
+
+#[test]
+fn math_blocks_need_a_closing_line() {
+    assert_nodes!("$$\n\nx\n", ["Paragraph \"$$\"", "Paragraph \"x\""]);
+}
+
+#[test]
+fn math_blocks_skip_code_and_one_liners() {
+    assert_nodes!(
+        "```\n$$\n\nx\n$$\n```\n",
+        ["Code() \"```\\n$$\\n\\nx\\n$$\\n```\" [```|```]"]
+    );
+    assert_nodes!(
+        "$$x$$\n",
+        ["Paragraph \"$$x$$\"", "Math(display) \"$$x$$\" [$$|$$]"]
+    );
+}
+
+#[test]
+fn math_blocks_in_callouts() {
+    let text = "> [!note] Sum\n> $$\n>\n> a+b\n> $$\n";
+    let doc = parse(text);
+    let math: Vec<&str> = doc
+        .nodes
+        .iter()
+        .filter(|n| n.kind == NodeKind::Math { display: true })
+        .map(|n| &text[n.range.clone()])
+        .collect();
+    assert_eq!(math, ["$$\n>\n> a+b\n> $$"]);
+    assert_eq!(doc.callouts.len(), 1);
+    // A quote ending part-way isn't a block.
+    let doc = parse("> $$\n> a\n\n$$\n");
+    assert!(
+        !doc.nodes
+            .iter()
+            .any(|n| matches!(n.kind, NodeKind::Math { .. }))
+    );
+}
+
+#[test]
 fn footnotes() {
     let text = "Text[^1] and ^[inline [nested] note].\n\n[^1]: Def.\n";
     assert_nodes!(

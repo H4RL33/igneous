@@ -29,11 +29,32 @@ pub fn render(tex: &str, color: &gdk::RGBA, px: f64) -> Result<gdk::Texture, Str
     gdk::Texture::from_bytes(&glib::Bytes::from_owned(svg.into_bytes())).map_err(|e| e.to_string())
 }
 
-/// The TeX inside `$$…$$`.
-pub fn source(block: &str) -> &str {
+/// The TeX inside `$$…$$`. In a quote or callout (`quoted`), each line
+/// after the first starts with `>` prefixes, which aren't part of it.
+pub fn source(block: &str, quoted: bool) -> String {
     let inner = block.trim();
     let inner = inner.strip_prefix("$$").unwrap_or(inner);
-    inner.strip_suffix("$$").unwrap_or(inner).trim()
+    let inner = inner.strip_suffix("$$").unwrap_or(inner);
+    if !quoted {
+        return inner.trim().to_owned();
+    }
+    inner
+        .split('\n')
+        .enumerate()
+        .map(|(i, line)| {
+            if i == 0 {
+                return line;
+            }
+            let mut line = line;
+            while let Some(rest) = line.trim_start().strip_prefix('>') {
+                line = rest.strip_prefix(' ').unwrap_or(rest);
+            }
+            line
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_owned()
 }
 
 /// A widget showing the formula, centred, or the error in place of it.
@@ -70,8 +91,10 @@ mod tests {
 
     #[test]
     fn sources() {
-        assert_eq!(source("$$\ne^{i\\pi}\n$$"), "e^{i\\pi}");
-        assert_eq!(source("$$x$$"), "x");
+        assert_eq!(source("$$\ne^{i\\pi}\n$$", false), "e^{i\\pi}");
+        assert_eq!(source("$$x$$", false), "x");
+        assert_eq!(source("$$\n  \nx\n$$", false), "x");
+        assert_eq!(source("$$\n>\n> a > b\n> > c\n> $$", true), "a > b\nc");
     }
 
     #[gtk::test]
