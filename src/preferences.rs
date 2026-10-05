@@ -102,14 +102,13 @@ impl Preferences {
         });
         imp.dark_handler.replace(Some(handler));
         crate::editor_prefs::fill(&imp.editor_page, window, dialog);
+        imp.editor_page.add(&saved_here());
 
         // The notes settings are split between Files & Links and Plugins.
         let notes = crate::notes_prefs::groups(window, dialog);
-        prefs.add(&crate::files_prefs::page(
-            window,
-            dialog,
-            &[&notes.opening, &notes.recovery],
-        ));
+        let files = crate::files_prefs::page(window, dialog, &[&notes.opening, &notes.recovery]);
+        files.add(&saved_here());
+        prefs.add(&files);
 
         let plugins = adw::PreferencesPage::builder()
             .name("plugins")
@@ -120,6 +119,7 @@ impl Preferences {
         plugins.add(&notes.templates);
         plugins.add(&crate::sync_prefs::group(window, dialog));
         plugins.add(&crate::lint_prefs::group(window, dialog));
+        plugins.add(&saved_here());
         prefs.add(&plugins);
         prefs
     }
@@ -343,6 +343,20 @@ impl Preferences {
             |_| {},
         );
     }
+}
+
+/// The note at the end of each tab: every setting here belongs to the vault.
+fn saved_here() -> adw::PreferencesGroup {
+    let group = adw::PreferencesGroup::new();
+    group.add(
+        &gtk::Label::builder()
+            .label("These preferences are saved in this vault’s .igneous folder")
+            .wrap(true)
+            .justify(gtk::Justification::Center)
+            .css_classes(["dim-label", "caption"])
+            .build(),
+    );
+    group
 }
 
 /// The accents shown under each sample, in Ptyxis's order.

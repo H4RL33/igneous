@@ -57,7 +57,6 @@ pub fn groups(window: &Window, dialog: &adw::PreferencesDialog) -> Groups {
 
     let daily = adw::PreferencesGroup::builder()
         .title("Daily Notes")
-        .description("Saved with this vault")
         .build();
     let daily_folder = entry("Folder", &settings.daily_notes.folder);
     let daily_format = entry("Name Format", &settings.daily_notes.format);
@@ -82,15 +81,16 @@ pub fn groups(window: &Window, dialog: &adw::PreferencesDialog) -> Groups {
     daily.add(&daily_format);
     daily.add(&daily_template);
 
-    let templates = adw::PreferencesGroup::builder()
-        .title("Templates")
-        .description("{{title}}, {{date}} and {{time}} are filled in; {{date:FORMAT}} and {{time:FORMAT}} take Moment.js formats")
-        .build();
+    let templates = adw::PreferencesGroup::builder().title("Templates").build();
     let template_folder = entry(
         "Templates Folder",
         settings.templates.folder.as_deref().unwrap_or(""),
     );
     let date_format = entry("Date Format", &settings.templates.date_format);
+    template_folder.set_tooltip_text(Some(
+        "{{title}}, {{date}} and {{time}} are filled in; {{date:FORMAT}} and \
+         {{time:FORMAT}} take Moment.js formats",
+    ));
     let time_format = entry("Time Format", &settings.templates.time_format);
     templates.add(&template_folder);
     templates.add(&date_format);
@@ -110,28 +110,26 @@ pub fn groups(window: &Window, dialog: &adw::PreferencesDialog) -> Groups {
 
     let recovery = adw::PreferencesGroup::builder()
         .title("File Recovery")
-        .description("Snapshots of notes as they’re edited, kept outside the vault; see Note Snapshots in the main menu")
         .build();
-    let spin = |title: &str, subtitle: &str, max: f64, value: u32| {
+    let spin = |title: &str, max: f64, value: u32| {
         let row = adw::SpinRow::with_range(0.0, max, 1.0);
         row.set_title(title);
-        row.set_subtitle(subtitle);
         row.set_value(f64::from(value));
         row
     };
     let interval = spin(
-        "Snapshot Every",
-        "Minutes between snapshots of a note; 0 for every save",
+        "Snapshot Every (Minutes)",
         120.0,
         settings.recovery.interval_minutes,
     );
-    let keep = spin("Keep For", "Days", 365.0, settings.recovery.keep_days);
+    interval.set_tooltip_text(Some("0 takes a snapshot on every save"));
+    let keep = spin("Keep For (Days)", 365.0, settings.recovery.keep_days);
     let size = spin(
-        "Use Up To",
-        "Megabytes for this vault",
+        "Space Limit (MB)",
         10_000.0,
         settings.recovery.max_megabytes,
     );
+    size.set_subtitle("Snapshots are kept outside the vault");
     recovery.add(&interval);
     recovery.add(&keep);
     recovery.add(&size);

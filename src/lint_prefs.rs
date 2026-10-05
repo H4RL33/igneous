@@ -19,32 +19,34 @@ pub fn group(window: &Window, dialog: &adw::PreferencesDialog) -> adw::Preferenc
     let lint = window.lint().clone();
     let group = adw::PreferencesGroup::builder().title("Linter").build();
     if let Some(error) = lint.error() {
-        group.set_description(Some(&format!(
-            "lint.json can’t be read, so these settings can’t be changed until it’s fixed or \
-             removed: {error}"
-        )));
+        group.add(
+            &adw::ActionRow::builder()
+                .title("Linter Settings Can’t Be Read")
+                .subtitle(glib::markup_escape_text(&format!(
+                    "Fix or remove .igneous/lint.json to change them: {error}"
+                )))
+                .build(),
+        );
         return group;
     }
-    group.set_description(Some(
-        "Saved with this vault, in .igneous/lint.json. The rules are obsidian-linter’s. \
-         Ctrl+Alt+L lints the open note.",
-    ));
 
     let rules_row = adw::ActionRow::builder()
         .title("Rules")
         .activatable(true)
         .build();
+    let rules_count = gtk::Label::builder()
+        .css_classes(["dim-label"])
+        .valign(gtk::Align::Center)
+        .build();
+    rules_row.add_suffix(&rules_count);
     rules_row.add_suffix(&gtk::Image::from_icon_name("go-next-symbolic"));
-    let count_rules = {
-        let rules_row = rules_row.clone();
-        move |settings: &LintSettings| {
-            let all = igneous_lint::rules::all();
-            let on = all
-                .iter()
-                .filter(|r| settings.rules.get(r.id()).is_some_and(|c| c.enabled))
-                .count();
-            rules_row.set_subtitle(&format!("{on} of {} on", all.len()));
-        }
+    let count_rules = move |settings: &LintSettings| {
+        let all = igneous_lint::rules::all();
+        let on = all
+            .iter()
+            .filter(|r| settings.rules.get(r.id()).is_some_and(|c| c.enabled))
+            .count();
+        rules_count.set_label(&format!("{on} of {} on", all.len()));
     };
 
     // Saves a change, then rechecks open notes.
@@ -77,10 +79,7 @@ pub fn group(window: &Window, dialog: &adw::PreferencesDialog) -> adw::Preferenc
 
     let on_save = adw::SwitchRow::builder()
         .title("Lint When Saving")
-        .subtitle(
-            "Ctrl+S lints the note before saving it. Automatic saves never lint, so text \
-             isn’t rewritten while you type.",
-        )
+        .subtitle("Only when saving with Ctrl+S, never while typing")
         .active(settings.lint_on_save)
         .build();
     let update_on_save = update.clone();
@@ -90,10 +89,7 @@ pub fn group(window: &Window, dialog: &adw::PreferencesDialog) -> adw::Preferenc
     });
     let underline = adw::SwitchRow::builder()
         .title("Underline Problems")
-        .subtitle(
-            "Mark what the rules would change. Frontmatter that isn’t valid YAML is always \
-             marked.",
-        )
+        .subtitle("Mark text the rules would change")
         .active(crate::lint::show_problems(&settings))
         .build();
     let update_underline = update.clone();
@@ -190,7 +186,7 @@ fn rule_row(
     if rule.options().is_empty() {
         let row = adw::SwitchRow::builder()
             .title(glib::markup_escape_text(rule.name()))
-            .subtitle(glib::markup_escape_text(rule.description()))
+            .tooltip_text(rule.description())
             .active(enabled)
             .build();
         row.set_widget_name(id);
@@ -199,7 +195,7 @@ fn rule_row(
     }
     let row = adw::ExpanderRow::builder()
         .title(glib::markup_escape_text(rule.name()))
-        .subtitle(glib::markup_escape_text(rule.description()))
+        .tooltip_text(rule.description())
         .show_enable_switch(true)
         .enable_expansion(enabled)
         .build();
@@ -235,21 +231,23 @@ fn option_row(
         }
     };
     let title = glib::markup_escape_text(spec.name);
-    let subtitle = glib::markup_escape_text(spec.description);
+    // Descriptions are tooltips: subtitles are kept for Igneous's own
+    // settings.
+    let tooltip = (!spec.description.is_empty()).then_some(spec.description);
     match &spec.kind {
         OptionKind::Bool(_) => {
             let row = adw::SwitchRow::builder()
                 .title(title)
-                .subtitle(subtitle)
                 .active(value.as_bool().unwrap_or(false))
                 .build();
+            row.set_tooltip_text(tooltip);
             row.connect_active_notify(move |row| save(Value::Bool(row.is_active())));
             row.upcast()
         }
         OptionKind::Number(_) => {
             let row = adw::SpinRow::with_range(0.0, 10_000.0, 1.0);
             row.set_title(&title);
-            row.set_subtitle(&subtitle);
+            row.set_tooltip_text(tooltip);
             row.set_value(value.as_f64().unwrap_or(0.0));
             row.connect_value_notify(move |row| {
                 if let Some(n) = serde_json::Number::from_f64(row.value()) {
@@ -261,9 +259,9 @@ fn option_row(
         OptionKind::Choice { choices, .. } => {
             let row = adw::ComboRow::builder()
                 .title(title)
-                .subtitle(subtitle)
                 .model(&gtk::StringList::new(choices))
                 .build();
+            row.set_tooltip_text(tooltip);
             let current = value.as_str().unwrap_or_default();
             if let Some(i) = choices.iter().position(|c| *c == current) {
                 row.set_selected(i as u32);
@@ -291,9 +289,7 @@ fn option_row(
                 .text(text)
                 .show_apply_button(true)
                 .build();
-            if !spec.description.is_empty() {
-                row.set_tooltip_text(Some(spec.description));
-            }
+            row.set_tooltip_text(tooltip);
             row.connect_apply(move |row| {
                 let text = row.text().to_string();
                 save(if list {

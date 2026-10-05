@@ -10,40 +10,24 @@ use crate::window::Window;
 
 pub fn group(window: &Window, dialog: &adw::PreferencesDialog) -> adw::PreferencesGroup {
     let sync = window.sync().clone();
+    let group = adw::PreferencesGroup::builder().title("Git Sync").build();
     if !sync.is_available() {
-        return adw::PreferencesGroup::builder()
-            .title("Git Sync")
-            .description(
-                "This vault isn’t in a Git repository. To sync it, make it one \
-                 (for example with “git init” and “git remote add”), then reopen the vault.",
-            )
-            .build();
+        group.add(
+            &adw::ActionRow::builder()
+                .title("Not a Git Repository")
+                .subtitle("Run “git init” and add a remote, then reopen the vault")
+                .build(),
+        );
+        return group;
     }
     let settings = sync.settings();
-    let group = adw::PreferencesGroup::builder()
-        .title("Git Sync")
-        .description(
-            "Saved with this vault, in .igneous/git.json. Commit messages fill in {{date}}, \
-             {{hostname}}, {{numFiles}} and {{files}}; the date format uses Moment.js tokens, \
-             such as YYYY-MM-DD HH:mm.",
-        )
-        .build();
 
     let enabled = adw::SwitchRow::builder()
         .title("Sync Automatically")
-        .subtitle("Commit, pull and push on a schedule")
         .active(settings.enabled)
         .build();
-    let sync_every = minutes_row(
-        "Commit and Sync Every",
-        "Minutes; 0 turns it off",
-        settings.sync_interval,
-    );
-    let pull_every = minutes_row(
-        "Pull Every",
-        "Minutes; 0 turns it off",
-        settings.pull_interval,
-    );
+    let sync_every = minutes_row("Commit and Sync Every (Minutes)", settings.sync_interval);
+    let pull_every = minutes_row("Pull Every (Minutes)", settings.pull_interval);
     let pull_on_open = adw::SwitchRow::builder()
         .title("Pull When the Vault Opens")
         .active(settings.pull_on_open)
@@ -74,11 +58,13 @@ pub fn group(window: &Window, dialog: &adw::PreferencesDialog) -> adw::Preferenc
         .title("Commit Message")
         .text(&settings.commit_message)
         .show_apply_button(true)
+        .tooltip_text("{{date}}, {{hostname}}, {{numFiles}} and {{files}} are filled in")
         .build();
     let date_format = adw::EntryRow::builder()
         .title("Commit Message Date Format")
         .text(&settings.date_format)
         .show_apply_button(true)
+        .tooltip_text("Moment.js tokens, such as YYYY-MM-DD HH:mm")
         .build();
     group.add(&enabled);
     group.add(&sync_every);
@@ -146,10 +132,10 @@ pub fn group(window: &Window, dialog: &adw::PreferencesDialog) -> adw::Preferenc
     group
 }
 
-fn minutes_row(title: &str, subtitle: &str, value: u32) -> adw::SpinRow {
+fn minutes_row(title: &str, value: u32) -> adw::SpinRow {
     let row = adw::SpinRow::with_range(0.0, 1440.0, 1.0);
     row.set_title(title);
-    row.set_subtitle(subtitle);
+    row.set_tooltip_text(Some("0 turns it off"));
     row.set_value(f64::from(value));
     row
 }

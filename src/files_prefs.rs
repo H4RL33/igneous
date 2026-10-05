@@ -74,10 +74,7 @@ pub fn page(
         .build();
     let settings = window.ctx().settings.borrow().clone();
 
-    let creating = adw::PreferencesGroup::builder()
-        .title("New Files")
-        .description("Saved with this vault")
-        .build();
+    let creating = adw::PreferencesGroup::builder().title("New Files").build();
     let notes = LocationRows::new("New Notes Go In", &settings.files.new_note_location);
     let attachments = LocationRows::new(
         "Pasted and Dropped Files Go In",
@@ -110,23 +107,22 @@ pub fn page(
     let links = adw::PreferencesGroup::builder().title("Links").build();
     let update = adw::SwitchRow::builder()
         .title("Update Links When Renaming")
-        .subtitle("Rewrite links to a note or folder when it’s renamed or moved")
         .active(settings.links.update_on_rename)
         .build();
     links.add(&update);
 
     let hiding = adw::PreferencesGroup::builder()
         .title("Excluded Files")
-        .description(
-            "Paths or patterns (such as Archive/ or *.tmp), separated by commas, hidden from \
-             the file tree, search, the graph and the index. Dot-folders such as .obsidian are \
-             always hidden. Takes effect when the vault is opened again.",
-        )
         .build();
     let excluded = adw::EntryRow::builder()
         .title("Excluded")
         .text(settings.files.excluded.join(", "))
         .show_apply_button(true)
+        .tooltip_text(
+            "Paths or patterns (such as Archive/ or *.tmp), separated by commas, hidden from \
+             the file tree, search, the graph and the index. Dot-folders such as .obsidian are \
+             always hidden. Takes effect when the vault is opened again.",
+        )
         .build();
     hiding.add(&excluded);
 

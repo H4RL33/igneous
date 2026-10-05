@@ -16,20 +16,16 @@ pub fn fill(page: &adw::PreferencesPage, window: &Window, dialog: &adw::Preferen
     let editor = window.ctx().settings.borrow().editor.clone();
     let readable = window.readable_line_length();
 
-    let switch = |title: &str, subtitle: &str, active: bool| {
+    let switch = |title: &str, active: bool| {
         adw::SwitchRow::builder()
             .title(title)
-            .subtitle(subtitle)
             .active(active)
             .build()
     };
 
     page.add(&text_group(window, dialog, readable));
 
-    let opening = adw::PreferencesGroup::builder()
-        .title("Notes")
-        .description("Saved with this vault")
-        .build();
+    let opening = adw::PreferencesGroup::builder().title("Notes").build();
     let mode = adw::ComboRow::builder()
         .title("Open Notes In")
         .model(&gtk::StringList::new(&[
@@ -43,43 +39,20 @@ pub fn fill(page: &adw::PreferencesPage, window: &Window, dialog: &adw::Preferen
             EditorMode::Reading => 2,
         })
         .build();
-    let numbers = switch("Line Numbers in Source Mode", "", editor.show_line_numbers);
-    let mentions = switch(
-        "Linked Mentions at the End",
-        "List the notes linking to a note below its text",
-        editor.backlinks_in_document,
-    );
+    let numbers = switch("Line Numbers in Source Mode", editor.show_line_numbers);
+    let mentions = switch("Linked Mentions at the End", editor.backlinks_in_document);
     opening.add(&mode);
     opening.add(&numbers);
     opening.add(&mentions);
 
     let typing = adw::PreferencesGroup::builder().title("Typing").build();
-    let vim = switch(
-        "Vim Mode",
-        "Vim keybindings, with :w to save",
-        editor.vim_mode,
-    );
-    let spellcheck = switch(
-        "Check Spelling",
-        "In the desktop’s language; right-click a word for corrections",
-        editor.spellcheck,
-    );
-    let lists = switch(
-        "Smart Lists",
-        "Enter continues lists and quotes; Tab and Shift+Tab indent list items",
-        editor.smart_lists,
-    );
-    let brackets = switch("Pair Brackets", "", editor.auto_pair_brackets);
-    let markers = switch(
-        "Wrap Selections in Markdown",
-        "Typing * _ ` = or ~ with text selected wraps it",
-        editor.auto_pair_markdown,
-    );
-    let tabs = switch(
-        "Indent With Tabs",
-        "As Obsidian does",
-        editor.indent_with_tabs,
-    );
+    let vim = switch("Vim Mode", editor.vim_mode);
+    let spellcheck = switch("Check Spelling", editor.spellcheck);
+    let lists = switch("Smart Lists", editor.smart_lists);
+    let brackets = switch("Pair Brackets", editor.auto_pair_brackets);
+    let markers = switch("Wrap Selections in Markdown", editor.auto_pair_markdown);
+    markers.set_tooltip_text(Some("Typing * _ ` = or ~ with text selected wraps it"));
+    let tabs = switch("Indent With Tabs", editor.indent_with_tabs);
     let tab_width = adw::SpinRow::with_range(1.0, 8.0, 1.0);
     tab_width.set_title("Tab Width");
     tab_width.set_value(f64::from(editor.tab_size));
@@ -88,14 +61,10 @@ pub fn fill(page: &adw::PreferencesPage, window: &Window, dialog: &adw::Preferen
     }
     typing.add(&tab_width);
 
-    let saving = adw::PreferencesGroup::builder()
-        .title("Saving")
-        .description(
-            "Notes save themselves shortly after you stop typing, and when you switch away",
-        )
-        .build();
+    let saving = adw::PreferencesGroup::builder().title("Saving").build();
     let delay = adw::SpinRow::with_range(0.5, 30.0, 0.5);
     delay.set_title("Save After (Seconds)");
+    delay.set_subtitle("Notes save themselves once you stop typing");
     delay.set_digits(1);
     delay.set_value(f64::from(editor.autosave_delay_ms) / 1000.0);
     saving.add(&delay);
@@ -243,18 +212,12 @@ fn text_group(
     let style = window.text_style();
     let (document_family, document_size) = desktop_font(true);
     let (monospace_family, _) = desktop_font(false);
-    let group = adw::PreferencesGroup::builder()
-        .title("Text")
-        .description("Saved with this vault")
-        .build();
+    let group = adw::PreferencesGroup::builder().title("Text").build();
     // Set while a row is changed to match a reset, so it isn't saved as a
     // choice.
     let quiet = Rc::new(Cell::new(false));
 
-    let font = adw::ActionRow::builder()
-        .title("Font")
-        .subtitle("Headings and other text are sized from the base size")
-        .build();
+    let font = adw::ActionRow::builder().title("Font").build();
     let font_button = family_button(style.family.as_deref().unwrap_or(&document_family), false);
     let font_reset = reset_button("Use the Desktop’s Document Font");
     font_reset.set_visible(style.family.is_some());
@@ -263,18 +226,14 @@ fn text_group(
     font.set_activatable_widget(Some(&font_button));
 
     let size = adw::SpinRow::with_range(6.0, 72.0, 0.5);
-    size.set_title("Base Size");
-    size.set_subtitle("Points");
+    size.set_title("Font Size (Points)");
     size.set_digits(1);
     size.set_value(style.size.unwrap_or(document_size));
     let size_reset = reset_button("Use the Desktop’s Document Font Size");
     size_reset.set_visible(style.size.is_some());
     size.add_suffix(&size_reset);
 
-    let monospace = adw::ActionRow::builder()
-        .title("Monospace Font")
-        .subtitle("Code, math source and frontmatter")
-        .build();
+    let monospace = adw::ActionRow::builder().title("Monospace Font").build();
     let monospace_button = family_button(
         style.monospace.as_deref().unwrap_or(&monospace_family),
         true,
@@ -287,12 +246,11 @@ fn text_group(
 
     let readable_row = adw::SwitchRow::builder()
         .title("Readable Line Length")
-        .subtitle("Keep the text column narrow on wide windows")
         .active(readable)
         .build();
     let width = adw::SpinRow::with_range(320.0, 2400.0, 20.0);
-    width.set_title("Text Width");
-    width.set_subtitle("Pixels");
+    width.set_title("Text Width (Pixels)");
+    width.set_subtitle("How wide readable line length keeps the text");
     width.set_value(f64::from(
         style
             .line_width
