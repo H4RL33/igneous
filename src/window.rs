@@ -7,7 +7,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use adw::{prelude::*, subclass::prelude::*};
-use gtk::{gio, glib};
+use gtk::{gio, glib, graphene};
 use igneous_core::fs::{self as corefs, Expect};
 use igneous_core::settings::{
     self as vault_settings, Appearance, InspectorView, Location, SidebarPane, TabKind, TabState,
@@ -1841,14 +1841,35 @@ impl Window {
                 glib::ControlFlow::Continue
             }
         ));
+        // The drag is the overlay's, which doesn't move: offsets from the
+        // handle, which follows the edge it's dragging, would shrink as it
+        // moved and the sidebar would jitter. It only starts on the handle.
         let drag = gtk::GestureDrag::new();
-        let start = Rc::new(Cell::new(0));
+        // The width when the drag began, or None for a drag that didn't start
+        // on the handle.
+        let start: Rc<Cell<Option<i32>>> = Rc::default();
         drag.connect_drag_begin(glib::clone!(
             #[weak]
             split,
+            #[weak]
+            handle,
+            #[weak]
+            overlay,
             #[strong]
             start,
-            move |_, _, _| start.set(split.min_sidebar_width() as i32)
+            move |drag, x, y| {
+                let on_handle = handle.can_target()
+                    && handle.compute_bounds(&overlay).is_some_and(|b| {
+                        b.contains_point(&graphene::Point::new(x as f32, y as f32))
+                    });
+                if on_handle {
+                    drag.set_state(gtk::EventSequenceState::Claimed);
+                    start.set(Some(split.min_sidebar_width() as i32));
+                } else {
+                    start.set(None);
+                    drag.set_state(gtk::EventSequenceState::Denied);
+                }
+            }
         ));
         drag.connect_drag_update(glib::clone!(
             #[weak]
@@ -1856,8 +1877,11 @@ impl Window {
             #[strong]
             start,
             move |_, dx, _| {
+                let Some(from) = start.get() else {
+                    return;
+                };
                 let dx = dx.round() as i32;
-                let wanted = start.get() + if end { -dx } else { dx };
+                let wanted = from + if end { -dx } else { dx };
                 // Never so wide that the content can't fit beside it.
                 let content = split
                     .content()
@@ -1869,9 +1893,15 @@ impl Window {
         drag.connect_drag_end(glib::clone!(
             #[weak(rename_to = window)]
             self,
-            move |_, _, _| window.schedule_workspace_save()
+            #[strong]
+            start,
+            move |_, _, _| {
+                if start.take().is_some() {
+                    window.schedule_workspace_save();
+                }
+            }
         ));
-        handle.add_controller(drag);
+        overlay.add_controller(drag);
     }
 
     // --- workspace -------------------------------------------------------------

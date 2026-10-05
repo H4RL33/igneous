@@ -218,9 +218,9 @@ async fn rows_in_the_panes_open_what_they_show() {
     window.close();
 }
 
-/// The sidebar's resize handle: the widget with the resize cursor nearest
-/// the start (`end`: the end) of the window.
-fn resize_handle(root: &gtk::Widget, label: &str) -> gtk::Widget {
+/// The sidebar's (`"end"`: the inspector's) resize handle: the widget with
+/// the resize cursor at that side.
+fn resize_handle(root: &gtk::Widget, side: &str) -> gtk::Widget {
     fn all(w: &gtk::Widget, out: &mut Vec<gtk::Widget>) {
         out.push(w.clone());
         let mut c = w.first_child();
@@ -231,21 +231,37 @@ fn resize_handle(root: &gtk::Widget, label: &str) -> gtk::Widget {
     }
     let mut widgets = Vec::new();
     all(root, &mut widgets);
+    let align = if side == "end" {
+        gtk::Align::End
+    } else {
+        gtk::Align::Start
+    };
     widgets
         .into_iter()
-        .filter(|w| w.cursor().and_then(|c| c.name()).as_deref() == Some("col-resize"))
         .find(|w| {
-            w.observe_controllers()
-                .into_iter()
-                .any(|c| c.is_ok_and(|c| c.is::<gtk::GestureDrag>()))
-                && w.halign()
-                    == if label == "end" {
-                        gtk::Align::End
-                    } else {
-                        gtk::Align::Start
-                    }
+            w.cursor().and_then(|c| c.name()).as_deref() == Some("col-resize")
+                && w.halign() == align
         })
         .expect("a resize handle")
+}
+
+/// Drags a sidebar's handle by `dx`, as the pointer would: the drag belongs
+/// to the overlay around the handle and starts on the handle.
+fn drag_handle(handle: &gtk::Widget, dx: f64) {
+    let overlay = handle.parent().unwrap();
+    let drag = overlay
+        .observe_controllers()
+        .into_iter()
+        .find_map(|c| c.ok().and_downcast::<gtk::GestureDrag>())
+        .unwrap();
+    let bounds = handle.compute_bounds(&overlay).unwrap();
+    let (x, y) = (
+        f64::from(bounds.x() + bounds.width() / 2.0),
+        f64::from(bounds.y() + bounds.height() / 2.0),
+    );
+    drag.emit_by_name::<()>("drag-begin", &[&x, &y]);
+    drag.emit_by_name::<()>("drag-update", &[&dx, &0.0f64]);
+    drag.emit_by_name::<()>("drag-end", &[&dx, &0.0f64]);
 }
 
 /// Both sidebars keep the width they're dragged to, within limits, and it's
@@ -268,28 +284,13 @@ async fn sidebars_resize_and_remember_their_width() {
     assert_eq!(workspace.inspector.width, 240);
 
     // Dragging the sidebar's handle 100 pixels outwards widens it.
-    let handle = resize_handle(window.upcast_ref(), "start");
-    let drag = handle
-        .observe_controllers()
-        .into_iter()
-        .find_map(|c| c.ok().and_downcast::<gtk::GestureDrag>())
-        .unwrap();
-    drag.emit_by_name::<()>("drag-begin", &[&0.0f64, &0.0f64]);
-    drag.emit_by_name::<()>("drag-update", &[&100.0f64, &0.0f64]);
-    drag.emit_by_name::<()>("drag-end", &[&100.0f64, &0.0f64]);
+    drag_handle(&resize_handle(window.upcast_ref(), "start"), 100.0);
     assert_eq!(window.workspace().sidebar.width, 460);
     // And the inspector's, dragged left, widens it too.
     let handle = resize_handle(window.upcast_ref(), "end");
-    let drag = handle
-        .observe_controllers()
-        .into_iter()
-        .find_map(|c| c.ok().and_downcast::<gtk::GestureDrag>())
-        .unwrap();
-    drag.emit_by_name::<()>("drag-begin", &[&0.0f64, &0.0f64]);
-    drag.emit_by_name::<()>("drag-update", &[&-60.0f64, &0.0f64]);
-    drag.emit_by_name::<()>("drag-end", &[&-60.0f64, &0.0f64]);
+    drag_handle(&handle, -60.0);
     assert_eq!(window.workspace().inspector.width, 300);
-    // The sidebar is laid out at that width.
+    // The handle follows the inspector's edge.
     assert!(until(2000, || handle.margin_end() == 300 - 3).await);
 
     window.save_workspace();

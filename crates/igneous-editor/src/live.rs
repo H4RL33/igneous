@@ -134,9 +134,6 @@ impl NoteView {
         ));
         self.add_tick_callback(|view, _| {
             let view = view.downcast_ref::<NoteView>().unwrap();
-            if view.width() != view.imp().last_width.get() {
-                view.schedule_relayout();
-            }
             view.place_overlays();
             glib::ControlFlow::Continue
         });
@@ -1334,10 +1331,10 @@ impl NoteView {
         }
     }
 
-    /// Updates the margins and the space reserved for block widgets before
-    /// the next frame. Doing either during a frame changes the text's
-    /// layout while GTK is laying the window out, and GTK then skips
-    /// drawing the note for that frame.
+    /// Updates the space reserved for block widgets before the next frame.
+    /// Doing it during a frame changes the text's layout while GTK is
+    /// laying the window out, and GTK then skips drawing the note for that
+    /// frame. (Margins are set as the view is allocated: see `view.rs`.)
     fn schedule_relayout(&self) {
         if self.imp().relayout_pending.replace(true) {
             return;
@@ -1353,7 +1350,6 @@ impl NoteView {
                 glib::ControlFlow::Break,
                 move || {
                     view.imp().relayout_pending.set(false);
-                    view.update_margins();
                     if let Ok(mut st) = view.imp().state.try_borrow_mut() {
                         view.reserve_space(&mut st);
                     }

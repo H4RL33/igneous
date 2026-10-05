@@ -142,3 +142,10 @@ textview .fold-toggle.folded {
   color: var(--accent-fg-color);
   -gtk-icon-size: 12px;
 }
+
+/* The selected tab of a track (the sidebar's and inspector's switchers,
+   the icon picker's categories) takes the desktop's accent colour. */
+toggle-group:not(.osd) {
+  --active-toggle-bg-color: var(--accent-bg-color);
+  --active-toggle-fg-color: var(--accent-fg-color);
+}

@@ -160,7 +160,17 @@ mod imp {
         }
     }
 
-    impl WidgetImpl for NoteView {}
+    impl WidgetImpl for NoteView {
+        fn size_allocate(&self, width: i32, height: i32, baseline: i32) {
+            // Margins for the new width before the text is laid out at it:
+            // setting them later wraps the text at the wrong width for a
+            // frame, then again at the right one, which made resizing a
+            // sidebar stutter. Margins only invalidate the layout, which
+            // the allocation below validates anyway.
+            self.obj().update_margins_for(width);
+            self.parent_size_allocate(width, height, baseline);
+        }
+    }
 
     impl TextViewImpl for NoteView {
         fn snapshot_layer(&self, layer: gtk::TextViewLayer, snapshot: gtk::Snapshot) {
@@ -412,7 +422,11 @@ impl NoteView {
 
     /// Keeps the text column readable: grows the margins on wide windows.
     pub(crate) fn update_margins(&self) {
-        let width = self.width();
+        self.update_margins_for(self.width());
+    }
+
+    /// The margins for a view `width` pixels wide.
+    fn update_margins_for(&self, width: i32) {
         if width == self.imp().last_width.get() {
             return;
         }
