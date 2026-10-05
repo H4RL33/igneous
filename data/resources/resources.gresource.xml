@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
-  <gresource prefix="/dev/h4rl3y/igneous">
+  <gresource prefix="/io/github/h4rl33/igneous">
     <file preprocess="xml-stripblanks">window.ui</file>
     <file preprocess="xml-stripblanks">note-page.ui</file>
     <file preprocess="xml-stripblanks">vault-picker.ui</file>
@@ -8,9 +8,9 @@
     <file preprocess="xml-stripblanks">preferences.ui</file>
     <file preprocess="xml-stripblanks">shortcuts-dialog.ui</file>
     <file>igneous.css</file>
-    <file alias="icons/scalable/apps/dev.h4rl3y.igneous.svg">icons/hicolor/scalable/apps/dev.h4rl3y.igneous.svg</file>
-    <file alias="icons/scalable/apps/dev.h4rl3y.igneous.Devel.svg">icons/hicolor/scalable/apps/dev.h4rl3y.igneous.svg</file>
+    <file alias="icons/scalable/apps/io.github.h4rl33.igneous.svg">icons/hicolor/scalable/apps/io.github.h4rl33.igneous.svg</file>
+    <file alias="icons/scalable/apps/io.github.h4rl33.igneous.Devel.svg">icons/hicolor/scalable/apps/io.github.h4rl33.igneous.svg</file>
     <file alias="icons/scalable/actions/tag-symbolic.svg">icons/symbolic/tag-symbolic.svg</file>
-    <file alias="icons/scalable/apps/dev.h4rl3y.igneous-symbolic.svg">icons/hicolor/symbolic/apps/dev.h4rl3y.igneous-symbolic.svg</file>
+    <file alias="icons/scalable/apps/io.github.h4rl33.igneous-symbolic.svg">icons/hicolor/symbolic/apps/io.github.h4rl33.igneous-symbolic.svg</file>
   </gresource>
 </gresources>

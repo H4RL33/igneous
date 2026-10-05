@@ -17,147 +17,147 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: data/dev.h4rl3y.igneous.desktop.in:2
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:6
+#: data/io.github.h4rl33.igneous.desktop.in:2
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:6
 #: data/resources/ui/vault-picker.blp:5 data/resources/ui/window.blp:133
 msgid "Igneous"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.desktop.in:3
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:7
+#: data/io.github.h4rl33.igneous.desktop.in:3
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:7
 msgid "Read and edit Markdown vaults"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.desktop.in:9
+#: data/io.github.h4rl33.igneous.desktop.in:9
 msgid "notes;markdown;obsidian;vault;wiki;knowledge;"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.gschema.xml.in:6
+#: data/io.github.h4rl33.igneous.gschema.xml.in:6
 msgid "Window width"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.gschema.xml.in:10
+#: data/io.github.h4rl33.igneous.gschema.xml.in:10
 msgid "Window height"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.gschema.xml.in:14
+#: data/io.github.h4rl33.igneous.gschema.xml.in:14
 msgid "Whether the window is maximized"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.gschema.xml.in:18
+#: data/io.github.h4rl33.igneous.gschema.xml.in:18
 msgid "Editor theme for vaults that haven't chosen one"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.gschema.xml.in:19
+#: data/io.github.h4rl33.igneous.gschema.xml.in:19
 msgid "Set to the theme most recently picked in any vault."
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.gschema.xml.in:23
+#: data/io.github.h4rl33.igneous.gschema.xml.in:23
 msgid "Recently opened vaults, most recent first"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.gschema.xml.in:27
+#: data/io.github.h4rl33.igneous.gschema.xml.in:27
 msgid "Vaults that were open when Igneous last quit"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.gschema.xml.in:28
+#: data/io.github.h4rl33.igneous.gschema.xml.in:28
 msgid "These are reopened when Igneous starts."
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:9
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:9
 msgid ""
 "Igneous opens any folder of Markdown notes, including Obsidian vaults, and "
 "edits it in place. Notes stay plain files that work in other apps, and "
 "everything Igneous keeps for a vault lives in its own folder inside it."
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:15
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:15
 msgid ""
 "Live Preview: formatted as you type, with the Markdown shown again around "
 "the cursor; Source and Reading modes too"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:16
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:16
 msgid ""
 "Wikilinks, embeds, callouts, tasks, tables, highlights, tags, footnotes and "
 "display math"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:17
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:17
 msgid ""
 "Backlinks, unlinked mentions, an outline and a graph of how notes connect"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:18
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:18
 msgid "Renaming a note updates every link to it"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:19
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:19
 msgid ""
 "Properties edited in place, searched with Obsidian’s search syntax and "
 "listed in Bases tables"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:20
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:20
 msgid ""
 "Git sync built in: commit, pull and push on a schedule, with conflicts "
 "resolved in the editor"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:21
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:21
 msgid "A linter with the rules of obsidian-linter"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:22
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:22
 msgid "Editor themes, including Catppuccin, Dracula, Gruvbox, Nord and more"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:38
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:38
 msgid "Notes formatted as you type"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:42
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:42
 msgid "Backlinks and editor themes"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:46
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:46
 msgid "The graph of linked notes"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:50
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:50
 msgid "Properties as tables with Bases"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:54
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:54
 msgid "Changes ready to commit and sync"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:73
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:73
 msgid "Markdown"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:74
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:74
 #: data/resources/ui/shortcuts-dialog.blp:55
 msgid "Notes"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:75
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:75
 msgid "Obsidian"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:76
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:76
 msgid "Vault"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:77
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:77
 msgid "Wiki"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:78
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:78
 msgid "Zettelkasten"
 msgstr ""
 
-#: data/dev.h4rl3y.igneous.metainfo.xml.in:83
+#: data/io.github.h4rl33.igneous.metainfo.xml.in:83
 msgid ""
 "The first release, with Live Preview, links and backlinks, search, Bases, "
 "Git sync, the linter and the graph."

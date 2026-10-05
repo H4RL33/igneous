@@ -9,12 +9,11 @@ project(
 gnome = import('gnome')
 i18n = import('i18n')
 
-base_id = 'dev.h4rl3y.igneous'
+base_id = 'io.github.h4rl33.igneous'
 
-# PLACEHOLDER: set to the published repository before the first release. The
-# metainfo's homepage, issue tracker and screenshot links are built from it
-# (screenshots are data/screenshots/*.png, served raw from the main branch).
-project_url = 'https://igneous.invalid'
+# The metainfo's homepage, issue tracker and screenshot links are built from
+# it (screenshots are data/screenshots/*.png, served raw from the main branch).
+project_url = 'https://github.com/H4RL33/igneous'
 screenshots_url = project_url / 'raw' / 'main' / 'data' / 'screenshots'
 
 dependency('gtk4', version: '>= 4.22')

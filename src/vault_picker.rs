@@ -12,7 +12,7 @@ mod imp {
     use super::*;
 
     #[derive(Default, gtk::CompositeTemplate)]
-    #[template(resource = "/dev/h4rl3y/igneous/vault-picker.ui")]
+    #[template(resource = "/io/github/h4rl33/igneous/vault-picker.ui")]
     pub struct VaultPicker {
         #[template_child]
         pub toast_overlay: TemplateChild<adw::ToastOverlay>,

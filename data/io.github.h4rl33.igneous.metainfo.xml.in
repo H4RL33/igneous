@@ -22,7 +22,7 @@
       <li>Editor themes, including Catppuccin, Dracula, Gruvbox, Nord and more</li>
     </ul>
   </description>
-  <developer id="dev.h4rl3y">
+  <developer id="io.github.h4rl33">
     <name translate="no">Harley Welsh</name>
   </developer>
   <launchable type="desktop-id">@APP_ID@.desktop</launchable>

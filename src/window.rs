@@ -47,7 +47,7 @@ pub(crate) mod imp {
     use super::*;
 
     #[derive(Default, gtk::CompositeTemplate)]
-    #[template(resource = "/dev/h4rl3y/igneous/window.ui")]
+    #[template(resource = "/io/github/h4rl33/igneous/window.ui")]
     pub struct Window {
         #[template_child]
         pub toast_overlay: TemplateChild<adw::ToastOverlay>,

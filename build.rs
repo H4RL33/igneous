@@ -7,7 +7,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const BASE_ID: &str = "dev.h4rl3y.igneous";
+const BASE_ID: &str = "io.github.h4rl33.igneous";
 
 fn main() {
     let out = PathBuf::from(std::env::var("OUT_DIR").unwrap());
@@ -41,7 +41,7 @@ fn main() {
              pub const GETTEXT_PACKAGE: &str = \"igneous\";\n\
              /// Where compiled translations are installed.\n\
              pub const LOCALEDIR: &str = {localedir:?};\n\
-             pub const RESOURCE_BASE: &str = \"/dev/h4rl3y/igneous\";\n\
+             pub const RESOURCE_BASE: &str = \"/io/github/h4rl33/igneous\";\n\
              /// Compiled schema for runs that aren't installed (empty when\n\
              /// built to be installed).\n\
              pub const SCHEMA_DIR: &str = {schema_dir:?};\n",
@@ -129,7 +129,7 @@ fn blueprint_compiler() -> Command {
 
 fn compile_schema(out: &Path, app_id: &str) {
     std::fs::create_dir_all(out).unwrap();
-    let schema = std::fs::read_to_string("data/dev.h4rl3y.igneous.gschema.xml.in")
+    let schema = std::fs::read_to_string("data/io.github.h4rl33.igneous.gschema.xml.in")
         .unwrap()
         .replace("@APP_ID@", app_id)
         .replace("@SCHEMA_PATH@", &format!("/{}/", app_id.replace('.', "/")));

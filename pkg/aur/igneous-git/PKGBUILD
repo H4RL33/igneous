@@ -1,7 +1,6 @@
 # Maintainer: Harley Welsh <git@harleywelsh.com>
 
-# PLACEHOLDER: the repository's URL, once Igneous is published.
-_repo='https://igneous.invalid/igneous.git'
+_repo='https://github.com/H4RL33/igneous.git'
 
 pkgname=igneous-git
 _pkgname=igneous

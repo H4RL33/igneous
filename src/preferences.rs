@@ -17,7 +17,7 @@ mod imp {
     use super::*;
 
     #[derive(Default, gtk::CompositeTemplate)]
-    #[template(resource = "/dev/h4rl3y/igneous/preferences.ui")]
+    #[template(resource = "/io/github/h4rl33/igneous/preferences.ui")]
     pub struct Preferences {
         #[template_child]
         pub editor_page: TemplateChild<adw::PreferencesPage>,

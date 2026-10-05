@@ -1,8 +1,7 @@
 # Maintainer: Harley Welsh <git@harleywelsh.com>
 
-# PLACEHOLDER: the repository's URL, once Igneous is published. Releases are
-# built from their Git tags (vX.Y.Z), which works whatever the forge.
-_repo='https://igneous.invalid/igneous.git'
+# Releases are built from their Git tags (vX.Y.Z).
+_repo='https://github.com/H4RL33/igneous.git'
 
 pkgname=igneous
 pkgver=0.1.0

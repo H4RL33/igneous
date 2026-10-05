@@ -45,7 +45,7 @@ mod imp {
     use super::*;
 
     #[derive(Default, gtk::CompositeTemplate)]
-    #[template(resource = "/dev/h4rl3y/igneous/note-page.ui")]
+    #[template(resource = "/io/github/h4rl33/igneous/note-page.ui")]
     pub struct NotePage {
         #[template_child]
         pub banner: TemplateChild<adw::Banner>,

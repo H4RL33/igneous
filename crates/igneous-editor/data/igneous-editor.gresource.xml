@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
-  <gresource prefix="/dev/h4rl3y/igneous/editor">
+  <gresource prefix="/io/github/h4rl33/igneous/editor">
     <file preprocess="xml-stripblanks">language-specs/igneous-markdown.lang</file>
   </gresource>
 </gresources>

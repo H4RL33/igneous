@@ -1,8 +1,8 @@
 # Files with translatable strings, relative to the source root.
 # Rust strings aren't marked for translation yet.
-data/dev.h4rl3y.igneous.desktop.in
-data/dev.h4rl3y.igneous.gschema.xml.in
-data/dev.h4rl3y.igneous.metainfo.xml.in
+data/io.github.h4rl33.igneous.desktop.in
+data/io.github.h4rl33.igneous.gschema.xml.in
+data/io.github.h4rl33.igneous.metainfo.xml.in
 data/resources/ui/note-page.blp
 data/resources/ui/preferences.blp
 data/resources/ui/quick-switcher.blp

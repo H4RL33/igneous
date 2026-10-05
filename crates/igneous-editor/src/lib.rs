@@ -39,6 +39,6 @@ pub fn init() {
             .expect("editor resources are valid");
         sourceview::init();
         sourceview::LanguageManager::default()
-            .append_search_path("resource:///dev/h4rl3y/igneous/editor/language-specs");
+            .append_search_path("resource:///io/github/h4rl33/igneous/editor/language-specs");
     });
 }

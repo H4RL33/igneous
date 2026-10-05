@@ -159,7 +159,7 @@ mod imp {
     use super::*;
 
     #[derive(Default, gtk::CompositeTemplate)]
-    #[template(resource = "/dev/h4rl3y/igneous/quick-switcher.ui")]
+    #[template(resource = "/io/github/h4rl33/igneous/quick-switcher.ui")]
     pub struct QuickSwitcher {
         #[template_child]
         pub search_entry: TemplateChild<gtk::SearchEntry>,

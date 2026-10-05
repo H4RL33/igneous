@@ -2,7 +2,7 @@ pkgbase = igneous-git
 	pkgdesc = Read and edit Markdown vaults, including Obsidian vaults, on GNOME (development version)
 	pkgver = 0.1.0.r0.g0000000
 	pkgrel = 1
-	url = https://igneous.invalid/igneous
+	url = https://github.com/H4RL33/igneous
 	arch = x86_64
 	arch = aarch64
 	license = BSD-3-Clause
@@ -24,7 +24,7 @@ pkgbase = igneous-git
 	provides = igneous
 	conflicts = igneous
 	options = !lto
-	source = igneous::git+https://igneous.invalid/igneous.git
+	source = igneous::git+https://github.com/H4RL33/igneous.git
 	sha256sums = SKIP
 
 pkgname = igneous-git

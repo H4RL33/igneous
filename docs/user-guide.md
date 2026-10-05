@@ -200,7 +200,7 @@ Start typing in Preferences to search every setting.
 | `~/.cache/igneous/` | the index and generated style schemes; safe to delete |
 | `~/.local/share/igneous/themes/` | your own editor themes |
 | `~/.local/share/igneous/snapshots/` | file recovery snapshots |
-| GSettings `dev.h4rl3y.igneous` | recent vaults, window size, the default editor theme |
+| GSettings `io.github.h4rl33.igneous` | recent vaults, window size, the default editor theme |
 
 ## Not yet
 

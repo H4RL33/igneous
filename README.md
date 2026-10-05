@@ -15,7 +15,7 @@ meson subprojects download blueprint-compiler
 For development:
 
 ```sh
-cargo run                        # the Devel build, dev.h4rl3y.igneous.Devel
+cargo run                        # the Devel build, io.github.h4rl33.igneous.Devel
 cargo run -- path/to/vault       # open a vault (or a note inside one)
 ```
 

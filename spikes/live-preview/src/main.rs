@@ -121,7 +121,7 @@ fn main() -> glib::ExitCode {
         }
     };
     let app = adw::Application::builder()
-        .application_id("dev.h4rl3y.igneous.Spike")
+        .application_id("io.github.h4rl33.igneous.Spike")
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
     app.connect_activate(move |app| {
