@@ -8,25 +8,79 @@
   <description>
     <p>
       Igneous opens any folder of Markdown notes, including Obsidian vaults, and
-      edits it in place. Notes stay plain files that work in other apps.
+      edits it in place. Notes stay plain files that work in other apps, and
+      everything Igneous keeps for a vault lives in its own folder inside it.
     </p>
+    <ul>
+      <li>Live Preview: formatted as you type, with the Markdown shown again around the cursor; Source and Reading modes too</li>
+      <li>Wikilinks, embeds, callouts, tasks, tables, highlights, tags, footnotes and display math</li>
+      <li>Backlinks, unlinked mentions, an outline and a graph of how notes connect</li>
+      <li>Renaming a note updates every link to it</li>
+      <li>Properties edited in place, searched with Obsidian’s search syntax and listed in Bases tables</li>
+      <li>Git sync built in: commit, pull and push on a schedule, with conflicts resolved in the editor</li>
+      <li>A linter with the rules of obsidian-linter</li>
+      <li>Editor themes, including Catppuccin, Dracula, Gruvbox, Nord and more</li>
+    </ul>
   </description>
   <developer id="dev.h4rl3y">
-    <name>Harley Welsh</name>
+    <name translate="no">Harley Welsh</name>
   </developer>
   <launchable type="desktop-id">@APP_ID@.desktop</launchable>
+  <url type="homepage">@URL@</url>
+  <url type="bugtracker">@URL@/issues</url>
+  <url type="vcs-browser">@URL@</url>
+  <branding>
+    <color type="primary" scheme_preference="light">#ffbe6f</color>
+    <color type="primary" scheme_preference="dark">#63452c</color>
+  </branding>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Notes formatted as you type</caption>
+      <image>@SCREENSHOTS@/live-preview.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Backlinks and editor themes</caption>
+      <image>@SCREENSHOTS@/backlinks-dark.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>The graph of linked notes</caption>
+      <image>@SCREENSHOTS@/graph.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Properties as tables with Bases</caption>
+      <image>@SCREENSHOTS@/bases.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Changes ready to commit and sync</caption>
+      <image>@SCREENSHOTS@/changes.png</image>
+    </screenshot>
+  </screenshots>
   <content_rating type="oars-1.1"/>
   <requires>
     <display_length compare="ge">360</display_length>
   </requires>
-  <supports>
+  <recommends>
     <control>keyboard</control>
+  </recommends>
+  <supports>
     <control>pointing</control>
+    <control>touch</control>
   </supports>
+  <provides>
+    <binary>igneous</binary>
+  </provides>
+  <keywords>
+    <keyword>Markdown</keyword>
+    <keyword>Notes</keyword>
+    <keyword>Obsidian</keyword>
+    <keyword>Vault</keyword>
+    <keyword>Wiki</keyword>
+    <keyword>Zettelkasten</keyword>
+  </keywords>
   <releases>
-    <release version="@VERSION@" date="2026-10-04">
+    <release version="0.1.0" date="2026-10-05">
       <description>
-        <p>Development preview.</p>
+        <p>The first release, with Live Preview, links and backlinks, search, Bases, Git sync, the linter and the graph.</p>
       </description>
     </release>
   </releases>

@@ -27,6 +27,10 @@ meson compile -C _build
 meson install -C _build          # add --skip-subprojects when Blueprint came from the subproject
 ```
 
+On Arch Linux, [`pkg/aur/`](pkg/aur) has the AUR packages: `igneous-git`, built from the repository, and `igneous`, built from release tags. Either builds with `makepkg -si` in its folder.
+
+Translations are in [`po/`](po); see [`po/README.md`](po/README.md) to add one. The screenshots in `data/screenshots/` (used by the metainfo) are regenerated with `build-aux/screenshots.sh`.
+
 ## Testing
 
 ```sh

@@ -1,0 +1,54 @@
+# Maintainer: Harley Welsh <git@harleywelsh.com>
+
+# PLACEHOLDER: the repository's URL, once Igneous is published. Releases are
+# built from their Git tags (vX.Y.Z), which works whatever the forge.
+_repo='https://igneous.invalid/igneous.git'
+
+pkgname=igneous
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Read and edit Markdown vaults, including Obsidian vaults, on GNOME'
+arch=('x86_64' 'aarch64')
+url="${_repo%.git}"
+license=('BSD-3-Clause')
+depends=(
+  'gcc-libs'
+  'git'
+  'glib2'
+  'glibc'
+  'gtk4'
+  'gtksourceview5'
+  'hicolor-icon-theme'
+  'libadwaita'
+  'libspelling'
+)
+makedepends=('blueprint-compiler' 'cargo' 'meson')
+checkdepends=('appstream' 'desktop-file-utils')
+optdepends=('git-crypt: sync vaults encrypted with git-crypt')
+# Bundled C (SQLite) compiled for LTO doesn't link into Rust binaries.
+options=('!lto')
+source=("$pkgname::git+$_repo#tag=v$pkgver")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$pkgname"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  export RUSTUP_TOOLCHAIN=stable
+  # Everything was fetched in prepare(); build() must not use the network.
+  export CARGO_NET_OFFLINE=true
+  arch-meson "$pkgname" build --wrap-mode=nodownload
+  meson compile -C build
+}
+
+check() {
+  meson test -C build --no-rebuild --print-errorlogs
+}
+
+package() {
+  meson install -C build --no-rebuild --skip-subprojects --destdir "$pkgdir"
+  install -Dm644 "$pkgname/LICENSE" -t "$pkgdir/usr/share/licenses/$pkgname"
+}

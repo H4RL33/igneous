@@ -7,8 +7,15 @@ project(
 )
 
 gnome = import('gnome')
+i18n = import('i18n')
 
 base_id = 'dev.h4rl3y.igneous'
+
+# PLACEHOLDER: set to the published repository before the first release. The
+# metainfo's homepage, issue tracker and screenshot links are built from it
+# (screenshots are data/screenshots/*.png, served raw from the main branch).
+project_url = 'https://igneous.invalid'
+screenshots_url = project_url / 'raw' / 'main' / 'data' / 'screenshots'
 
 dependency('gtk4', version: '>= 4.22')
 dependency('libadwaita-1', version: '>= 1.9')
@@ -33,8 +40,10 @@ endif
 prefix = get_option('prefix')
 bindir = prefix / get_option('bindir')
 datadir = prefix / get_option('datadir')
+localedir = prefix / get_option('localedir')
 
 subdir('data')
+subdir('po')
 subdir('src')
 
 gnome.post_install(

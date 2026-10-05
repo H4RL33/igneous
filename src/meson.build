@@ -17,6 +17,8 @@ cargo_env.prepend('PYTHONPATH', meson.project_source_root() / 'subprojects' / 'b
 cargo_env.set('IGNEOUS_APP_ID', application_id)
 cargo_env.set('IGNEOUS_PROFILE', profile)
 cargo_env.set('IGNEOUS_VERSION', version)
+cargo_env.set('IGNEOUS_LOCALEDIR', localedir)
+cargo_env.set('IGNEOUS_INSTALLED', '1')
 
 custom_target(
   'cargo-build',
