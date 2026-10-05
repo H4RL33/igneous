@@ -477,6 +477,42 @@ impl Window {
     /// Shows the icon picker for `path`.
     pub fn icon_dialog(&self, path: VaultPath) {
         let current = self.note_icon(&path);
+        let (name, _) = crate::files::display_name(&path, false);
+        self.icon_picker(
+            &format!("Icon for “{name}”"),
+            current,
+            move |window, icon| {
+                window.set_note_icon(&path, icon);
+            },
+        );
+    }
+
+    /// Shows the icon picker for the property `key`, whose icon shows
+    /// wherever it appears.
+    pub fn property_icon_dialog(&self, key: String) {
+        let current = self.property_names().icon(&key);
+        self.icon_picker(
+            &format!("Icon for “{key}”"),
+            current,
+            move |window, icon| {
+                if let Err(e) = window.property_names().set_icon(&key, icon) {
+                    window.toast(&e);
+                }
+                for note in window.notes() {
+                    note.view().refresh_properties();
+                }
+            },
+        );
+    }
+
+    /// Shows the icon picker, starting at `current`; `choose` gets the icon
+    /// picked, or `None` for Reset to Default.
+    fn icon_picker(
+        &self,
+        title: &str,
+        current: Option<String>,
+        choose: impl Fn(&Window, Option<&str>) + 'static,
+    ) {
         let display = WidgetExt::display(self);
         let theme = gtk::IconTheme::for_display(&display);
         let names = symbolic_icons(&display);
@@ -610,9 +646,8 @@ impl Window {
         toolbar.add_top_bar(&group);
         toolbar.add_bottom_bar(&bottom);
         toolbar.set_content(Some(&content));
-        let (name, _) = crate::files::display_name(&path, false);
         let dialog = adw::Dialog::builder()
-            .title(format!("Icon for “{name}”"))
+            .title(title)
             .content_width(560)
             .content_height(540)
             .child(&toolbar)
@@ -626,7 +661,7 @@ impl Window {
                     crate::gsettings::add_recent_icon(&crate::gsettings::settings(), icon);
                 }
                 if let Some(window) = window.upgrade() {
-                    window.set_note_icon(&path, icon.as_deref());
+                    choose(&window, icon.as_deref());
                 }
                 if let Some(dialog) = dialog.upgrade() {
                     dialog.close();

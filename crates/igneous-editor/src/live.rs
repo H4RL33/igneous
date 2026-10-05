@@ -530,6 +530,16 @@ impl NoteView {
         self.queue_draw();
     }
 
+    /// Throws away the properties so they're built again.
+    pub(crate) fn rebuild_properties(&self) {
+        for overlay in &self.imp().state.borrow().overlays {
+            if overlay.kind == OverlayKind::Properties {
+                overlay.stale.set(true);
+            }
+        }
+        self.queue_draw();
+    }
+
     /// Shows `widget` over the text, in a free slot or a new one.
     fn take_slot(&self, widget: &gtk::Widget, fit: bool) -> crate::slot::Slot {
         let slot = self.imp().free_slots.borrow_mut().pop().unwrap_or_else(|| {
@@ -1369,10 +1379,8 @@ impl NoteView {
             return;
         };
         // Until it's on screen it can't take the focus: try again next frame.
-        if let Some(row) = find_descendant(&widget, &|w| {
-            w.downcast_ref::<adw::ActionRow>()
-                .is_some_and(|row| adw::prelude::PreferencesRowExt::title(row) == "Add Property")
-        }) && row.is_mapped()
+        if let Some(row) = find_descendant(&widget, &|w| w.has_css_class("add-property"))
+            && row.is_mapped()
             && row.grab_focus()
         {
             self.imp().focus_new_property.set(false);
@@ -1795,7 +1803,7 @@ pub(crate) fn keep_clicks(widget: &impl IsA<gtk::Widget>) {
 }
 
 /// The first widget under `widget` that `matches`, depth first.
-fn find_descendant(
+pub(crate) fn find_descendant(
     widget: &gtk::Widget,
     matches: &dyn Fn(&gtk::Widget) -> bool,
 ) -> Option<gtk::Widget> {

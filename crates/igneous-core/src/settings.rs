@@ -1023,13 +1023,17 @@ fn rebased(path: &VaultPath, from: &VaultPath, to: &VaultPath) -> Option<VaultPa
 
 /// Every property name used in the vault, for Add Property's menu, so it
 /// needn't wait on the index. Names are only ever added, when a property is
-/// made in Igneous (along with any the index found since).
+/// made in Igneous (along with any the index found since). Also the icon
+/// chosen for a property, shown wherever it appears.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct PropertyNames {
     #[serde(default = "one")]
     pub version: u32,
     pub names: Vec<String>,
+    /// Property name → symbolic icon name.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub icons: BTreeMap<String, String>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
@@ -1040,6 +1044,7 @@ impl Default for PropertyNames {
         Self {
             version: 1,
             names: Vec::new(),
+            icons: BTreeMap::new(),
             extra: Map::new(),
         }
     }

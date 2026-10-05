@@ -3,9 +3,10 @@
 //! it as notes gain properties. They're kept in `.igneous/properties.json`,
 //! so the menu is complete as soon as a vault opens; the file is written
 //! when a property is made in Igneous, as opening a vault writes nothing.
+//! The file also holds the icon chosen for each property.
 
 use std::cell::RefCell;
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;
 
 use gtk::gio;
@@ -17,6 +18,8 @@ pub struct PropertyNames {
     names: RefCell<Vec<String>>,
     known: RefCell<HashSet<String>>,
     menu: gio::Menu,
+    /// Property name → icon, as last read or written.
+    icons: RefCell<BTreeMap<String, String>>,
 }
 
 impl PropertyNames {
@@ -32,6 +35,7 @@ impl PropertyNames {
             names: RefCell::default(),
             known: RefCell::default(),
             menu: gio::Menu::new(),
+            icons: RefCell::new(file.icons.clone()),
         };
         this.learn(file.names.iter().map(String::as_str));
         this
@@ -72,6 +76,26 @@ impl PropertyNames {
         vault_settings::save(&self.igneous_dir, &file)
             .map_err(|e| format!("Couldn’t save the property names: {e}"))?;
         Ok(count)
+    }
+
+    /// The icon chosen for `name`, if any.
+    pub fn icon(&self, name: &str) -> Option<String> {
+        self.icons.borrow().get(name).cloned()
+    }
+
+    /// Sets the icon for `name`, or goes back to its type's with `None`.
+    pub fn set_icon(&self, name: &str, icon: Option<&str>) -> Result<(), String> {
+        let mut file = vault_settings::load::<NamesFile>(&self.igneous_dir)
+            .map_err(|e| format!("Couldn’t read the property icons: {e}"))?;
+        match icon {
+            Some(icon) => file.icons.insert(name.to_owned(), icon.to_owned()),
+            None => file.icons.remove(name),
+        };
+        file.add(self.names.borrow().iter().map(String::as_str));
+        self.icons.replace(file.icons.clone());
+        vault_settings::save(&self.igneous_dir, &file)
+            .map_err(|e| format!("Couldn’t save the property icons: {e}"))?;
+        Ok(())
     }
 
     /// Notes a property just made in Igneous, saving every name known so

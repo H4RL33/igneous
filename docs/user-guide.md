@@ -70,11 +70,12 @@ Move the cursor into any of these to see and edit its source.
 
 ### Properties
 
-The fields at the top of a note are its YAML frontmatter:
+The fields at the top of a note are its YAML frontmatter, one per line: the property's icon and name on the left, then its value.
 
-- text, lists (tags and aliases too), numbers, checkboxes, and dates with a calendar;
-- each field's menu changes its type for the whole vault, or removes it;
-- **Add Property** adds one. It's there on every note in Live Preview, including notes without properties yet; adding one creates the frontmatter. Click it for the property names used across the vault (those the note has already are greyed out), or **New Property…** to type a new name, then Enter. Typing `---` and Enter on a note's first line starts the properties too, as in Obsidian.
+- Values are text, lists (tags and aliases too), numbers, checkboxes, and dates with a calendar. Text and numbers are saved when you press Enter or leave the field.
+- Click a property's name to change its type or its icon, or to remove it. The type and the icon apply to that property throughout the vault: every note shows the same icon for it (icons are saved in `.igneous/properties.json`).
+- Hovering over a name shows a button to remove the property.
+- **Add Property** adds one. It's there on every note in Live Preview, including notes without properties yet; adding one creates the frontmatter. Click it for the property names used across the vault (those the note has already are greyed out), or **New Property…** to type a new name, then Enter. Escape, or clicking elsewhere, puts Add Property back. Typing `---` and Enter on a note's first line starts the properties too, as in Obsidian.
 - The menu is made once and shared by every note, and gains names as notes gain properties, in Igneous or elsewhere. The names are saved in `.igneous/properties.json` when you make a new property, so the menu is complete as soon as the vault opens; just opening a vault never writes it. Names are only ever added until you click the refresh button at the bottom of the menu (**Refresh Property Names**), which re-reads every note in the vault and remakes the list from the names they use now.
 
 Igneous changes only the property you edit, leaving the rest of the frontmatter, comments included, exactly as written.

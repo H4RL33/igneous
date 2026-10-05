@@ -194,6 +194,16 @@ impl IndexService {
         self.properties.borrow().clone()
     }
 
+    /// The type of the property `key`: the user's choice, or else what the
+    /// catalogue inferred.
+    pub fn property_type(&self, key: &str) -> Option<PropertyType> {
+        if let Some(ty) = self.overrides.borrow().get(key) {
+            return Some(*ty);
+        }
+        let properties = self.properties.borrow();
+        properties.iter().find(|p| p.key == key).map(|p| p.ty)
+    }
+
     /// Sets the user's property types and refreshes the catalogue.
     pub fn set_overrides(self: &Rc<Self>, overrides: BTreeMap<String, PropertyType>) {
         self.overrides.replace(overrides);

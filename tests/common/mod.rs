@@ -130,6 +130,40 @@ pub fn save_png(window: &gtk::Window, out: &str) {
     texture.save_to_png(out).unwrap();
 }
 
+/// How dark the darkest pixel drawn over `widget` is, 0 (white) to 255
+/// (black), from the whole window as it's drawn now.
+#[allow(dead_code)]
+pub fn darkest_in(widget: &gtk::Widget) -> u8 {
+    let window = widget.root().and_downcast::<gtk::Window>().unwrap();
+    let paintable = gtk::WidgetPaintable::new(Some(&window));
+    let snapshot = gtk::Snapshot::new();
+    paintable.snapshot(&snapshot, window.width() as f64, window.height() as f64);
+    let texture = window
+        .renderer()
+        .unwrap()
+        .render_texture(snapshot.to_node().unwrap(), None);
+    let mut downloader = gtk::gdk::TextureDownloader::new(&texture);
+    downloader.set_format(gtk::gdk::MemoryFormat::R8g8b8a8);
+    let (bytes, stride) = downloader.download_bytes();
+    let bounds = widget.compute_bounds(&window).unwrap();
+    let scale = texture.width() as f32 / window.width() as f32;
+    let (x0, y0) = ((bounds.x() * scale) as usize, (bounds.y() * scale) as usize);
+    let (x1, y1) = (
+        ((bounds.x() + bounds.width()) * scale) as usize,
+        ((bounds.y() + bounds.height()) * scale) as usize,
+    );
+    let mut darkest = 0;
+    for y in y0..y1 {
+        for x in x0..x1 {
+            let at = y * stride + x * 4;
+            let lightness =
+                (u16::from(bytes[at]) + u16::from(bytes[at + 1]) + u16::from(bytes[at + 2])) / 3;
+            darkest = darkest.max(255 - lightness as u8);
+        }
+    }
+    darkest
+}
+
 /// Real pointer and keyboard input, through the remote desktop API of the
 /// sealed session's mutter. Events then go through GTK as a person's would,
 /// which `emit_by_name` can't imitate. Windows used with it must be
@@ -187,6 +221,16 @@ impl RemoteInput {
 
     /// Clicks the middle of `widget` (or `x` pixels in from its start).
     pub async fn click(&self, widget: &gtk::Widget, x: Option<f32>) {
+        self.point_at(widget, x).await;
+        for pressed in [true, false] {
+            self.call("NotifyPointerButton", Some(&(272i32, pressed).to_variant()))
+                .await;
+        }
+        wait(150).await;
+    }
+
+    /// Moves the pointer over `widget`, `x` from its left (or its middle).
+    pub async fn point_at(&self, widget: &gtk::Widget, x: Option<f32>) {
         let root = widget.root().expect("a widget on screen");
         // Only a maximized window's coordinates are the screen's, and
         // maximizing takes a moment.
@@ -231,11 +275,6 @@ impl RemoteInput {
         }
         window.remove_controller(&motion);
         wait(50).await;
-        for pressed in [true, false] {
-            self.call("NotifyPointerButton", Some(&(272i32, pressed).to_variant()))
-                .await;
-        }
-        wait(150).await;
     }
 
     /// Presses and releases the key with X keysym `keysym`.

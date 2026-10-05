@@ -1115,12 +1115,254 @@ fn labels(menu: &gtk::gio::MenuModel) -> Vec<String> {
         .collect()
 }
 
-fn add_property_row(view: &igneous_editor::NoteView) -> Option<adw::ActionRow> {
-    find_widget(view.upcast_ref(), &|w| {
-        w.downcast_ref::<adw::ActionRow>()
-            .is_some_and(|row| row.title() == "Add Property")
+fn add_property_row(view: &igneous_editor::NoteView) -> Option<gtk::ListBoxRow> {
+    find_widget(view.upcast_ref(), &|w| w.has_css_class("add-property")).and_downcast()
+}
+
+/// Every widget under `root` that `f` picks, in order.
+fn find_widgets(root: &gtk::Widget, f: &dyn Fn(&gtk::Widget) -> bool) -> Vec<gtk::Widget> {
+    let mut found = Vec::new();
+    let mut stack = vec![root.clone()];
+    while let Some(widget) = stack.pop() {
+        if f(&widget) {
+            found.push(widget.clone());
+        }
+        let mut child = widget.last_child();
+        while let Some(c) = child {
+            child = c.prev_sibling();
+            stack.push(c);
+        }
+    }
+    found
+}
+
+/// The row of the property `key`.
+fn property_row(view: &igneous_editor::NoteView, key: &str) -> Option<gtk::Widget> {
+    find_widgets(view.upcast_ref(), &|w| w.has_css_class("property"))
+        .into_iter()
+        .find(|row| {
+            find_widget(row, &|w| w.has_css_class("property-key"))
+                .is_some_and(|k| k.tooltip_text().as_deref() == Some(key))
+        })
+}
+
+/// Properties are a name and its icon, a separator, then the value. The
+/// name's menu sets the type and the icon (the same in every note), a
+/// remove button shows over the name, and values save as the field is left.
+#[gtk::test]
+async fn properties_are_names_beside_values() {
+    let dir = vault(Some(100));
+    let props = "---\ntitle: A Plan\nstatus: draft\ntags:\n  - idea\npriority: 3\n---\nBody.\n";
+    std::fs::write(dir.path().join("Props.md"), props).unwrap();
+    std::fs::write(
+        dir.path().join("Other.md"),
+        "---\nstatus: done\n---\nOther.\n",
+    )
+    .unwrap();
+    let window = open(&dir);
+    window.maximize();
+    window.open_path(&p("Other.md"), false);
+    let other = window.selected_note().unwrap();
+    window.open_path(&p("Props.md"), true);
+    let note = window.selected_note().unwrap();
+    let view = note.view();
+    assert!(
+        until(3000, || property_row(&view, "priority")
+            .is_some_and(|r| r.is_mapped()))
+        .await
+    );
+
+    // One line each, with the separators in a column.
+    let root: gtk::Widget = window.clone().upcast();
+    let separators: Vec<f32> = find_widgets(view.upcast_ref(), &|w| {
+        w.has_css_class("property-separator")
     })
-    .and_downcast()
+    .iter()
+    .map(|s| s.compute_bounds(&root).unwrap().x())
+    .collect();
+    assert_eq!(separators.len(), 4);
+    assert!(
+        separators.iter().all(|x| (x - separators[0]).abs() < 0.5),
+        "{separators:?}"
+    );
+    for key in ["title", "status", "tags", "priority"] {
+        let height = property_row(&view, key).unwrap().height();
+        assert!(height < 46, "{key} is {height}px tall");
+    }
+
+    // Leaving a value's field saves it.
+    let title = find_widget(&property_row(&view, "title").unwrap(), &|w| {
+        w.is::<gtk::Entry>()
+    })
+    .and_downcast::<gtk::Entry>()
+    .unwrap();
+    title.grab_focus();
+    title.set_text("A Better Plan");
+    view.grab_focus();
+    assert!(
+        until(1000, || note.text().contains("title: A Better Plan\n")).await,
+        "{:?}",
+        note.text()
+    );
+
+    // The remove button shows while the pointer is over a name.
+    assert!(
+        until(2000, || property_row(&view, "priority")
+            .is_some_and(|r| r.is_mapped()))
+        .await
+    );
+    let input = RemoteInput::new().await;
+    let row = property_row(&view, "priority").unwrap();
+    let name = find_widget(&row, &|w| w.has_css_class("property-name")).unwrap();
+    let remove = find_widget(&row, &|w| w.has_css_class("property-remove")).unwrap();
+    let hidden = darkest_in(&remove);
+    assert!(
+        hidden < 40,
+        "the remove button shows before hovering ({hidden})"
+    );
+    input.point_at(&name, Some(30.0)).await;
+    assert!(
+        until(1000, || darkest_in(&remove) > 150).await,
+        "{}",
+        darkest_in(&remove)
+    );
+    input.click(&remove, None).await;
+    assert!(
+        until(1000, || !note.text().contains("priority")).await,
+        "{:?}",
+        note.text()
+    );
+
+    // The type comes from the name's menu.
+    assert!(
+        until(2000, || property_row(&view, "status")
+            .is_some_and(|r| r.is_mapped()))
+        .await
+    );
+    let name = find_widget(&property_row(&view, "status").unwrap(), &|w| {
+        w.has_css_class("property-name")
+    })
+    .unwrap();
+    WidgetExt::activate_action(&name, "prop.kind", Some(&"checkbox".to_variant())).unwrap();
+    assert!(
+        until(2000, || property_row(&view, "status").is_some_and(|row| {
+            find_widget(&row, &|w| w.is::<gtk::CheckButton>()).is_some()
+        }))
+        .await
+    );
+
+    // So does the icon, which every note then shows.
+    let icon_of = |view: &igneous_editor::NoteView| {
+        property_row(view, "status").and_then(|row| {
+            find_widget(&row, &|w| w.is::<gtk::Image>())
+                .and_downcast::<gtk::Image>()
+                .and_then(|i| i.icon_name())
+                .map(|n| n.to_string())
+        })
+    };
+    let checkbox = icon_of(&view).unwrap();
+    let name = find_widget(&property_row(&view, "status").unwrap(), &|w| {
+        w.has_css_class("property-name")
+    })
+    .unwrap();
+    WidgetExt::activate_action(&name, "prop.icon", None).unwrap();
+    let picker = || find_widget(&root, &|w| w.is::<adw::Dialog>()).and_downcast::<adw::Dialog>();
+    assert!(until(2000, || picker().is_some()).await);
+    let search = find_widget(picker().unwrap().upcast_ref(), &|w| {
+        w.is::<gtk::SearchEntry>()
+    })
+    .and_downcast::<gtk::SearchEntry>()
+    .unwrap();
+    search.set_text("starred");
+    wait(400).await;
+    search.emit_activate();
+    assert!(
+        until(2000, || icon_of(&view)
+            .is_some_and(|i| i != checkbox && i.contains("starred")))
+        .await,
+        "{:?}",
+        icon_of(&view)
+    );
+    let chosen = icon_of(&view).unwrap();
+    let saved = std::fs::read_to_string(dir.path().join(".igneous/properties.json")).unwrap();
+    assert!(
+        saved.contains(&format!("\"status\": \"{chosen}\"")),
+        "{saved}"
+    );
+    assert!(
+        until(2000, || icon_of(&other.view()).as_ref() == Some(&chosen)).await,
+        "{:?}",
+        icon_of(&other.view())
+    );
+    note.discard();
+    other.discard();
+    window.close();
+}
+
+/// New Property… goes back to Add Property on Escape, or when the user
+/// clicks elsewhere, and won't add a name the note already has.
+#[gtk::test]
+async fn new_property_goes_back_when_left() {
+    let dir = vault(Some(100));
+    std::fs::write(
+        dir.path().join("Plain.md"),
+        "---\nstatus: draft\n---\nSome text.\n",
+    )
+    .unwrap();
+    let window = open(&dir);
+    window.maximize();
+    window.open_path(&p("Plain.md"), false);
+    let note = window.selected_note().unwrap();
+    let view = note.view();
+    assert!(
+        until(3000, || add_property_row(&view)
+            .is_some_and(|r| r.is_mapped()))
+        .await
+    );
+    let input = RemoteInput::new().await;
+    let field = |view: &igneous_editor::NoteView| {
+        add_property_row(view).and_then(|row| {
+            find_widget(row.upcast_ref(), &|w| w.is::<gtk::Stack>())
+                .and_downcast::<gtk::Stack>()
+                .and_then(|stack| stack.visible_child_name())
+                .map(|n| n.to_string())
+        })
+    };
+
+    // Clicking the note.
+    let row = add_property_row(&view).unwrap();
+    WidgetExt::activate_action(&row, "property.new", None).unwrap();
+    assert_eq!(field(&view).as_deref(), Some("new"));
+    wait(200).await;
+    input.type_text("draft").await;
+    input.click(view.upcast_ref(), Some(40.0)).await;
+    assert!(
+        until(1000, || field(&view).as_deref() == Some("add")).await,
+        "{:?}",
+        field(&view)
+    );
+    assert_eq!(note.text(), "---\nstatus: draft\n---\nSome text.\n");
+
+    // Escape.
+    let row = add_property_row(&view).unwrap();
+    WidgetExt::activate_action(&row, "property.new", None).unwrap();
+    wait(200).await;
+    input.key(0xff1b).await;
+    assert!(until(1000, || field(&view).as_deref() == Some("add")).await);
+
+    // A name the note has stays in the field, rather than clearing it.
+    let row = add_property_row(&view).unwrap();
+    WidgetExt::activate_action(&row, "property.new", None).unwrap();
+    wait(200).await;
+    input.type_text("status").await;
+    input.enter().await;
+    let entry = find_widget(row.upcast_ref(), &|w| w.is::<gtk::Entry>())
+        .and_downcast::<gtk::Entry>()
+        .unwrap();
+    assert!(entry.has_css_class("error"));
+    assert_eq!(note.text(), "---\nstatus: draft\n---\nSome text.\n");
+    note.discard();
+    window.close();
 }
 
 /// Add Property, clicked: a menu of the vault's property names, then New

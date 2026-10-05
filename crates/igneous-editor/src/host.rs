@@ -108,6 +108,15 @@ pub trait Host {
     /// `key` has just been made a property of a note.
     fn add_property_name(&self, _key: &str) {}
 
+    /// The icon chosen for the property `key`, shown in place of its
+    /// type's wherever it appears.
+    fn property_icon(&self, _key: &str) -> Option<String> {
+        None
+    }
+
+    /// Lets the user choose the icon for the property `key`.
+    fn choose_property_icon(&self, _key: &str) {}
+
     /// Rescans the vault and remakes [`property_names`](Self::property_names)
     /// from the names its notes use now.
     fn refresh_property_names(&self) {}

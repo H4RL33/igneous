@@ -159,10 +159,7 @@ impl Host for NoteHost {
     }
 
     fn property_kind(&self, key: &str) -> Option<PropertyKind> {
-        let window = self.window()?;
-        let properties = window.index().properties();
-        let info = properties.iter().find(|p| p.key == key)?;
-        Some(kind_of(info.ty))
+        Some(kind_of(self.window()?.index().property_type(key)?))
     }
 
     fn set_property_kind(&self, key: &str, kind: PropertyKind) {
@@ -185,6 +182,10 @@ impl Host for NoteHost {
             return;
         }
         window.index().set_overrides(settings.properties.types);
+        // Every open note shows the new type.
+        for note in window.notes() {
+            note.view().refresh_properties();
+        }
     }
 
     fn save_attachment(&self, name: &str, bytes: &[u8]) -> Option<String> {
@@ -219,6 +220,20 @@ impl Host for NoteHost {
     fn add_property_name(&self, key: &str) {
         if let Some(window) = self.window() {
             window.property_names().add(key);
+        }
+    }
+
+    fn property_icon(&self, key: &str) -> Option<String> {
+        let window = self.window()?;
+        let icon = window.property_names().icon(key)?;
+        gtk::IconTheme::for_display(&WidgetExt::display(&window))
+            .has_icon(&icon)
+            .then_some(icon)
+    }
+
+    fn choose_property_icon(&self, key: &str) {
+        if let Some(window) = self.window() {
+            window.property_icon_dialog(key.to_owned());
         }
     }
 

@@ -67,8 +67,64 @@ textview.igneous-note .card {
   background: none;
 }
 
+/* Properties: each name, a short separator, then its value. */
 .properties row.property {
-  min-height: 36px;
+  min-height: 38px;
+  padding: 0 6px;
+}
+
+.properties .property-key > button {
+  min-height: 28px;
+  padding: 2px 8px;
+}
+
+.properties .property-key > button label,
+.properties .property-value button label {
+  font-weight: normal;
+}
+
+.properties .property-separator {
+  margin: 10px 8px 10px 2px;
+}
+
+/* Values all start the same distance from the separator. */
+.properties entry.property-value {
+  min-height: 28px;
+  padding-left: 8px;
+}
+
+.properties menubutton.property-value > button {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.properties checkbutton.property-value {
+  margin-left: 6px;
+}
+
+.properties .property-value .property-pill:first-child {
+  margin-left: 8px;
+}
+
+/* New Property's field sits where Add Property's label was. */
+.properties .add-property-stack entry {
+  min-height: 28px;
+  margin: 4px 4px 4px -8px;
+  padding-left: 8px;
+}
+
+/* Remove shows while the pointer is over the name, or it has the focus. */
+.properties .property-remove {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+}
+
+.properties .property-name:hover .property-remove,
+.properties .property-name:focus-within .property-remove {
+  opacity: 1;
 }
 
 /* Bases. */
