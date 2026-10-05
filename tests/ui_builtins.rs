@@ -260,7 +260,7 @@ async fn screenshot() {
         .visible_dialog()
         .and_downcast::<adw::PreferencesDialog>()
     {
-        prefs.set_visible_page_name("notes");
+        prefs.set_visible_page_name("plugins");
     }
     wait(800).await;
     save_png(window.upcast_ref(), &out.replace(".png", "-prefs.png"));

@@ -183,7 +183,7 @@ impl SyncButton {
             lines.push(format!("Last synced {}", relative_time(time)));
         }
         if !settings.enabled {
-            lines.push("Automatic sync is off for this vault (Preferences → Sync).".to_owned());
+            lines.push("Automatic sync is off for this vault (Preferences → Plugins).".to_owned());
         }
         self.detail.set_label(&lines.join("\n"));
         let no_upstream = status.as_ref().is_some_and(|s| s.upstream.is_none())

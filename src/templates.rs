@@ -164,7 +164,7 @@ impl Window {
             return;
         }
         if self.ctx().settings.borrow().templates.folder.is_none() {
-            self.toast("Choose a templates folder in Preferences → Notes");
+            self.toast("Choose a templates folder in Preferences → Plugins");
             return;
         }
         let templates = self.templates();

@@ -117,6 +117,17 @@ async fn preferences_round_trip_lint_json() {
     WidgetExt::activate_action(&window, "win.preferences", None).unwrap();
     wait(300).await;
     let prefs = preferences(&window);
+    // The rules are on a page of their own, opened from the Linter section.
+    descendants(prefs.upcast_ref())
+        .into_iter()
+        .find_map(|w| {
+            w.downcast::<adw::ActionRow>()
+                .ok()
+                .filter(|r| r.title() == "Rules")
+        })
+        .expect("a Rules row")
+        .emit_by_name::<()>("activated", &[]);
+    wait(300).await;
     let widgets = descendants(prefs.upcast_ref());
     let switch = |title: &str| {
         widgets
@@ -231,7 +242,7 @@ async fn lint_screenshot() {
     if let Some(page) = descendants(prefs.upcast_ref()).into_iter().find_map(|w| {
         w.downcast::<adw::PreferencesPage>()
             .ok()
-            .filter(|p| p.title() == "Linter")
+            .filter(|p| p.title() == "Plugins")
     }) {
         prefs.set_visible_page(&page);
     }

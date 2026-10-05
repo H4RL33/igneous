@@ -1,13 +1,17 @@
-//! The Preferences dialog: Appearance (the editor theme) and Sync (Git).
+//! The Preferences dialog: Editor (the theme, fonts and typing), Files &
+//! Links, and Plugins (daily notes, templates, Git sync and the linter).
+//! Typing searches every setting.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 use adw::{prelude::*, subclass::prelude::*};
 use gtk::{gio, glib};
-use igneous_core::settings::{GitSettings, SyncMethod};
-use igneous_editor::theme::Origin;
+use igneous_editor::theme::{Origin, Theme};
 
 use crate::window::Window;
+
+/// Themes shown before "Show All Themes" (two rows of three).
+const FEW_THEMES: i32 = 6;
 
 mod imp {
     use super::*;
@@ -16,13 +20,24 @@ mod imp {
     #[template(resource = "/dev/h4rl3y/igneous/preferences.ui")]
     pub struct Preferences {
         #[template_child]
+        pub editor_page: TemplateChild<adw::PreferencesPage>,
+        #[template_child]
         pub themes_box: TemplateChild<gtk::FlowBox>,
+        #[template_child]
+        pub show_all_themes: TemplateChild<gtk::ToggleButton>,
+        #[template_child]
+        pub show_all_content: TemplateChild<adw::ButtonContent>,
         #[template_child]
         pub problems_group: TemplateChild<adw::PreferencesGroup>,
         #[template_child]
         pub problems_list: TemplateChild<gtk::ListBox>,
         pub window: glib::WeakRef<Window>,
         pub dark_handler: RefCell<Option<glib::SignalHandlerId>>,
+        /// The theme cards' colours (see `fill_themes`).
+        pub card_css: RefCell<Option<gtk::CssProvider>>,
+        /// The id of the theme in use.
+        pub current: RefCell<String>,
+        pub theme_count: Cell<i32>,
     }
 
     #[glib::object_subclass]
@@ -48,6 +63,12 @@ mod imp {
             if let Some(handler) = self.dark_handler.take() {
                 adw::StyleManager::default().disconnect(handler);
             }
+            if let Some(css) = self.card_css.take() {
+                gtk::style_context_remove_provider_for_display(
+                    &WidgetExt::display(&*self.obj()),
+                    &css,
+                );
+            }
         }
     }
 
@@ -65,9 +86,13 @@ glib::wrapper! {
 impl Preferences {
     pub fn new(window: &Window) -> Self {
         let prefs: Self = glib::Object::new();
-        prefs.imp().window.set(Some(window));
-        // Pick up theme files added since the window opened.
+        let imp = prefs.imp();
+        imp.window.set(Some(window));
+        let dialog: &adw::PreferencesDialog = prefs.upcast_ref();
+
+        // Editor: the theme first, then text and typing.
         window.reload_themes();
+        prefs.set_up_theme_cards();
         prefs.fill_themes();
         let weak = prefs.downgrade();
         let handler = adw::StyleManager::default().connect_dark_notify(move |_| {
@@ -75,172 +100,82 @@ impl Preferences {
                 prefs.fill_themes();
             }
         });
-        prefs.imp().dark_handler.replace(Some(handler));
-        prefs.add(&crate::editor_prefs::page(window, prefs.upcast_ref()));
-        prefs.add(&crate::files_prefs::page(window, prefs.upcast_ref()));
-        prefs.add(&crate::notes_prefs::page(window, prefs.upcast_ref()));
-        prefs.add_sync_page(window);
-        prefs.add(&crate::lint_prefs::page(window, prefs.upcast_ref()));
+        imp.dark_handler.replace(Some(handler));
+        crate::editor_prefs::fill(&imp.editor_page, window, dialog);
+
+        // The notes settings are split between Files & Links and Plugins.
+        let notes = crate::notes_prefs::groups(window, dialog);
+        prefs.add(&crate::files_prefs::page(
+            window,
+            dialog,
+            &[&notes.opening, &notes.recovery],
+        ));
+
+        let plugins = adw::PreferencesPage::builder()
+            .name("plugins")
+            .title("Plugins")
+            .icon_name("application-x-addon-symbolic")
+            .build();
+        plugins.add(&notes.daily);
+        plugins.add(&notes.templates);
+        plugins.add(&crate::sync_prefs::group(window, dialog));
+        plugins.add(&crate::lint_prefs::group(window, dialog));
+        prefs.add(&plugins);
         prefs
     }
 
-    // --- Sync ----------------------------------------------------------------
+    // --- Theme cards ---------------------------------------------------------
 
-    fn add_sync_page(&self, window: &Window) {
-        let page = adw::PreferencesPage::builder()
-            .title("Sync")
-            .icon_name("view-refresh-symbolic")
-            .build();
-        self.add(&page);
-        let sync = window.sync().clone();
-        if !sync.is_available() {
-            let group = adw::PreferencesGroup::builder()
-                .title("Git Sync")
-                .description(
-                    "This vault isn’t in a Git repository. To sync it, make it one \
-                     (for example with “git init” and “git remote add”), then reopen the vault.",
-                )
-                .build();
-            page.add(&group);
-            return;
-        }
-        let settings = sync.settings();
-
-        let schedule = adw::PreferencesGroup::builder()
-            .title("Automatic Sync")
-            .description("Saved with this vault, in .igneous/git.json")
-            .build();
-        let enabled = adw::SwitchRow::builder()
-            .title("Sync Automatically")
-            .subtitle("Commit, pull and push on a schedule")
-            .active(settings.enabled)
-            .build();
-        let sync_every = minutes_row(
-            "Commit and Sync Every",
-            "Minutes; 0 turns it off",
-            settings.sync_interval,
-        );
-        let pull_every = minutes_row(
-            "Pull Every",
-            "Minutes; 0 turns it off",
-            settings.pull_interval,
-        );
-        let pull_on_open = adw::SwitchRow::builder()
-            .title("Pull When the Vault Opens")
-            .active(settings.pull_on_open)
-            .build();
-        for row in [&sync_every, &pull_every] {
-            enabled
-                .bind_property("active", row, "sensitive")
-                .sync_create()
-                .build();
-        }
-        enabled
-            .bind_property("active", &pull_on_open, "sensitive")
-            .sync_create()
-            .build();
-        schedule.add(&enabled);
-        schedule.add(&sync_every);
-        schedule.add(&pull_every);
-        schedule.add(&pull_on_open);
-
-        let how = adw::PreferencesGroup::builder().title("Syncing").build();
-        let method = adw::ComboRow::builder()
-            .title("Bring In Remote Changes By")
-            .model(&gtk::StringList::new(&["Merging", "Rebasing"]))
-            .selected(match settings.method {
-                SyncMethod::Merge => 0,
-                SyncMethod::Rebase => 1,
-            })
-            .build();
-        let push = adw::SwitchRow::builder()
-            .title("Push After Committing")
-            .active(settings.push)
-            .build();
-        how.add(&method);
-        how.add(&push);
-
-        let messages = adw::PreferencesGroup::builder()
-            .title("Commit Messages")
-            .description(
-                "{{date}}, {{hostname}}, {{numFiles}} and {{files}} are filled in. \
-                 The date format uses Moment.js tokens, such as YYYY-MM-DD HH:mm.",
-            )
-            .build();
-        let message = adw::EntryRow::builder()
-            .title("Message")
-            .text(&settings.commit_message)
-            .show_apply_button(true)
-            .build();
-        let date_format = adw::EntryRow::builder()
-            .title("Date Format")
-            .text(&settings.date_format)
-            .show_apply_button(true)
-            .build();
-        messages.add(&message);
-        messages.add(&date_format);
-
-        for group in [&schedule, &how, &messages] {
-            page.add(group);
-        }
-
-        // Every change is saved straight away.
-        let save = {
-            let prefs = self.downgrade();
-            let sync = sync.clone();
-            let enabled = enabled.clone();
-            let sync_every = sync_every.clone();
-            let pull_every = pull_every.clone();
-            let pull_on_open = pull_on_open.clone();
-            let method = method.clone();
-            let push = push.clone();
-            let message = message.clone();
-            let date_format = date_format.clone();
-            std::rc::Rc::new(move || {
-                let mut settings: GitSettings = sync.settings();
-                settings.enabled = enabled.is_active();
-                settings.sync_interval = sync_every.value() as u32;
-                settings.pull_interval = pull_every.value() as u32;
-                settings.pull_on_open = pull_on_open.is_active();
-                settings.method = if method.selected() == 1 {
-                    SyncMethod::Rebase
-                } else {
-                    SyncMethod::Merge
-                };
-                settings.push = push.is_active();
-                let text = message.text();
-                if !text.trim().is_empty() {
-                    settings.commit_message = text.to_string();
-                }
-                let text = date_format.text();
-                if !text.trim().is_empty() {
-                    settings.date_format = text.to_string();
-                }
-                if settings == sync.settings() {
+    fn set_up_theme_cards(&self) {
+        let imp = self.imp();
+        imp.themes_box.connect_child_activated(glib::clone!(
+            #[weak(rename_to = prefs)]
+            self,
+            move |_, child| {
+                let Some(window) = prefs.imp().window.upgrade() else {
                     return;
-                }
-                if let (Err(e), Some(prefs)) = (sync.set_settings(settings), prefs.upgrade()) {
-                    prefs.add_toast(adw::Toast::new(&e));
-                }
-            })
-        };
-        for row in [&enabled, &pull_on_open, &push] {
-            let save = save.clone();
-            row.connect_active_notify(move |_| save());
-        }
-        for row in [&sync_every, &pull_every] {
-            let save = save.clone();
-            row.connect_value_notify(move |_| save());
-        }
-        let on_method = save.clone();
-        method.connect_selected_notify(move |_| on_method());
-        for row in [&message, &date_format] {
-            let save = save.clone();
-            row.connect_apply(move |_| save());
-        }
+                };
+                let id = child.widget_name();
+                window.set_editor_theme(&id);
+                prefs.mark_selected(&id);
+            }
+        ));
+        imp.themes_box.set_filter_func(glib::clone!(
+            #[weak(rename_to = prefs)]
+            self,
+            #[upgrade_or]
+            true,
+            move |child| {
+                let imp = prefs.imp();
+                imp.show_all_themes.is_active()
+                    || child.index() < FEW_THEMES
+                    || child.widget_name() == imp.current.borrow().as_str()
+            }
+        ));
+        imp.show_all_themes.connect_active_notify(glib::clone!(
+            #[weak(rename_to = prefs)]
+            self,
+            move |button| {
+                let imp = prefs.imp();
+                let all = button.is_active();
+                imp.show_all_content.set_label(if all {
+                    "Show Fewer Themes"
+                } else {
+                    "Show All Themes"
+                });
+                imp.show_all_content.set_icon_name(if all {
+                    "pan-up-symbolic"
+                } else {
+                    "pan-down-symbolic"
+                });
+                imp.themes_box.invalidate_filter();
+            }
+        ));
     }
 
-    /// One preview per theme, in the variant for the current light/dark style.
+    /// One card per theme, in the variant for the current light or dark
+    /// style, as Ptyxis shows its palettes: the theme's name and a sample
+    /// in its colours, with a row of its accents.
     fn fill_themes(&self) {
         let imp = self.imp();
         let Some(window) = imp.window.upgrade() else {
@@ -248,45 +183,36 @@ impl Preferences {
         };
         imp.themes_box.remove_all();
         let catalog = window.themes();
-        let current = window.editor_theme_id();
+        imp.current.replace(window.editor_theme_id());
         let dark = adw::StyleManager::default().is_dark();
-        for theme in catalog.themes() {
-            let Some(scheme) = igneous_editor::style_scheme(theme, dark) else {
-                continue;
-            };
-            let preview = sourceview::StyleSchemePreview::new(&scheme);
-            preview.set_widget_name(&theme.id);
-            preview.set_selected(theme.id == current);
-            let origin = match theme.origin {
-                Origin::BuiltIn => "Built in",
-                Origin::User => "From your themes folder",
-                Origin::Vault => "From this vault",
-            };
-            preview.set_tooltip_text(Some(&format!("{} · {origin}", theme.display_name(dark))));
-            let id = theme.id.clone();
-            preview.connect_activate(glib::clone!(
-                #[weak(rename_to = prefs)]
-                self,
-                #[weak]
-                window,
-                move |_| {
-                    window.set_editor_theme(&id);
-                    prefs.mark_selected(&id);
-                }
-            ));
-            let label = gtk::Label::builder()
-                .label(theme.display_name(dark))
-                .ellipsize(gtk::pango::EllipsizeMode::End)
-                .css_classes(["caption"])
-                .build();
-            let tile = gtk::Box::builder()
-                .orientation(gtk::Orientation::Vertical)
-                .spacing(6)
-                .build();
-            tile.append(&preview);
-            tile.append(&label);
-            imp.themes_box.append(&tile);
+        let accent = igneous_editor::system_accent();
+        let family = window
+            .text_style()
+            .family
+            .unwrap_or_else(|| crate::window::desktop_font(true).0);
+        let mut css = String::new();
+        for (i, theme) in catalog.themes().iter().enumerate() {
+            css.push_str(&card_css(i, theme, dark, accent));
+            imp.themes_box
+                .append(&self.theme_card(i, theme, dark, &family));
         }
+        // The cards' colours come from the themes, so they're CSS of their own.
+        let provider = gtk::CssProvider::new();
+        provider.load_from_string(&css);
+        let display = WidgetExt::display(self);
+        if let Some(old) = imp.card_css.replace(Some(provider.clone())) {
+            gtk::style_context_remove_provider_for_display(&display, &old);
+        }
+        gtk::style_context_add_provider_for_display(
+            &display,
+            &provider,
+            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
+        let count = catalog.themes().len() as i32;
+        imp.theme_count.set(count);
+        imp.show_all_themes.set_visible(count > FEW_THEMES);
+        let current = imp.current.borrow().clone();
+        self.mark_selected(&current);
 
         imp.problems_list.remove_all();
         imp.problems_group.set_visible(!catalog.errors.is_empty());
@@ -301,19 +227,107 @@ impl Preferences {
         }
     }
 
-    fn mark_selected(&self, id: &str) {
-        let mut child = self.imp().themes_box.first_child();
-        while let Some(flow_child) = child {
-            if let Some(preview) = flow_child
-                .downcast_ref::<gtk::FlowBoxChild>()
-                .and_then(|c| c.child())
-                .and_then(|tile| tile.first_child())
-                .and_downcast::<sourceview::StyleSchemePreview>()
-            {
-                preview.set_selected(preview.widget_name() == id);
-            }
-            child = flow_child.next_sibling();
+    fn theme_card(
+        &self,
+        index: usize,
+        theme: &Theme,
+        dark: bool,
+        family: &str,
+    ) -> gtk::FlowBoxChild {
+        let name = theme.display_name(dark);
+        let title = gtk::Label::builder()
+            .label(&name)
+            .xalign(0.0)
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .max_width_chars(14)
+            .css_classes(["theme-card-title"])
+            .build();
+        let sample = gtk::Label::builder()
+            .label("The quick brown fox jumps over the lazy dog")
+            .xalign(0.0)
+            .yalign(0.0)
+            .wrap(true)
+            // FlowBox fits as many cards on a line as their natural widths
+            // allow: keep them narrow enough for three.
+            .width_chars(10)
+            .max_width_chars(14)
+            .lines(3)
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .css_classes(["theme-card-sample"])
+            .build();
+        let attributes = gtk::pango::AttrList::new();
+        attributes.insert(gtk::pango::AttrString::new_family(family));
+        sample.set_attributes(Some(&attributes));
+        let swatches = gtk::Box::builder()
+            .spacing(4)
+            .css_classes(["theme-card-swatches"])
+            .build();
+        for _ in SWATCHES {
+            swatches.append(&gtk::Box::builder().css_classes(["theme-swatch"]).build());
         }
+        let card = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(8)
+            .css_classes(["theme-card", &format!("theme-card-{index}")])
+            .build();
+        card.append(&title);
+        card.append(&sample);
+        card.append(&swatches);
+
+        let check = gtk::Image::builder()
+            .icon_name("object-select-symbolic")
+            .halign(gtk::Align::End)
+            .valign(gtk::Align::Start)
+            .margin_top(10)
+            .margin_end(10)
+            .css_classes(["theme-card-check"])
+            .visible(false)
+            .build();
+        let overlay = gtk::Overlay::builder().child(&card).build();
+        overlay.add_overlay(&check);
+
+        let origin = match theme.origin {
+            Origin::BuiltIn => "Built in",
+            Origin::User => "From your themes folder",
+            Origin::Vault => "From this vault",
+        };
+        let child = gtk::FlowBoxChild::builder()
+            .child(&overlay)
+            .name(&theme.id)
+            .tooltip_text(format!("{name} · {origin}"))
+            .build();
+        child.update_property(&[gtk::accessible::Property::Label(&name)]);
+        child
+    }
+
+    fn mark_selected(&self, id: &str) {
+        let imp = self.imp();
+        imp.current.replace(id.to_owned());
+        let mut child = imp.themes_box.first_child();
+        while let Some(widget) = child {
+            if let Some(flow_child) = widget.downcast_ref::<gtk::FlowBoxChild>() {
+                let selected = flow_child.widget_name() == id;
+                if let Some(overlay) = flow_child.child().and_downcast::<gtk::Overlay>() {
+                    if let Some(card) = overlay.child() {
+                        if selected {
+                            card.add_css_class("selected");
+                        } else {
+                            card.remove_css_class("selected");
+                        }
+                    }
+                    if let Some(check) = overlay.last_child().filter(|c| c.is::<gtk::Image>()) {
+                        check.set_visible(selected);
+                    }
+                }
+                flow_child.update_state(&[gtk::accessible::State::Checked(if selected {
+                    gtk::AccessibleTristate::True
+                } else {
+                    gtk::AccessibleTristate::False
+                })]);
+            }
+            child = widget.next_sibling();
+        }
+        imp.themes_box.invalidate_filter();
     }
 
     fn open_themes_folder(&self) {
@@ -331,10 +345,31 @@ impl Preferences {
     }
 }
 
-fn minutes_row(title: &str, subtitle: &str, value: u32) -> adw::SpinRow {
-    let row = adw::SpinRow::with_range(0.0, 1440.0, 1.0);
-    row.set_title(title);
-    row.set_subtitle(subtitle);
-    row.set_value(f64::from(value));
-    row
+/// The accents shown under each sample, in Ptyxis's order.
+const SWATCHES: [&str; 6] = ["red", "green", "yellow", "blue", "purple", "cyan"];
+
+/// A card's colours: the theme's background and text, and its accents.
+fn card_css(
+    index: usize,
+    theme: &Theme,
+    dark: bool,
+    accent: igneous_editor::theme::Color,
+) -> String {
+    let variant = theme.variant(dark);
+    let role = |name: &str| variant.role(name, accent).to_string();
+    let mut css = format!(
+        ".theme-card-{index} {{ background-color: {}; color: {}; }}\n",
+        role("background"),
+        role("text"),
+    );
+    for (n, name) in SWATCHES.iter().enumerate() {
+        let colour = variant
+            .palette(name)
+            .map_or_else(|| role("text"), |c| c.to_string());
+        css.push_str(&format!(
+            ".theme-card-{index} .theme-swatch:nth-child({}) {{ background-color: {colour}; }}\n",
+            n + 1
+        ));
+    }
+    css
 }

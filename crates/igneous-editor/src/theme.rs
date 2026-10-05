@@ -220,9 +220,16 @@ pub struct Variant {
     /// E.g. "Mocha" for Catppuccin's dark variant.
     pub name: Option<String>,
     roles: BTreeMap<&'static str, Paint>,
+    /// Every [`PALETTE`] colour, with defaults filled in.
+    palette: BTreeMap<&'static str, Color>,
 }
 
 impl Variant {
+    /// A [`PALETTE`] colour, such as "red" or "background".
+    pub fn palette(&self, key: &str) -> Option<Color> {
+        self.palette.get(key).copied()
+    }
+
     /// The colour for `role`. Unknown roles fall back to the text colour.
     pub fn role(&self, role: &str, accent: Color) -> Color {
         self.roles
@@ -456,6 +463,7 @@ fn parse_variant(
             .and_then(toml::Value::as_str)
             .map(str::to_owned),
         roles,
+        palette,
     })
 }
 

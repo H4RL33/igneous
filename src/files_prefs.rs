@@ -1,6 +1,7 @@
 //! Preferences → Files & Links: where new notes and attachments go, how
-//! deleting works, link updates on rename, and excluded files. Saved with
-//! the vault in `vault.json`.
+//! deleting works, link updates on rename, and excluded files (plus the
+//! startup note and file recovery, from `notes_prefs`). Saved with the
+//! vault in `vault.json`.
 
 use std::rc::Rc;
 
@@ -60,8 +61,14 @@ impl LocationRows {
     }
 }
 
-pub fn page(window: &Window, dialog: &adw::PreferencesDialog) -> adw::PreferencesPage {
+/// The page, with `more` (the startup note and file recovery) at the end.
+pub fn page(
+    window: &Window,
+    dialog: &adw::PreferencesDialog,
+    more: &[&adw::PreferencesGroup],
+) -> adw::PreferencesPage {
     let page = adw::PreferencesPage::builder()
+        .name("files")
         .title("Files & Links")
         .icon_name("folder-symbolic")
         .build();
@@ -125,6 +132,9 @@ pub fn page(window: &Window, dialog: &adw::PreferencesDialog) -> adw::Preference
 
     for group in [&creating, &deleting, &links, &hiding] {
         page.add(group);
+    }
+    for group in more {
+        page.add(*group);
     }
 
     let notes = Rc::new(notes);

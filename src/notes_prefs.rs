@@ -1,5 +1,6 @@
-//! Preferences → Notes: daily notes, templates, the startup note and file
-//! recovery. Saved with the vault in `vault.json`.
+//! Daily notes and templates (Preferences → Plugins), and the startup note
+//! and file recovery (Preferences → Files & Links). Saved with the vault in
+//! `vault.json`.
 
 use std::rc::Rc;
 
@@ -35,12 +36,15 @@ fn optional_path(text: &str) -> Result<Option<VaultPath>, ()> {
     VaultPath::new(&with_ext).map(Some).map_err(|_| ())
 }
 
-pub fn page(window: &Window, dialog: &adw::PreferencesDialog) -> adw::PreferencesPage {
-    let page = adw::PreferencesPage::builder()
-        .name("notes")
-        .title("Notes")
-        .icon_name("x-office-calendar-symbolic")
-        .build();
+/// The groups, for the pages they belong on.
+pub struct Groups {
+    pub daily: adw::PreferencesGroup,
+    pub templates: adw::PreferencesGroup,
+    pub opening: adw::PreferencesGroup,
+    pub recovery: adw::PreferencesGroup,
+}
+
+pub fn groups(window: &Window, dialog: &adw::PreferencesDialog) -> Groups {
     let settings = window.ctx().settings.borrow().clone();
 
     let entry = |title: &str, text: &str| {
@@ -131,10 +135,6 @@ pub fn page(window: &Window, dialog: &adw::PreferencesDialog) -> adw::Preference
     recovery.add(&interval);
     recovery.add(&keep);
     recovery.add(&size);
-
-    for group in [&daily, &templates, &opening, &recovery] {
-        page.add(group);
-    }
 
     let save = {
         let window = window.downgrade();
@@ -234,7 +234,12 @@ pub fn page(window: &Window, dialog: &adw::PreferencesDialog) -> adw::Preference
         let save = save.clone();
         row.connect_value_notify(move |_| save());
     }
-    page
+    Groups {
+        daily,
+        templates,
+        opening,
+        recovery,
+    }
 }
 
 #[cfg(test)]

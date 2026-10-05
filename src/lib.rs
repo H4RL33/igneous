@@ -33,6 +33,7 @@ mod search_pane;
 mod snapshots;
 mod sync;
 mod sync_button;
+mod sync_prefs;
 mod tags_pane;
 mod templates;
 mod text_page;

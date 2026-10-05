@@ -2,33 +2,57 @@ using Gtk 4.0;
 using Adw 1;
 
 template $IgneousPreferences: Adw.PreferencesDialog {
-  Adw.PreferencesPage {
-    title: _("Appearance");
-    icon-name: "preferences-desktop-appearance-symbolic";
+  search-enabled: true;
+
+  Adw.PreferencesPage editor_page {
+    name: "editor";
+    title: _("Editor");
+    icon-name: "document-edit-symbolic";
 
     Adw.PreferencesGroup {
-      title: _("Editor Theme");
-      description: _("Saved with this vault. Vaults that haven't chosen a theme use the one picked most recently.");
+      title: _("Theme");
+      description: _("Saved with this vault");
 
       [header-suffix]
-      Button {
-        icon-name: "folder-open-symbolic";
-        tooltip-text: _("Open Themes Folder");
+      Box {
+        spacing: 6;
         valign: center;
-        action-name: "prefs.open-themes-folder";
 
-        styles [
-          "flat",
-        ]
+        ToggleButton show_all_themes {
+          visible: false;
+
+          child: Adw.ButtonContent show_all_content {
+            icon-name: "pan-down-symbolic";
+            label: _("Show All Themes");
+          };
+
+          styles [
+            "flat",
+          ]
+        }
+
+        Button {
+          icon-name: "folder-open-symbolic";
+          tooltip-text: _("Open Themes Folder");
+          action-name: "prefs.open-themes-folder";
+
+          styles [
+            "flat",
+          ]
+        }
       }
 
       FlowBox themes_box {
         selection-mode: none;
         homogeneous: true;
         min-children-per-line: 2;
-        max-children-per-line: 4;
+        max-children-per-line: 3;
         row-spacing: 12;
         column-spacing: 12;
+
+        styles [
+          "theme-cards",
+        ]
       }
     }
 

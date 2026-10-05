@@ -1,7 +1,7 @@
-//! The Linter page in Preferences: when to lint, whether to underline
-//! problems, each rule with its options, and what to ignore. Every change is
-//! saved to `.igneous/lint.json` straight away, keeping keys Igneous doesn't
-//! know.
+//! Preferences → Plugins → Linter: when to lint, whether to underline
+//! problems, what to ignore, and (on a page of their own) each rule with its
+//! options. Every change is saved to `.igneous/lint.json` straight away,
+//! keeping keys Igneous doesn't know.
 
 use std::rc::Rc;
 
@@ -15,29 +15,43 @@ use crate::window::Window;
 
 type Update = Rc<dyn Fn(&dyn Fn(&mut LintSettings))>;
 
-pub fn page(window: &Window, dialog: &adw::PreferencesDialog) -> adw::PreferencesPage {
-    let page = adw::PreferencesPage::builder()
-        .title("Linter")
-        .icon_name("tools-check-spelling-symbolic")
-        .build();
+pub fn group(window: &Window, dialog: &adw::PreferencesDialog) -> adw::PreferencesGroup {
     let lint = window.lint().clone();
+    let group = adw::PreferencesGroup::builder().title("Linter").build();
     if let Some(error) = lint.error() {
-        page.add(
-            &adw::PreferencesGroup::builder()
-                .title("Linter")
-                .description(format!(
-                    "lint.json can’t be read, so these settings can’t be changed until it’s \
-                     fixed or removed: {error}"
-                ))
-                .build(),
-        );
-        return page;
+        group.set_description(Some(&format!(
+            "lint.json can’t be read, so these settings can’t be changed until it’s fixed or \
+             removed: {error}"
+        )));
+        return group;
     }
+    group.set_description(Some(
+        "Saved with this vault, in .igneous/lint.json. The rules are obsidian-linter’s. \
+         Ctrl+Alt+L lints the open note.",
+    ));
+
+    let rules_row = adw::ActionRow::builder()
+        .title("Rules")
+        .activatable(true)
+        .build();
+    rules_row.add_suffix(&gtk::Image::from_icon_name("go-next-symbolic"));
+    let count_rules = {
+        let rules_row = rules_row.clone();
+        move |settings: &LintSettings| {
+            let all = igneous_lint::rules::all();
+            let on = all
+                .iter()
+                .filter(|r| settings.rules.get(r.id()).is_some_and(|c| c.enabled))
+                .count();
+            rules_row.set_subtitle(&format!("{on} of {} on", all.len()));
+        }
+    };
 
     // Saves a change, then rechecks open notes.
     let update: Update = {
         let window = window.downgrade();
         let dialog = dialog.downgrade();
+        let count_rules = count_rules.clone();
         Rc::new(move |change: &dyn Fn(&mut LintSettings)| {
             let Some(window) = window.upgrade() else {
                 return;
@@ -47,6 +61,7 @@ pub fn page(window: &Window, dialog: &adw::PreferencesDialog) -> adw::Preference
             if settings == window.lint().settings() {
                 return;
             }
+            count_rules(&settings);
             match window.lint().set_settings(settings) {
                 Ok(()) => window.refresh_problems(),
                 Err(e) => {
@@ -58,14 +73,8 @@ pub fn page(window: &Window, dialog: &adw::PreferencesDialog) -> adw::Preference
         })
     };
     let settings = lint.settings();
+    count_rules(&settings);
 
-    let general = adw::PreferencesGroup::builder()
-        .title("Linting")
-        .description(
-            "Saved with this vault, in .igneous/lint.json. The rules are obsidian-linter’s. \
-             Ctrl+Alt+L lints the open note.",
-        )
-        .build();
     let on_save = adw::SwitchRow::builder()
         .title("Lint When Saving")
         .subtitle(
@@ -92,10 +101,12 @@ pub fn page(window: &Window, dialog: &adw::PreferencesDialog) -> adw::Preference
         let active = row.is_active();
         update_underline(&|s| crate::lint::set_show_problems(s, active));
     });
-    general.add(&on_save);
-    general.add(&underline);
-    page.add(&general);
+    group.add(&on_save);
+    group.add(&underline);
+    group.add(&rules_row);
 
+    // The rules, on a page of their own.
+    let rules_page = adw::PreferencesPage::new();
     let linter = lint.linter();
     for (category, title) in [
         (Category::Yaml, "YAML Rules"),
@@ -112,27 +123,37 @@ pub fn page(window: &Window, dialog: &adw::PreferencesDialog) -> adw::Preference
         if rules.is_empty() {
             continue;
         }
-        let group = adw::PreferencesGroup::builder().title(title).build();
+        let rule_group = adw::PreferencesGroup::builder().title(title).build();
         for rule in rules {
             let enabled = settings.rules.get(rule.id()).is_some_and(|c| c.enabled);
             let options = linter.options_for(rule);
-            group.add(&rule_row(rule, enabled, &options, &update));
+            rule_group.add(&rule_row(rule, enabled, &options, &update));
         }
-        page.add(&group);
+        rules_page.add(&rule_group);
     }
-
-    let ignored = adw::PreferencesGroup::builder()
-        .title("Ignored")
-        .description("Notes the linter leaves alone. Separate entries with commas.")
+    let toolbar = adw::ToolbarView::builder().content(&rules_page).build();
+    toolbar.add_top_bar(&adw::HeaderBar::new());
+    let subpage = adw::NavigationPage::builder()
+        .title("Linter Rules")
+        .tag("lint-rules")
+        .child(&toolbar)
         .build();
+    let dialog_weak = dialog.downgrade();
+    rules_row.connect_activated(move |_| {
+        if let Some(dialog) = dialog_weak.upgrade() {
+            dialog.push_subpage(&subpage);
+        }
+    });
+
     for (title, current, folders) in [
-        ("Folders", settings.ignore_folders.join(", "), true),
-        ("Files", settings.ignore_files.join(", "), false),
+        ("Ignored Folders", settings.ignore_folders.join(", "), true),
+        ("Ignored Files", settings.ignore_files.join(", "), false),
     ] {
         let row = adw::EntryRow::builder()
             .title(title)
             .text(current)
             .show_apply_button(true)
+            .tooltip_text("Notes the linter leaves alone. Separate entries with commas.")
             .build();
         let update = update.clone();
         row.connect_apply(move |row| {
@@ -145,10 +166,9 @@ pub fn page(window: &Window, dialog: &adw::PreferencesDialog) -> adw::Preference
                 }
             });
         });
-        ignored.add(&row);
+        group.add(&row);
     }
-    page.add(&ignored);
-    page
+    group
 }
 
 /// A rule's row: a switch, and its options when it has any.

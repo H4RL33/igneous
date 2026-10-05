@@ -84,7 +84,7 @@ Igneous changes only the property you edit, leaving the rest of the frontmatter,
 - **Bookmarks** collect notes, folders, headings and searches in the sidebar's Bookmarks page; **Bookmark Note** in the main menu or command palette adds or removes the open note. They follow renames.
 - **A startup note** can open whenever the vault does.
 
-**Preferences → Notes** sets the daily notes folder, date format and template, the templates folder, and the startup note.
+**Preferences → Plugins** sets the daily notes folder, date format and template, and the templates folder; **Preferences → Files & Links** sets the startup note and file recovery.
 
 ### File recovery
 
@@ -127,7 +127,7 @@ The **Aa** button makes a search case-sensitive.
 If the vault is a Git repository, Igneous can keep it in sync, like obsidian-git:
 
 - **The sync button** in the header bar shows the state. Its popover has **Sync Now** (Ctrl+Alt+S), **Pull**, and **Publish Branch** for branches without an upstream.
-- **Automatic sync** is in **Preferences → Sync**, off by default. When on, Igneous commits, pulls and pushes every few minutes, and can pull when the vault opens. The commit message template can use `{{date}}`, `{{hostname}}`, `{{numFiles}}` and `{{files}}`.
+- **Automatic sync** is in **Preferences → Plugins**, off by default. When on, Igneous commits, pulls and pushes every few minutes, and can pull when the vault opens. The commit message template can use `{{date}}`, `{{hostname}}`, `{{numFiles}}` and `{{files}}`.
 - **The Changes pane** lists changed files: stage, unstage, discard or view the diff of each, and commit with a message. **History** in a file's menu lists its commits and opens old versions.
 - **Conflicts** pause syncing. A banner says how many files are affected, and each one shows a bar with **Keep Mine**, **Keep Theirs** and **Keep Both**. When they're resolved, mark them in the Changes pane and commit; syncing resumes.
 
@@ -137,7 +137,7 @@ Vaults encrypted with git-crypt aren't supported yet. Igneous refuses to sync th
 
 ## Linting
 
-The linter follows obsidian-linter's rules, with the same names. Turn rules on and set their options in **Preferences → Linter**.
+The linter follows obsidian-linter's rules, with the same names. Turn rules on and set their options in **Preferences → Plugins → Linter → Rules**.
 
 - **Lint Note** (Ctrl+Alt+L) fixes the open note in one undoable step.
 - **Lint Folder** (in a folder's menu) and **Lint Vault** (the file tree's empty area, or the command palette) ask first, and suggest committing beforehand if the vault uses Git.
@@ -146,12 +146,14 @@ The linter follows obsidian-linter's rules, with the same names. Turn rules on a
 
 Code, math, frontmatter (except for YAML rules) and anything between `<!-- linter-disable -->` and `<!-- linter-enable -->` are never changed.
 
-## Appearance and editing preferences
+## Preferences
 
-- **Appearance:** the editor theme. Themes come with Igneous, from your themes folder, or from the vault. See [themes.md](themes.md) for writing your own.
+Start typing in Preferences to search every setting.
+
 - **Editor:**
+  - the theme, shown as cards in its colours. Themes come with Igneous, from your themes folder, or from the vault. See [themes.md](themes.md) for writing your own;
+  - the font, base size and monospace font (headings and other sized text scale from the base size), and the text width when readable line length is on;
   - the mode notes open in;
-  - readable line length;
   - line numbers in Source mode;
   - Vim keybindings (`:w` saves);
   - spell checking;
@@ -161,7 +163,9 @@ Code, math, frontmatter (except for YAML rules) and anything between `<!-- linte
   - where new notes and attachments go;
   - whether deleting uses the Trash or the vault's `.trash` folder;
   - updating links on rename;
-  - files to hide.
+  - files to hide;
+  - the startup note and file recovery.
+- **Plugins:** daily notes, templates, Git sync and the linter, each in a section of its own.
 
 ## Keyboard shortcuts
 
@@ -191,7 +195,7 @@ Code, math, frontmatter (except for YAML rules) and anything between `<!-- linte
 
 | Where | What |
 |---|---|
-| `<vault>/.igneous/` | the vault's settings, open tabs, appearance, Git, linter, graph, bookmarks and its own themes |
+| `<vault>/.igneous/` | the vault's settings, open tabs, appearance and fonts, Git, linter, graph, bookmarks and its own themes |
 | `~/.cache/igneous/` | the index and generated style schemes; safe to delete |
 | `~/.local/share/igneous/themes/` | your own editor themes |
 | `~/.local/share/igneous/snapshots/` | file recovery snapshots |
