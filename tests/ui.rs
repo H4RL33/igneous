@@ -1031,3 +1031,69 @@ async fn text_style_applies_to_notes() {
     );
     window.close();
 }
+
+/// Presses Enter in a note's editor, through its key handler.
+fn press_enter(view: &igneous_editor::NoteView) -> bool {
+    use gtk::glib::translate::IntoGlib;
+    let keys = view
+        .observe_controllers()
+        .into_iter()
+        .filter_map(|c| c.ok().and_downcast::<gtk::EventControllerKey>())
+        .find(|k| k.propagation_phase() == gtk::PropagationPhase::Capture)
+        .expect("the editor's key handler");
+    keys.emit_by_name::<bool>(
+        "key-pressed",
+        &[
+            &gtk::gdk::Key::Return.into_glib(),
+            &36u32,
+            &gtk::gdk::ModifierType::empty(),
+        ],
+    )
+}
+
+/// `---` and Enter at the top of a note starts its properties, as in
+/// Obsidian, instead of drawing a horizontal rule.
+#[gtk::test]
+async fn three_dashes_start_properties() {
+    let dir = vault(Some(100));
+    std::fs::write(dir.path().join("Blank.md"), "").unwrap();
+    let window = open(&dir);
+    window.open_path(&p("Blank.md"), false);
+    let note = window.selected_note().unwrap();
+    let view = note.view();
+    // Typing comes after opening has settled (opening puts the focus in
+    // the text once the tab has switched).
+    wait(100).await;
+    // An empty note offers Add Property before it has any properties.
+    assert!(view.overlay_kinds().contains(&"properties".to_owned()));
+    view.buffer().insert_at_cursor("---");
+    assert!(press_enter(&view), "Enter was left to the text view");
+    assert_eq!(note.text(), "---\n---\n");
+    // The properties show, with Add Property focused for a name.
+    assert!(
+        until(3000, || {
+            gtk::prelude::GtkWindowExt::focus(&window)
+                .and_then(|f| f.ancestor(adw::EntryRow::static_type()))
+                .and_downcast::<adw::EntryRow>()
+                .is_some_and(|row| row.title() == "Add Property")
+        })
+        .await,
+        "Add Property didn't take the focus"
+    );
+    assert!(view.overlay_kinds().contains(&"properties".to_owned()));
+    // One undo brings the dashes back.
+    view.buffer().undo();
+    assert_eq!(note.text(), "---");
+
+    // Not in Source mode, and not below the first line.
+    note.view().set_mode(igneous_editor::Mode::Source);
+    let buffer = view.buffer();
+    buffer.place_cursor(&buffer.end_iter());
+    assert!(!press_enter(&view));
+    note.view().set_mode(igneous_editor::Mode::Live);
+    buffer.set_text("Text\n---");
+    buffer.place_cursor(&buffer.end_iter());
+    assert!(!view.start_properties_for_test());
+    note.discard();
+    window.close();
+}

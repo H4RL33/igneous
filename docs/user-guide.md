@@ -74,7 +74,7 @@ The fields at the top of a note are its YAML frontmatter:
 
 - text, lists (tags and aliases too), numbers, checkboxes, and dates with a calendar;
 - each field's menu changes its type for the whole vault, or removes it;
-- **Add Property** adds one.
+- **Add Property** adds one. It's there on every note in Live Preview, including notes without properties yet; adding one creates the frontmatter. Typing `---` and Enter on a note's first line does the same, as in Obsidian.
 
 Igneous changes only the property you edit, leaving the rest of the frontmatter, comments included, exactly as written.
 

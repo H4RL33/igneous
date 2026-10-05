@@ -176,6 +176,11 @@ impl NoteView {
         let options = self.input_options();
         match key {
             gdk::Key::Return | gdk::Key::KP_Enter
+                if modifiers.is_empty() && self.start_properties() =>
+            {
+                glib::Propagation::Stop
+            }
+            gdk::Key::Return | gdk::Key::KP_Enter
                 if modifiers.is_empty() && options.smart_lists =>
             {
                 self.enter()
@@ -193,6 +198,44 @@ impl NoteView {
                 _ => glib::Propagation::Proceed,
             },
         }
+    }
+
+    /// `---` and Enter on a note's first line starts its properties, as in
+    /// Obsidian: the closing `---` is added, the cursor moves below it and
+    /// Add Property takes the focus. Undo puts the `---` back. Returns
+    /// whether it did.
+    pub(crate) fn start_properties(&self) -> bool {
+        if self.mode() != Mode::Live {
+            return false;
+        }
+        let buffer = self.buffer();
+        if buffer.has_selection() {
+            return false;
+        }
+        let cursor = buffer.iter_at_mark(&buffer.get_insert());
+        if cursor.line() != 0 || !cursor.ends_line() {
+            return false;
+        }
+        let (_, line) = self.line_before_cursor();
+        let text = buffer.text(&buffer.start_iter(), &buffer.end_iter(), true);
+        if line.trim_end() != "---" || igneous_markdown::frontmatter::detect(&text).is_some() {
+            return false;
+        }
+        buffer.begin_user_action();
+        let mut at = cursor;
+        let closing = if at.is_end() { "\n---\n" } else { "\n---" };
+        buffer.insert(&mut at, closing);
+        let body = buffer.iter_at_line(2).unwrap_or_else(|| buffer.end_iter());
+        buffer.place_cursor(&body);
+        buffer.end_user_action();
+        self.imp().focus_new_property.set(true);
+        true
+    }
+
+    /// [`NoteView::start_properties`], for tests.
+    #[doc(hidden)]
+    pub fn start_properties_for_test(&self) -> bool {
+        self.start_properties()
     }
 
     fn line_before_cursor(&self) -> (gtk::TextIter, String) {

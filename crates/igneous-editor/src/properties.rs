@@ -146,11 +146,16 @@ impl NoteView {
     }
 
     /// The properties header for `fm`.
-    pub(crate) fn properties_widget_for(&self, fm: &Frontmatter) -> gtk::Widget {
+    /// The properties, or with no frontmatter just Add Property.
+    pub(crate) fn properties_widget_for(&self, fm: Option<&Frontmatter>) -> gtk::Widget {
         let list = gtk::ListBox::builder()
             .selection_mode(gtk::SelectionMode::None)
             .css_classes(["boxed-list", "properties"])
             .build();
+        let Some(fm) = fm else {
+            list.append(&self.add_property_row());
+            return list.upcast();
+        };
         if let Some(error) = &fm.error {
             let row = adw::ActionRow::builder()
                 .title("The properties aren’t valid YAML")

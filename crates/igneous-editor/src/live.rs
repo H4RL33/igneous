@@ -592,6 +592,11 @@ impl NoteView {
                     };
                     desired.push((kind, start, span.range.end, false));
                 }
+                // A note without properties still offers Add Property, so
+                // there's always somewhere to add one.
+                if st.mode == Mode::Live && st.doc.frontmatter.is_none() {
+                    desired.push((OverlayKind::Properties, 0, 0, false));
+                }
                 if st.mentions.is_some() {
                     let end = st.text.len();
                     let start = igneous_markdown::text::line_start(&st.text, end.saturating_sub(1));
@@ -706,6 +711,7 @@ impl NoteView {
     fn reserve_space(&self, st: &mut State) {
         let buffer = self.buffer();
         let fm_end = st.doc.frontmatter.as_ref().map(|f| f.range.end);
+        let mut empty_note_space = 0;
         let mut spacing: HashMap<String, Vec<Range<usize>>> = HashMap::new();
         let text_len = st.text.len();
         for overlay in &st.overlays {
@@ -743,6 +749,9 @@ impl NoteView {
                             .entry(format!("space:above-{}", height + 20))
                             .or_default()
                             .push(line_of(body));
+                    } else if fm_end.is_none() {
+                        // An empty note has no line to put space above.
+                        empty_note_space = height + 20;
                     }
                 }
                 OverlayKind::Checkbox
@@ -759,7 +768,19 @@ impl NoteView {
             .collect();
         keys.sort_unstable();
         keys.dedup();
+        self.set_empty_note_space(empty_note_space);
         self.apply(st, spacing, &keys);
+    }
+
+    /// Room above an empty note's first line for its properties, as extra
+    /// top margin (there's no text to put space above).
+    fn set_empty_note_space(&self, space: i32) {
+        let imp = self.imp();
+        if imp.empty_note_space.replace(space) == space {
+            return;
+        }
+        let base = *imp.base_top_margin.get_or_init(|| self.top_margin());
+        self.set_top_margin(base + space);
     }
 
     /// The height a block widget needs, laid out as its slot will.
@@ -1299,10 +1320,7 @@ impl NoteView {
     }
 
     fn properties_widget(&self, st: &State) -> gtk::Widget {
-        match &st.doc.frontmatter {
-            Some(fm) => self.properties_widget_for(fm),
-            None => gtk::Box::new(gtk::Orientation::Vertical, 0).upcast(),
-        }
+        self.properties_widget_for(st.doc.frontmatter.as_ref())
     }
 
     // --- per-frame work -----------------------------------------------------------
@@ -1324,10 +1342,38 @@ impl NoteView {
     /// Attaches widgets near the visible area, detaches the rest, and moves
     /// them to follow their lines.
     fn place_overlays(&self) {
+        if self.imp().focus_new_property.get() {
+            self.focus_new_property();
+        }
         if self.place_overlays_inner() {
             // A widget's height changed (text views lay out lazily): move the
             // text below it, between frames.
             self.schedule_relayout();
+        }
+    }
+
+    /// Focuses the properties' Add Property entry, once they show.
+    fn focus_new_property(&self) {
+        let widget = {
+            let Ok(st) = self.imp().state.try_borrow() else {
+                return;
+            };
+            st.overlays
+                .iter()
+                .filter(|o| o.kind == OverlayKind::Properties && o.slot.borrow().is_some())
+                .find_map(|o| o.widget.borrow().clone())
+        };
+        let Some(widget) = widget else {
+            return;
+        };
+        // Until it's on screen it can't take the focus: try again next frame.
+        if let Some(entry) = find_descendant(&widget, &|w| {
+            w.downcast_ref::<adw::EntryRow>()
+                .is_some_and(|row| adw::prelude::PreferencesRowExt::title(row) == "Add Property")
+        }) && entry.is_mapped()
+            && entry.grab_focus()
+        {
+            self.imp().focus_new_property.set(false);
         }
     }
 
@@ -1465,7 +1511,9 @@ impl NoteView {
                 OverlayKind::Properties => {
                     let body = self.iter_at(&st.lines, fm_end.unwrap_or(0));
                     let (y, _) = self.line_yrange(&body);
-                    (left, y + 4)
+                    // In an empty note, in the top margin's extra room.
+                    let space = self.imp().empty_note_space.get();
+                    (left, if space > 0 { -space } else { y } + 4)
                 }
             };
             if overlay.last_pos.get() != pos
@@ -1716,6 +1764,24 @@ fn split_row(line: &str) -> Vec<String> {
         }
     }
     cells
+}
+
+/// The first widget under `widget` that `matches`, depth first.
+fn find_descendant(
+    widget: &gtk::Widget,
+    matches: &dyn Fn(&gtk::Widget) -> bool,
+) -> Option<gtk::Widget> {
+    let mut child = widget.first_child();
+    while let Some(c) = child {
+        if matches(&c) {
+            return Some(c);
+        }
+        if let Some(found) = find_descendant(&c, matches) {
+            return Some(found);
+        }
+        child = c.next_sibling();
+    }
+    None
 }
 
 /// The corner radius of every block: code, math, callouts, tables, images

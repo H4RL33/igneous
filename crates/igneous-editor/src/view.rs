@@ -81,6 +81,13 @@ mod imp {
         pub(crate) last_width: Cell<i32>,
         /// A relayout is scheduled (see `schedule_relayout`).
         pub(crate) relayout_pending: Cell<bool>,
+        /// Add Property takes the focus once the properties show (see
+        /// `start_properties`).
+        pub(crate) focus_new_property: Cell<bool>,
+        /// Extra top margin holding an empty note's properties, and the
+        /// margin without it.
+        pub(crate) empty_note_space: Cell<i32>,
+        pub(crate) base_top_margin: OnceCell<i32>,
         pub(crate) tags: OnceCell<Tags>,
         pub(crate) state: RefCell<State>,
         pub(crate) host: RefCell<Option<Rc<dyn Host>>>,
