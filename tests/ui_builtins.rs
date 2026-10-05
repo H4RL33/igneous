@@ -228,6 +228,36 @@ async fn note_icons_are_picked_saved_and_follow_renames() {
     window.close();
 }
 
+/// The picker opens at the note's icon. Scrolling the grid before it was
+/// laid out left it blank, at the top.
+#[gtk::test]
+async fn the_icon_picker_opens_at_the_current_icon() {
+    let dir = vault(None);
+    let window = open(&dir);
+    window.open_path(&p("Home.md"), false);
+    window.set_note_icon(&p("Home.md"), Some("starred-symbolic"));
+    WidgetExt::activate_action(&window, "win.set-icon", None).unwrap();
+    let dialog = window.visible_dialog().unwrap();
+    let grid = find(dialog.upcast_ref(), &|w| w.is::<gtk::GridView>())
+        .and_downcast::<gtk::GridView>()
+        .unwrap();
+    let selected = grid
+        .model()
+        .and_downcast::<gtk::SingleSelection>()
+        .unwrap()
+        .selected_item()
+        .and_downcast::<gtk::StringObject>()
+        .map(|s| s.string().to_string());
+    assert_eq!(selected.as_deref(), Some("starred-symbolic"));
+    let adjustment = grid.vadjustment().unwrap();
+    assert!(
+        until(3000, || adjustment.value() > 0.0).await,
+        "the picker didn't scroll to the icon"
+    );
+    dialog.close();
+    window.close();
+}
+
 #[gtk::test]
 async fn unreadable_icons_are_never_overwritten() {
     let dir = vault(None);

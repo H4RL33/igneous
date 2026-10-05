@@ -305,14 +305,12 @@ impl Window {
             .css_classes(["compact"])
             .build();
         let stack = gtk::Stack::new();
-        stack.add_named(
-            &gtk::ScrolledWindow::builder()
-                .hscrollbar_policy(gtk::PolicyType::Never)
-                .vexpand(true)
-                .child(&grid)
-                .build(),
-            Some("icons"),
-        );
+        let scrolled = gtk::ScrolledWindow::builder()
+            .hscrollbar_policy(gtk::PolicyType::Never)
+            .vexpand(true)
+            .child(&grid)
+            .build();
+        stack.add_named(&scrolled, Some("icons"));
         stack.add_named(&empty, Some("empty"));
 
         let reset = gtk::Button::builder()
@@ -413,13 +411,33 @@ impl Window {
         }
         entry.add_controller(keys);
 
-        // Start at the icon the note has now.
+        // Start at the icon the note has now. Scrolling a grid before it has
+        // a size, or while it's being laid out, leaves it blank: scroll once
+        // it has one, between frames.
         if let Some(current) = &current
             && let Some(position) = names.iter().position(|n| *n == current.as_str())
         {
             let position = position as u32;
             selection.set_selected(position);
-            grid.scroll_to(position, gtk::ListScrollFlags::NONE, None);
+            let adjustment = scrolled.vadjustment();
+            let handler: Rc<RefCell<Option<glib::SignalHandlerId>>> = Rc::default();
+            let grid = grid.downgrade();
+            let once = handler.clone();
+            let id = adjustment.connect_changed(move |adjustment| {
+                if adjustment.page_size() <= 0.0 {
+                    return;
+                }
+                if let Some(id) = once.take() {
+                    adjustment.disconnect(id);
+                }
+                let grid = grid.clone();
+                glib::idle_add_local_once(move || {
+                    if let Some(grid) = grid.upgrade() {
+                        grid.scroll_to(position, gtk::ListScrollFlags::NONE, None);
+                    }
+                });
+            });
+            handler.replace(Some(id));
         }
         dialog.present(Some(self));
         entry.grab_focus();
