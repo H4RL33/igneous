@@ -2,6 +2,8 @@
 
 A GNOME app for reading and editing Markdown vaults, including Obsidian vaults.
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/R8W528F1KI)
+
 ## Building
 
 You need Rust (stable), GTK 4.22, libadwaita 1.9, GtkSourceView 5.18+, Meson and `blueprint-compiler` 0.22+. Without a system `blueprint-compiler`, fetch the pinned copy:
