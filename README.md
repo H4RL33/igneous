@@ -1,6 +1,17 @@
 # Igneous
 
-A GNOME app for reading and editing Markdown vaults, including Obsidian vaults.
+An alternative frontend to [Obsidian.md](https://obsidian.md/) for GNOME. Supports:
+
+- Backlinks
+- Graph View
+- Frontmatter & Querying
+- Markdown Linting
+- Git Sync
+- Daily Notes
+
+I built Igneous so that I could spend time in my Obsidian Vault while still enjoying the GNOME/Libadwaita design and UX that I love so much.
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/R8W528F1KI)
 
 ## Building
 
