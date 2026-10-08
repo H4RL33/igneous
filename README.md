@@ -1,6 +1,6 @@
 # Igneous
 
-An alternative [Obsidian.md](https://obsidian.md/) frontend for GNOME. Supports:
+An alternative frontend to [Obsidian.md](https://obsidian.md/) for GNOME. Supports:
 
 - Backlinks
 - Graph View
