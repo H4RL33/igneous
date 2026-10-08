@@ -2,8 +2,6 @@
 
 A GNOME app for reading and editing Markdown vaults, including Obsidian vaults.
 
-Igneous is approaching its first release: Live Preview editing, links and backlinks, properties, search, Bases, the graph, Git sync and the linter all work. [`docs/user-guide.md`](docs/user-guide.md) explains how to use it.
-
 ## Building
 
 You need Rust (stable), GTK 4.22, libadwaita 1.9, GtkSourceView 5.18+, Meson and `blueprint-compiler` 0.22+. Without a system `blueprint-compiler`, fetch the pinned copy:
