@@ -9,7 +9,7 @@ An alternative [Obsidian.md](https://obsidian.md/) frontend for GNOME. Supports:
 - Git Sync
 - Daily Notes
 
-I built Igneous so that I could spend time in my Obsidian Vault while still enjoying the GNOME/Libadwaita design and UX that I enjoy so much.
+I built Igneous so that I could spend time in my Obsidian Vault while still enjoying the GNOME/Libadwaita design and UX that I love so much.
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/R8W528F1KI)
 
