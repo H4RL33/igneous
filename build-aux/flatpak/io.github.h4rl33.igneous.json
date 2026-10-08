@@ -1,0 +1,98 @@
+{
+    "app-id": "io.github.h4rl33.igneous",
+    "runtime": "org.gnome.Platform",
+    "runtime-version": "51",
+    "sdk": "org.gnome.Sdk",
+    "sdk-extensions": [
+        "org.freedesktop.Sdk.Extension.rust-stable"
+    ],
+    "command": "igneous",
+    "separate-locales": false,
+    "finish-args": [
+        "--share=ipc",
+        "--socket=wayland",
+        "--socket=fallback-x11",
+        "--device=dri",
+        "--share=network"
+    ],
+    "build-options": {
+        "append-path": "/usr/lib/sdk/rust-stable/bin"
+    },
+    "cleanup": [
+        "/include",
+        "/lib/pkgconfig",
+        "/share/pkgconfig",
+        "*.a",
+        "/share/man"
+    ],
+    "modules": [
+        {
+            "name": "blueprint-compiler",
+            "buildsystem": "meson",
+            "cleanup": [
+                "*"
+            ],
+            "sources": [
+                {
+                    "type": "archive",
+                    "url": "https://download.gnome.org/sources/blueprint-compiler/0.22/blueprint-compiler-0.22.2.tar.xz",
+                    "sha256": "231d72efbac931c235ac3e022fe94982095c20d88721d9a8dcf60152f2017e07"
+                }
+            ]
+        },
+        {
+            "name": "git",
+            "buildsystem": "autotools",
+            "config-opts": [
+                "--without-tcltk"
+            ],
+            "post-install": [
+                "for f in /app/libexec/git-core/* /app/bin/*; do eu-strip \"$f\" 2>/dev/null || true; done"
+            ],
+            "cleanup": [
+                "/share/gitweb",
+                "/share/doc/git*"
+            ],
+            "sources": [
+                {
+                    "type": "archive",
+                    "url": "https://www.kernel.org/pub/software/scm/git/git-2.56.0.tar.xz",
+                    "sha256": "26c56c296b38c0695b26fa95f475f1d01704d2d38e73465ca30b0b2f5dc789d3"
+                }
+            ]
+        },
+        {
+            "name": "libspelling",
+            "buildsystem": "meson",
+            "config-opts": [
+                "-Ddocs=false",
+                "-Dvapi=false"
+            ],
+            "sources": [
+                {
+                    "type": "archive",
+                    "url": "https://download.gnome.org/sources/libspelling/0.4/libspelling-0.4.10.tar.xz",
+                    "sha256": "56e3f01a3a18b575beea4c34349f99cdaba316e1f7c271b1231f7bcf5d9af73b"
+                }
+            ]
+        },
+        {
+            "name": "igneous",
+            "buildsystem": "meson",
+            "build-options": {
+                "env": {
+                    "CARGO_HOME": "/run/build/igneous/cargo",
+                    "CARGO_NET_OFFLINE": "true"
+                }
+            },
+            "sources": [
+                {
+                    "type": "git",
+                    "url": "https://github.com/H4RL33/igneous.git",
+                    "branch": "main"
+                },
+                "cargo-sources.json"
+            ]
+        }
+    ]
+}
